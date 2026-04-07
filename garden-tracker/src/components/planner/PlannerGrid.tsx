@@ -17,6 +17,7 @@ import { defaultCalendarStart, todayWeekIndex } from '@/src/utils/dateUtils';
 import ColumnHeader from './ColumnHeader';
 import RowHeader from './RowHeader';
 import GridBody from './GridBody';
+import TaskOverlay from './TaskOverlay';
 
 // ---------------------------------------------------------------------------
 // Component
@@ -197,6 +198,14 @@ export default function PlannerGrid() {
                   viewHeight={viewDims.height}
                 />
               </Animated.View>
+
+              {/* SVG overlay — task lines + today cursor, sits on top of cells */}
+              <TaskOverlay
+                calendarStart={calendarStart}
+                totalHeight={totalHeight}
+                scrollX={scrollX}
+                scrollY={scrollY}
+              />
             </View>
           </GestureDetector>
         </View>
