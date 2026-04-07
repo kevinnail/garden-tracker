@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(update-config)",
+      "Bash(mkdir -p \"C:/Users/kevin/.claude/commands\")",
+      "Bash(mv \"C:/Users/kevin/.claude/skills/commit-each.md\" \"C:/Users/kevin/.claude/commands/commit-each.md\")"
+    ]
+  }
+}
