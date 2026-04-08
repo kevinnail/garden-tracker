@@ -3,7 +3,9 @@
     "allow": [
       "Skill(update-config)",
       "Bash(mkdir -p \"C:/Users/kevin/.claude/commands\")",
-      "Bash(mv \"C:/Users/kevin/.claude/skills/commit-each.md\" \"C:/Users/kevin/.claude/commands/commit-each.md\")"
+      "Bash(mv \"C:/Users/kevin/.claude/skills/commit-each.md\" \"C:/Users/kevin/.claude/commands/commit-each.md\")",
+      "mcp__plugin_context7_context7__resolve-library-id",
+      "mcp__plugin_context7_context7__query-docs"
     ]
   }
 }
