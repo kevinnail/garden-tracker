@@ -8,6 +8,22 @@ import {
   EMPTY_CELL_COLOR,
   PLACEHOLDER_ROW_COUNT,
 } from '@/src/constants/layout';
+import { toSunday, dateToWeekIndex, todayWeekIndex } from '@/src/utils/dateUtils';
+import { getStageColorAtWeek } from '@/src/utils/stageUtils';
+import CropCell from './CropCell';
+
+// ---------------------------------------------------------------------------
+// Demo crop (Slice 3 hardcoded data — removed in Slice 5 when DB is wired)
+// ---------------------------------------------------------------------------
+
+const _today = new Date();
+const DEMO_START_DATE = toSunday(new Date(_today.getTime() - 4 * 7 * 24 * 60 * 60 * 1000));
+
+const DEMO_STAGES = [
+  { stage_name: 'Seedling',   color: '#90EE90', duration_weeks: 3 },
+  { stage_name: 'Vegetative', color: '#00CC00', duration_weeks: 6 },
+  { stage_name: 'Flowering',  color: '#007700', duration_weeks: 8 },
+];
 
 // ---------------------------------------------------------------------------
 // Component
@@ -15,73 +31,65 @@ import {
 
 interface Props {
   rowCount?: number;
-  renderScrollX: number; // current horizontal scroll offset (JS state, from PlannerGrid)
-  renderScrollY: number; // current vertical scroll offset (JS state, from PlannerGrid)
-  viewWidth: number;     // visible viewport width in px
-  viewHeight: number;    // visible viewport height in px
+  calendarStart: Date;
+  renderScrollX: number;
+  renderScrollY: number;
+  viewWidth: number;
+  viewHeight: number;
 }
 
-/**
- * GridBody renders the crop cell area — the part of the grid that contains
- * colored stage cells, past-week hatching, task lines, etc.
- *
- * It sits inside a large Animated.View (owned by PlannerGrid) whose dimensions
- * are TOTAL_WEEKS * CELL_WIDTH × rowCount * ROW_HEIGHT.  PlannerGrid translates
- * that Animated.View to create the scroll effect.
- *
- * GridBody itself only renders cells that fall within the visible viewport
- * (virtualization), using renderScrollX/renderScrollY to calculate the window.
- *
- * In Slice 1:  all cells are empty dark grey — just proving the grid renders.
- * In Slice 3:  CropCell is introduced with stage colors and past-week hatching.
- * In Slice 4:  TaskOverlay SVG is layered on top.
- */
 export default function GridBody({
   rowCount = PLACEHOLDER_ROW_COUNT,
+  calendarStart,
   renderScrollX,
   renderScrollY,
   viewWidth,
   viewHeight,
 }: Props) {
 
-  // ── Compute the visible window (with a 1-cell buffer on every edge) ──────
+  const cropStartWeek = dateToWeekIndex(calendarStart, DEMO_START_DATE);
+  const todayCol      = todayWeekIndex(calendarStart);
+
   const colStart = Math.max(0, Math.floor(renderScrollX / CELL_WIDTH) - 1);
   const colEnd   = Math.min(TOTAL_WEEKS - 1, Math.ceil((renderScrollX + viewWidth)  / CELL_WIDTH) + 1);
   const rowStart = Math.max(0, Math.floor(renderScrollY / ROW_HEIGHT) - 1);
   const rowEnd   = Math.min(rowCount - 1, Math.ceil((renderScrollY + viewHeight) / ROW_HEIGHT) + 1);
 
-  // ── Render only the visible cells ─────────────────────────────────────────
   const cells: React.ReactElement[] = [];
 
   for (let row = rowStart; row <= rowEnd; row++) {
     for (let col = colStart; col <= colEnd; col++) {
-      cells.push(
-        <View
-          key={`${row}-${col}`}
-          style={[
-            styles.cell,
-            {
-              left: col * CELL_WIDTH,
-              top:  row * ROW_HEIGHT,
-            },
-          ]}
-        />,
-      );
+      const isPast = col < todayCol;
+
+      if (row === 0) {
+        // Demo crop row — use CropCell with stage color
+        const stageColor = getStageColorAtWeek(DEMO_STAGES, col, cropStartWeek);
+        cells.push(
+          <CropCell
+            key={`${row}-${col}`}
+            stageColor={stageColor}
+            isPast={isPast}
+            style={{ left: col * CELL_WIDTH, top: row * ROW_HEIGHT }}
+          />,
+        );
+      } else {
+        // Placeholder rows — plain empty cell, no hatch outside crop spans
+        cells.push(
+          <View
+            key={`${row}-${col}`}
+            style={[styles.cell, { left: col * CELL_WIDTH, top: row * ROW_HEIGHT }]}
+          />,
+        );
+      }
     }
   }
 
   return <>{cells}</>;
 }
 
-// ---------------------------------------------------------------------------
-// Styles
-// ---------------------------------------------------------------------------
-
 const styles = StyleSheet.create({
   cell: {
     position: 'absolute',
-    // 1px less than full cell size — the gap shows BACKGROUND_COLOR through,
-    // creating a thin grid-line effect without explicit border rendering.
     width:  CELL_WIDTH  - 1,
     height: ROW_HEIGHT  - 1,
     backgroundColor: EMPTY_CELL_COLOR,

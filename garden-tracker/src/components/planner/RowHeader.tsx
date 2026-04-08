@@ -28,23 +28,29 @@ interface Props {
  * PlannerGrid wraps this in an Animated.View that translates vertically to
  * stay in sync with GridBody's vertical scroll.
  */
+// Demo crop for Slice 3 — removed in Slice 5 when real data is loaded
+const DEMO_ROW = { name: 'Tomato', plant_count: 6 };
+
 export default function RowHeader({ rowCount = PLACEHOLDER_ROW_COUNT }: Props) {
   return (
     <View style={[styles.container, { height: rowCount * ROW_HEIGHT }]}>
-      {Array.from({ length: rowCount }, (_, i) => (
-        <View key={i} style={styles.row}>
-          {/* Plant count cell */}
-          <View style={styles.countCell}>
-            <Text style={styles.countText}>{i + 1}</Text>
+      {Array.from({ length: rowCount }, (_, i) => {
+        const isDemo = i === 0;
+        return (
+          <View key={i} style={styles.row}>
+            <View style={styles.countCell}>
+              <Text style={[styles.countText, isDemo && styles.demoText]}>
+                {isDemo ? DEMO_ROW.plant_count : i + 1}
+              </Text>
+            </View>
+            <View style={styles.nameCell}>
+              <Text style={[styles.nameText, isDemo && styles.demoText]} numberOfLines={1}>
+                {isDemo ? DEMO_ROW.name : `Row ${i + 1}`}
+              </Text>
+            </View>
           </View>
-          {/* Crop name cell */}
-          <View style={styles.nameCell}>
-            <Text style={styles.nameText} numberOfLines={1}>
-              Row {i + 1}
-            </Text>
-          </View>
-        </View>
-      ))}
+        );
+      })}
     </View>
   );
 }
@@ -87,5 +93,8 @@ const styles = StyleSheet.create({
   nameText: {
     color: '#777',
     fontSize: 10,
+  },
+  demoText: {
+    color: '#ccc',
   },
 });

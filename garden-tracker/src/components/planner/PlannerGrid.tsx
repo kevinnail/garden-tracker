@@ -192,6 +192,7 @@ export default function PlannerGrid() {
               >
                 <GridBody
                   rowCount={rowCount}
+                  calendarStart={calendarStart}
                   renderScrollX={renderScrollX}
                   renderScrollY={renderScrollY}
                   viewWidth={viewDims.width}
