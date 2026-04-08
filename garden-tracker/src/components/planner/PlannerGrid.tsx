@@ -27,7 +27,7 @@ import GridBody from './GridBody';
 import TaskOverlay from './TaskOverlay';
 
 export default function PlannerGrid() {
-  const { top: topInset } = useSafeAreaInsets();
+  const { left: leftInset } = useSafeAreaInsets();
 
   const rows         = usePlannerStore(s => s.rows);
   const allTaskLines = usePlannerStore(s => s.allTaskLines);
@@ -113,7 +113,7 @@ export default function PlannerGrid() {
   });
 
   return (
-    <View style={[styles.root, { paddingTop: topInset }]}>
+    <View style={[styles.root, { paddingLeft: leftInset }]}>
 
       {/* ── Top row: corner + column header ── */}
       <View style={styles.headerRow}>
