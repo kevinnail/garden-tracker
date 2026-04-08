@@ -1,5 +1,16 @@
 import { getDb } from '@/src/db/database';
 import { CropInstance, CropStage, StageDefinition } from '@/src/types';
+import { formatDateKey, parseDateKey, toSunday } from '@/src/utils/dateUtils';
+
+function normalizeStartDate(startDate: string): string {
+  const strict = parseDateKey(startDate);
+  if (strict) return formatDateKey(toSunday(strict));
+
+  const loose = new Date(startDate);
+  if (!isNaN(loose.getTime())) return formatDateKey(toSunday(loose));
+
+  return formatDateKey(toSunday(new Date()));
+}
 
 export async function getCropsForSection(sectionId: number, includeArchived = false): Promise<CropInstance[]> {
   const db = await getDb();
@@ -42,9 +53,10 @@ export async function insertCropInstance(
   startDate: string
 ): Promise<number> {
   const db = await getDb();
+  const normalizedStartDate = normalizeStartDate(startDate);
   const result = await db.runAsync(
     `INSERT INTO crop_instances (section_id, name, plant_count, start_date) VALUES (?, ?, ?, ?)`,
-    sectionId, name, plantCount, startDate
+    sectionId, name, plantCount, normalizedStartDate
   );
   return result.lastInsertRowId;
 }
