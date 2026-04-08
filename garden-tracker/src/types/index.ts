@@ -94,8 +94,18 @@ export interface Note {
 export type GridRowItem =
   | { type: 'group_header';   group: LocationGroup }
   | { type: 'section_header'; section: Section; location: Location }
-  | { type: 'crop_row';       crop: CropInstance; stages: CropStage[]; tasks: Task[]; completions: TaskCompletion[] }
-  | { type: 'placeholder';    index: number }; // used in Slices 1–4 before DB is wired
+  | { type: 'crop_row';       crop: CropInstance; weekColorMap: Record<number, string>; tasks: Task[]; completions: TaskCompletion[] }
+  | { type: 'placeholder';    index: number };
+
+// Precomputed task line ready to hand directly to the SVG renderer — zero work at render time
+export interface PrecomputedTaskLine {
+  key: string;
+  x: number;
+  y1: number;
+  y2: number;
+  color: string;
+  dashed: boolean;
+}
 
 // ---------------------------------------------------------------------------
 // Input shapes for store actions (Slice 5+)
