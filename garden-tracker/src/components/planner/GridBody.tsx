@@ -6,31 +6,13 @@ import {
   ROW_HEIGHT,
   TOTAL_WEEKS,
   EMPTY_CELL_COLOR,
-  PLACEHOLDER_ROW_COUNT,
 } from '@/src/constants/layout';
-import { toSunday, dateToWeekIndex, todayWeekIndex } from '@/src/utils/dateUtils';
-import { getStageColorAtWeek } from '@/src/utils/stageUtils';
+import { todayWeekIndex } from '@/src/utils/dateUtils';
+import { GridRowItem } from '@/src/types';
 import CropCell from './CropCell';
 
-// ---------------------------------------------------------------------------
-// Demo crop (Slice 3 hardcoded data — removed in Slice 5 when DB is wired)
-// ---------------------------------------------------------------------------
-
-const _today = new Date();
-const DEMO_START_DATE = toSunday(new Date(_today.getTime() - 4 * 7 * 24 * 60 * 60 * 1000));
-
-const DEMO_STAGES = [
-  { stage_name: 'Seedling',   color: '#90EE90', duration_weeks: 3 },
-  { stage_name: 'Vegetative', color: '#00CC00', duration_weeks: 6 },
-  { stage_name: 'Flowering',  color: '#007700', duration_weeks: 8 },
-];
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
-
 interface Props {
-  rowCount?: number;
+  rows: GridRowItem[];
   calendarStart: Date;
   renderScrollX: number;
   renderScrollY: number;
@@ -39,16 +21,15 @@ interface Props {
 }
 
 export default function GridBody({
-  rowCount = PLACEHOLDER_ROW_COUNT,
+  rows,
   calendarStart,
   renderScrollX,
   renderScrollY,
   viewWidth,
   viewHeight,
 }: Props) {
-
-  const cropStartWeek = dateToWeekIndex(calendarStart, DEMO_START_DATE);
-  const todayCol      = todayWeekIndex(calendarStart);
+  const rowCount  = rows.length;
+  const todayCol  = todayWeekIndex(calendarStart);
 
   const colStart = Math.max(0, Math.floor(renderScrollX / CELL_WIDTH) - 1);
   const colEnd   = Math.min(TOTAL_WEEKS - 1, Math.ceil((renderScrollX + viewWidth)  / CELL_WIDTH) + 1);
@@ -58,27 +39,30 @@ export default function GridBody({
   const cells: React.ReactElement[] = [];
 
   for (let row = rowStart; row <= rowEnd; row++) {
+    const rowItem = rows[row];
+    const isPastRow = false; // group/section headers never get hatch
+
     for (let col = colStart; col <= colEnd; col++) {
+      const left = col * CELL_WIDTH;
+      const top  = row * ROW_HEIGHT;
       const isPast = col < todayCol;
 
-      if (row === 0) {
-        // Demo crop row — use CropCell with stage color
-        const stageColor = getStageColorAtWeek(DEMO_STAGES, col, cropStartWeek);
+      if (rowItem?.type === 'crop_row') {
+        const stageColor = rowItem.weekColorMap[col] ?? null;
         cells.push(
           <CropCell
             key={`${row}-${col}`}
             stageColor={stageColor}
             isPast={isPast}
-            style={{ left: col * CELL_WIDTH, top: row * ROW_HEIGHT }}
-          />,
+            style={{ left, top }}
+          />
         );
       } else {
-        // Placeholder rows — plain empty cell, no hatch outside crop spans
         cells.push(
           <View
             key={`${row}-${col}`}
-            style={[styles.cell, { left: col * CELL_WIDTH, top: row * ROW_HEIGHT }]}
-          />,
+            style={[styles.cell, { left, top }]}
+          />
         );
       }
     }
