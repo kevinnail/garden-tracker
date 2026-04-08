@@ -6,47 +6,61 @@ import {
   ROW_HEADER_WIDTH,
   PLANT_COUNT_WIDTH,
   CROP_NAME_WIDTH,
-  PLACEHOLDER_ROW_COUNT,
   BACKGROUND_COLOR,
 } from '@/src/constants/layout';
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
+import { GridRowItem } from '@/src/types';
 
 interface Props {
-  rowCount?: number; // Slice 1: placeholder row count. Slice 5+: real row count from store.
+  rows: GridRowItem[];
 }
 
-/**
- * RowHeader renders the frozen left panel.
- *
- * In Slice 1 this shows numbered placeholder rows.
- * From Slice 5 onward it renders group headers, section headers, and crop rows
- * driven by real data from the Zustand store.
- *
- * PlannerGrid wraps this in an Animated.View that translates vertically to
- * stay in sync with GridBody's vertical scroll.
- */
-// Demo crop for Slice 3 — removed in Slice 5 when real data is loaded
-const DEMO_ROW = { name: 'Tomato', plant_count: 6 };
-
-export default function RowHeader({ rowCount = PLACEHOLDER_ROW_COUNT }: Props) {
+export default function RowHeader({ rows }: Props) {
   return (
-    <View style={[styles.container, { height: rowCount * ROW_HEIGHT }]}>
-      {Array.from({ length: rowCount }, (_, i) => {
-        const isDemo = i === 0;
+    <View style={[styles.container, { height: rows.length * ROW_HEIGHT }]}>
+      {rows.map((item, i) => {
+        if (item.type === 'group_header') {
+          return (
+            <View key={i} style={[styles.row, styles.groupHeader]}>
+              <Text style={styles.groupText} numberOfLines={1}>
+                {item.group.name}
+              </Text>
+            </View>
+          );
+        }
+
+        if (item.type === 'section_header') {
+          return (
+            <View key={i} style={[styles.row, styles.sectionHeader]}>
+              <Text style={styles.sectionText} numberOfLines={1}>
+                {item.location.name} › {item.section.name}
+              </Text>
+            </View>
+          );
+        }
+
+        if (item.type === 'crop_row') {
+          return (
+            <View key={i} style={styles.row}>
+              <View style={styles.countCell}>
+                <Text style={styles.countText}>{item.crop.plant_count}</Text>
+              </View>
+              <View style={styles.nameCell}>
+                <Text style={styles.nameText} numberOfLines={1}>
+                  {item.crop.name}
+                </Text>
+              </View>
+            </View>
+          );
+        }
+
+        // placeholder
         return (
           <View key={i} style={styles.row}>
             <View style={styles.countCell}>
-              <Text style={[styles.countText, isDemo && styles.demoText]}>
-                {isDemo ? DEMO_ROW.plant_count : i + 1}
-              </Text>
+              <Text style={styles.countText}>{i + 1}</Text>
             </View>
             <View style={styles.nameCell}>
-              <Text style={[styles.nameText, isDemo && styles.demoText]} numberOfLines={1}>
-                {isDemo ? DEMO_ROW.name : `Row ${i + 1}`}
-              </Text>
+              <Text style={styles.placeholderText} numberOfLines={1}>—</Text>
             </View>
           </View>
         );
@@ -54,10 +68,6 @@ export default function RowHeader({ rowCount = PLACEHOLDER_ROW_COUNT }: Props) {
     </View>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Styles
-// ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
   container: {
@@ -70,6 +80,28 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#2a2a2a',
   },
+  groupHeader: {
+    backgroundColor: '#1e1e2e',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+  },
+  groupText: {
+    color: '#aaa',
+    fontSize: 10,
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  sectionHeader: {
+    backgroundColor: '#1a1a28',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingLeft: 14,
+  },
+  sectionText: {
+    color: '#888',
+    fontSize: 9,
+  },
   countCell: {
     width: PLANT_COUNT_WIDTH,
     height: ROW_HEIGHT,
@@ -79,7 +111,7 @@ const styles = StyleSheet.create({
     borderRightColor: '#333',
   },
   countText: {
-    color: '#666',
+    color: '#aaa',
     fontSize: 9,
   },
   nameCell: {
@@ -91,10 +123,11 @@ const styles = StyleSheet.create({
     borderRightColor: '#444',
   },
   nameText: {
-    color: '#777',
+    color: '#ddd',
     fontSize: 10,
   },
-  demoText: {
-    color: '#ccc',
+  placeholderText: {
+    color: '#444',
+    fontSize: 10,
   },
 });
