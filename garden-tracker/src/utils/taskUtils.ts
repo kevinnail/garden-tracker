@@ -1,5 +1,5 @@
 import { CELL_WIDTH } from '@/src/constants/layout';
-import { dayXOffset, weekIndexToDate } from '@/src/utils/dateUtils';
+import { dayXOffset, weekIndexToDate, formatDateKey } from '@/src/utils/dateUtils';
 
 export interface TaskLineOccurrence {
   x: number;           // pixel x within the virtual canvas
@@ -33,7 +33,7 @@ export function getTaskLineOccurrences(
   let col = cropStartWeek + task.start_offset_weeks;
 
   while (col <= cropEndWeek) {
-    const weekSunday = weekIndexToDate(calendarStart, col).toISOString().slice(0, 10);
+    const weekSunday = formatDateKey(weekIndexToDate(calendarStart, col));
     results.push({
       x: col * CELL_WIDTH + xOffset,
       weekIndex: col,
