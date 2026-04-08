@@ -3,7 +3,7 @@
     "name": "garden-tracker",
     "slug": "garden-tracker",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "gardentracker",
     "userInterfaceStyle": "automatic",
