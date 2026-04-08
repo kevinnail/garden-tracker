@@ -106,7 +106,7 @@ export interface NewCropData {
   plant_count: number;
   start_date: string; // ISO Sunday
   section_id: number;
-  stages: T<{ stage_definition_id: number; duration_weeks: number }>;
+  stages: { stage_definition_id: number; duration_weeks: number }[];
 }
 
 export interface NewTaskData {
