@@ -1,6 +1,12 @@
 import React, { useRef, useState } from 'react';
 import { View, Text, StyleSheet, LayoutChangeEvent } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, runOnJS } from 'react-native-reanimated';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  useAnimatedReaction,
+  withDecay,
+} from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 
 import {
@@ -78,18 +84,27 @@ export default function PlannerGrid() {
     .onUpdate((e) => {
       const maxX = Math.max(0, totalWidth  - sharedViewW.value);
       const maxY = Math.max(0, totalHeight - sharedViewH.value);
-
-      const newX = Math.min(Math.max(startScrollX.value - e.translationX, 0), maxX);
-      const newY = Math.min(Math.max(startScrollY.value - e.translationY, 0), maxY);
-
-      scrollX.value = newX;
-      scrollY.value = newY;
-
-      // Update JS state for virtualization (slightly behind animation, which is fine —
-      // the 1-cell render buffer ensures no visible gaps during fast scrolling)
-      runOnJS(setRenderScrollX)(newX);
-      runOnJS(setRenderScrollY)(newY);
+      scrollX.value = Math.min(Math.max(startScrollX.value - e.translationX, 0), maxX);
+      scrollY.value = Math.min(Math.max(startScrollY.value - e.translationY, 0), maxY);
+    })
+    .onEnd((e) => {
+      const maxX = Math.max(0, totalWidth  - sharedViewW.value);
+      const maxY = Math.max(0, totalHeight - sharedViewH.value);
+      scrollX.value = withDecay({ velocity: -e.velocityX, clamp: [0, maxX] });
+      scrollY.value = withDecay({ velocity: -e.velocityY, clamp: [0, maxY] });
     });
+
+  // ── Keep virtualization state in sync during decay animation ─────────────
+  // useAnimatedReaction runs on the UI thread and calls scheduleOnRN whenever the
+  // shared values change — covers both drag and the post-release decay glide.
+  useAnimatedReaction(
+    () => scrollX.value,
+    (val) => scheduleOnRN(setRenderScrollX, val),
+  );
+  useAnimatedReaction(
+    () => scrollY.value,
+    (val) => scheduleOnRN(setRenderScrollY, val),
+  );
 
   // ── Animated styles ───────────────────────────────────────────────────────
 
