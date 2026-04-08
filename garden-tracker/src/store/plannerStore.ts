@@ -7,13 +7,14 @@ import {
   TaskType,
 } from '@/src/types';
 import { ROW_HEIGHT } from '@/src/constants/layout';
-import { defaultCalendarStart, dateToWeekIndex } from '@/src/utils/dateUtils';
+import { defaultCalendarStart, dateToWeekIndex, parseDateKey, toSunday } from '@/src/utils/dateUtils';
 import { getStageColorAtWeek } from '@/src/utils/stageUtils';
 import { getTaskLineOccurrences } from '@/src/utils/taskUtils';
 
 import { getAllLocationGroups, getAllLocations, getAllSections } from '@/src/db/queries/locationQueries';
-import { getCropsForSection, getCropStages, getStageDefs } from '@/src/db/queries/cropQueries';
+import { getCropsForSection, getCropStages, getStageDefs, insertCropInstance, insertCropStage } from '@/src/db/queries/cropQueries';
 import { getTasksForCrop, getCompletionsForCrop, getTaskTypes } from '@/src/db/queries/taskQueries';
+import { NewCropData } from '@/src/types';
 
 interface PlannerState {
   rows: GridRowItem[];
@@ -25,6 +26,7 @@ interface PlannerState {
   isLoaded: boolean;
 
   loadData: () => Promise<void>;
+  addCrop: (data: NewCropData) => Promise<void>;
   toggleArchivedRows: () => void;
 }
 
@@ -36,6 +38,14 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
   taskTypes: [],
   showArchivedRows: false,
   isLoaded: false,
+
+  addCrop: async (data: NewCropData) => {
+    const cropId = await insertCropInstance(data.section_id, data.name, data.plant_count, data.start_date);
+    for (let i = 0; i < data.stages.length; i++) {
+      await insertCropStage(cropId, data.stages[i].stage_definition_id, data.stages[i].duration_weeks, i);
+    }
+    await get().loadData();
+  },
 
   toggleArchivedRows: () => {
     set(s => ({ showArchivedRows: !s.showArchivedRows }));
@@ -80,7 +90,16 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
             ]);
 
             // Precompute weekColorMap — O(1) lookup per cell at render time
-            const cropStartWeek = dateToWeekIndex(calendarStart, new Date(crop.start_date));
+            const parsedStartDate = (() => {
+              const strict = parseDateKey(crop.start_date);
+              if (strict) return strict;
+
+              const loose = new Date(crop.start_date);
+              if (!isNaN(loose.getTime())) return toSunday(loose);
+
+              return toSunday(new Date());
+            })();
+            const cropStartWeek = dateToWeekIndex(calendarStart, parsedStartDate);
             const weekColorMap: Record<number, string> = {};
             let cursor = cropStartWeek;
             for (const stage of stages) {
