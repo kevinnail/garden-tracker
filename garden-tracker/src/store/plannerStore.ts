@@ -4,6 +4,7 @@ import {
   GridRowItem,
   NewCropData,
   NewTaskData,
+  Note,
   PrecomputedTaskLine,
   StageDefinition,
   TaskType,
@@ -16,6 +17,7 @@ import { getTaskLineOccurrences } from '@/src/utils/taskUtils';
 import { getAllLocationGroups, getAllLocations, getAllSections, insertLocationGroup, insertLocation, insertSection, deleteLocationGroup, deleteLocation, deleteSection } from '@/src/db/queries/locationQueries';
 import { archiveCrop as archiveCropQuery, getCropsForSection, getCropStages, getStageDefs, insertCropInstance, insertCropStage, deleteCropInstance, replaceCropStages, updateCropInstance } from '@/src/db/queries/cropQueries';
 import { getTasksForCrop, getCompletionsForCrop, getTaskTypes, insertTask, insertCompletion, deleteCompletion, deleteTask as dbDeleteTask, updateTaskDay } from '@/src/db/queries/taskQueries';
+import { deleteNote as deleteNoteQuery, getAllNotesForCrop, upsertNote } from '@/src/db/queries/noteQueries';
 
 interface PlannerState {
   rows: GridRowItem[];
@@ -23,6 +25,7 @@ interface PlannerState {
   calendarStart: Date;
   stageDefinitions: StageDefinition[];
   taskTypes: TaskType[];
+  notes: Note[];
   showArchivedRows: boolean;
   isLoaded: boolean;
   selectedCropId: number | null;
@@ -37,6 +40,8 @@ interface PlannerState {
   uncompleteTask: (taskId: number, weekDate: string) => Promise<void>;
   deleteTask: (taskId: number) => Promise<void>;
   adjustTaskDay: (taskId: number, dayOfWeek: number) => Promise<void>;
+  saveCellNote: (cropInstanceId: number, weekDate: string, content: string) => Promise<void>;
+  deleteNote: (noteId: number) => Promise<void>;
   addLocationGroup: (name: string) => Promise<void>;
   addLocation: (groupId: number, name: string) => Promise<void>;
   addSection: (locationId: number, name: string) => Promise<void>;
@@ -53,6 +58,7 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
   calendarStart: defaultCalendarStart(),
   stageDefinitions: [],
   taskTypes: [],
+  notes: [],
   showArchivedRows: false,
   isLoaded: false,
   selectedCropId: null,
@@ -114,6 +120,16 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
     await get().loadData();
   },
 
+  saveCellNote: async (cropInstanceId, weekDate, content) => {
+    await upsertNote(cropInstanceId, weekDate, content);
+    await get().loadData();
+  },
+
+  deleteNote: async (noteId) => {
+    await deleteNoteQuery(noteId);
+    await get().loadData();
+  },
+
   deleteCrop: async (cropId) => {
     await deleteCropInstance(cropId);
     set({ selectedCropId: null });
@@ -164,6 +180,7 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
 
     const rows: GridRowItem[]           = [];
     const allTaskLines: PrecomputedTaskLine[] = [];
+    const notes: Note[] = [];
     let currentTop = 0;
 
     const pushRow = (row: GridRowItem) => {
@@ -194,11 +211,20 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
           for (const crop of crops) {
             const y1 = currentTop;
 
-            const [stages, tasks, completions] = await Promise.all([
+            const [stages, tasks, completions, cellNotes] = await Promise.all([
               getCropStages(crop.id),
               getTasksForCrop(crop.id),
               getCompletionsForCrop(crop.id),
+              getAllNotesForCrop(crop.id),
             ]);
+
+            const notesByWeek: Record<string, Note> = {};
+            for (const note of cellNotes) {
+              notes.push(note);
+              if (note.week_date && !notesByWeek[note.week_date]) {
+                notesByWeek[note.week_date] = note;
+              }
+            }
 
             // Precompute weekColorMap — O(1) lookup per cell at render time
             const parsedStartDate = (() => {
@@ -221,7 +247,7 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
             }
             const cropEndWeek = cursor - 1;
 
-            pushRow({ type: 'crop_row', crop, weekColorMap, tasks, completions });
+            pushRow({ type: 'crop_row', crop, weekColorMap, tasks, completions, notesByWeek });
 
             // Precompute task lines for this row — zero work at render time
             const completionSet = new Set(
@@ -255,6 +281,6 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
       pushRow({ type: 'group_footer' });
     }
 
-    set({ rows, allTaskLines, stageDefinitions: stageDefs, taskTypes: taskTypeList, isLoaded: true });
+    set({ rows, allTaskLines, notes, stageDefinitions: stageDefs, taskTypes: taskTypeList, isLoaded: true });
   },
 }));
