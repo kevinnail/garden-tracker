@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ReanimatedSwipeable from 'react-native-gesture-handler/Swipeable';
 
 import { usePlannerData } from '@/src/hooks/usePlannerData';
 import { TodayTaskItem } from '@/src/types';
@@ -9,72 +10,161 @@ import { usePlannerStore } from '@/src/store/plannerStore';
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-function TaskRow({ item, overdue = false }: { item: TodayTaskItem; overdue?: boolean }) {
-  const focusPlannerCrop = usePlannerStore(s => s.focusPlannerCrop);
+// ── Data grouping ─────────────────────────────────────────────────────────────
 
-  const handlePress = () => {
-    focusPlannerCrop(item.crop_instance_id, item.due_date);
-    router.navigate('/(tabs)');
-  };
+interface CropTaskGroup {
+  cropId: number;
+  cropName: string;
+  sectionName: string;
+  locationName: string;
+  tasks: TodayTaskItem[];
+}
 
+function groupByCrop(items: TodayTaskItem[]): CropTaskGroup[] {
+  const map = new Map<number, CropTaskGroup>();
+  for (const item of items) {
+    if (!map.has(item.crop_instance_id)) {
+      map.set(item.crop_instance_id, {
+        cropId: item.crop_instance_id,
+        cropName: item.crop_name,
+        sectionName: item.section_name,
+        locationName: item.location_name,
+        tasks: [],
+      });
+    }
+    map.get(item.crop_instance_id)!.tasks.push(item);
+  }
+  return Array.from(map.values());
+}
+
+// ── Swipe-to-complete action panel ────────────────────────────────────────────
+
+function DoneAction() {
   return (
-    <Pressable style={styles.taskRow} onPress={handlePress}>
-      <View style={[styles.colorRail, { backgroundColor: item.color }]} />
-      <View style={styles.taskBody}>
-        <View style={styles.taskTopRow}>
-          <Text style={styles.taskTitle}>{item.task_type_name}</Text>
-          <Text style={[styles.taskBadge, overdue ? styles.overdueBadge : styles.dueBadge]}>
-            {overdue ? 'Overdue' : 'Due Today'}
-          </Text>
-        </View>
-        <Text style={styles.taskMeta}>{item.crop_name} · {item.section_name}</Text>
-        <Text style={styles.taskMeta}>{item.location_name} · {DAY_LABELS[item.day_of_week]} · {item.due_date}</Text>
-      </View>
-    </Pressable>
+    <View style={styles.doneAction}>
+      <Text style={styles.doneActionText}>✓ Done</Text>
+    </View>
   );
 }
 
+// ── Individual task row (swipeable) ───────────────────────────────────────────
+
+function overdueBadgeLabel(missed_count: number): string {
+  if (missed_count <= 1) return 'Overdue';
+  return `${missed_count} wks overdue`;
+}
+
+function TaskSwipeRow({ item, overdue }: { item: TodayTaskItem; overdue: boolean }) {
+  const completeTask = usePlannerStore(s => s.completeTask);
+
+  return (
+    <ReanimatedSwipeable
+      friction={2}
+      leftThreshold={60}
+      renderLeftActions={() => <DoneAction />}
+      onSwipeableOpen={() => completeTask(item.task_id, item.week_date)}
+    >
+      <View style={styles.taskRow}>
+        <View style={styles.taskBody}>
+          <View style={styles.taskTopRow}>
+            <Text style={styles.taskTitle}>{item.task_type_name}</Text>
+            <Text style={[styles.taskBadge, overdue ? styles.overdueBadge : styles.dueBadge]}>
+              {overdue ? overdueBadgeLabel(item.missed_count) : 'Due Today'}
+            </Text>
+          </View>
+          <Text style={styles.taskMeta}>{DAY_LABELS[item.day_of_week]} · {item.due_date}</Text>
+        </View>
+      </View>
+    </ReanimatedSwipeable>
+  );
+}
+
+// ── Crop group card ───────────────────────────────────────────────────────────
+
+function CropGroup({ group, overdue }: { group: CropTaskGroup; overdue: boolean }) {
+  const focusPlannerCrop = usePlannerStore(s => s.focusPlannerCrop);
+  const setSelectedCrop = usePlannerStore(s => s.setSelectedCrop);
+
+  const handleHeaderPress = () => {
+    const firstTask = group.tasks[0];
+    setSelectedCrop(group.cropId);
+    focusPlannerCrop(group.cropId, firstTask?.due_date ?? null);
+    router.navigate('/(tabs)');
+    router.push('/(modals)/manage-tasks');
+  };
+
+  return (
+    <View style={styles.cropGroup}>
+      <Pressable style={styles.cropHeader} onPress={handleHeaderPress}>
+        <View style={styles.cropHeaderLeft}>
+          <Text style={styles.cropName}>{group.cropName}</Text>
+          <Text style={styles.cropMeta}>{group.locationName} · {group.sectionName}</Text>
+        </View>
+        <Text style={styles.cropArrow}>
+          {group.tasks.length} task{group.tasks.length !== 1 ? 's' : ''} ›
+        </Text>
+      </Pressable>
+      <View style={styles.taskList}>
+        {group.tasks.map(task => (
+          <TaskSwipeRow
+            key={`${task.task_id}:${task.week_date}`}
+            item={task}
+            overdue={overdue}
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+// ── Section ───────────────────────────────────────────────────────────────────
+
 function Section({
   title,
-  items,
+  groups,
   overdue = false,
   emptyText,
 }: {
   title: string;
-  items: TodayTaskItem[];
+  groups: CropTaskGroup[];
   overdue?: boolean;
   emptyText: string;
 }) {
+  const totalTasks = groups.reduce((n, g) => n + g.tasks.length, 0);
+
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>{title}</Text>
-        <Text style={styles.sectionCount}>{items.length}</Text>
+        <Text style={styles.sectionCount}>{totalTasks}</Text>
       </View>
 
-      {items.length === 0 ? (
+      {groups.length === 0 ? (
         <View style={styles.emptyCard}>
           <Text style={styles.emptyText}>{emptyText}</Text>
         </View>
       ) : (
-        items.map(item => (
-          <TaskRow key={`${item.task_id}:${item.week_date}`} item={item} overdue={overdue} />
+        groups.map(group => (
+          <CropGroup key={group.cropId} group={group} overdue={overdue} />
         ))
       )}
     </View>
   );
 }
 
+// ── Screen ────────────────────────────────────────────────────────────────────
+
 export default function TodayScreen() {
   usePlannerData();
 
-  const todayDueTasks = usePlannerStore(s => s.todayDueTasks);
+  const todayDueTasks    = usePlannerStore(s => s.todayDueTasks);
   const todayOverdueTasks = usePlannerStore(s => s.todayOverdueTasks);
 
+  const dueGroups      = useMemo(() => groupByCrop(todayDueTasks),    [todayDueTasks]);
+  const overdueGroups  = useMemo(() => groupByCrop(todayOverdueTasks), [todayOverdueTasks]);
+
   const todayLabel = new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
+    weekday: 'long', month: 'long', day: 'numeric',
   });
 
   return (
@@ -92,12 +182,12 @@ export default function TodayScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <Section
           title="Due Today"
-          items={todayDueTasks}
+          groups={dueGroups}
           emptyText="Nothing is due today."
         />
         <Section
           title="Overdue"
-          items={todayOverdueTasks}
+          groups={overdueGroups}
           overdue
           emptyText="No overdue tasks from the last 7 days."
         />
@@ -105,6 +195,8 @@ export default function TodayScreen() {
     </SafeAreaView>
   );
 }
+
+// ── Styles ────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   safeArea: {
@@ -146,8 +238,10 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
-    gap: 16,
+    gap: 20,
   },
+
+  // Section
   section: {
     gap: 10,
   },
@@ -177,22 +271,61 @@ const styles = StyleSheet.create({
     color: '#828282',
     fontSize: 13,
   },
-  taskRow: {
-    flexDirection: 'row',
+
+  // Crop group card
+  cropGroup: {
     borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: '#171c22',
     borderWidth: 1,
-    borderColor: '#263240',
+    borderColor: '#1e2d3d',
   },
-  colorRail: {
-    width: 6,
+  cropHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 12,
+    backgroundColor: '#0d1a27',
+    borderBottomWidth: 1,
+    borderBottomColor: '#1e2d3d',
+  },
+  cropHeaderLeft: {
+    flex: 1,
+    gap: 3,
+  },
+  cropName: {
+    color: '#cde0f0',
+    fontSize: 17,
+    fontWeight: '700',
+    letterSpacing: 0.1,
+  },
+  cropMeta: {
+    color: '#3d5a72',
+    fontSize: 12,
+  },
+  cropArrow: {
+    color: '#2d5070',
+    fontSize: 12,
+    fontWeight: '600',
+    paddingLeft: 12,
+  },
+
+  // Task list inside the group
+  taskList: {
+    gap: 0,
+    backgroundColor: '#080e14',
+  },
+  taskRow: {
+    backgroundColor: '#080e14',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#1a2535',
   },
   taskBody: {
     flex: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
-    gap: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    gap: 3,
   },
   taskTopRow: {
     flexDirection: 'row',
@@ -202,13 +335,13 @@ const styles = StyleSheet.create({
   },
   taskTitle: {
     flex: 1,
-    color: '#f0f0f0',
-    fontSize: 15,
-    fontWeight: '700',
+    color: '#9db8cc',
+    fontSize: 13,
+    fontWeight: '500',
   },
   taskBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
     borderRadius: 999,
     fontSize: 11,
     fontWeight: '700',
@@ -223,7 +356,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#4a2020',
   },
   taskMeta: {
-    color: '#98a3b3',
-    fontSize: 12,
+    color: '#2e4a5e',
+    fontSize: 11,
+  },
+
+  // Swipe-to-complete action
+  doneAction: {
+    backgroundColor: '#1e5c2e',
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    paddingHorizontal: 20,
+    minWidth: 80,
+  },
+  doneActionText: {
+    color: '#7fdb9e',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });
