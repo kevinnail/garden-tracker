@@ -15,6 +15,7 @@ import {
   getStageDefs,
   insertCropInstance,
   insertCropStage,
+  replaceCropStages,
   updateCropInstance,
   archiveCrop,
 } from '@/src/db/queries/cropQueries';
@@ -246,6 +247,38 @@ describe('updateCropInstance', () => {
     const crops = await getCropsForSection(SEED.SECTION_ID);
     const basil = crops.find(c => c.id === otherId);
     expect(basil!.name).toBe('Basil');
+  });
+
+  it('snaps an updated mid-week start_date back to Sunday', async () => {
+    await updateCropInstance(SEED.CROP_ID, { start_date: '2025-03-05' });
+
+    const crops = await getCropsForSection(SEED.SECTION_ID);
+    expect(crops[0].start_date).toBe('2025-03-02');
+  });
+});
+
+// ── replaceCropStages ─────────────────────────────────────────────────────────
+
+describe('replaceCropStages', () => {
+  it('removes existing stages and writes the replacement set in order', async () => {
+    const stageDefs = await getStageDefs();
+    const flowering = stageDefs.find(stage => stage.name === 'Flowering');
+    const fruiting = stageDefs.find(stage => stage.name === 'Fruiting');
+
+    await replaceCropStages(SEED.CROP_ID, [
+      { stage_definition_id: flowering!.id, duration_weeks: 5 },
+      { stage_definition_id: fruiting!.id, duration_weeks: 3 },
+    ]);
+
+    const stages = await getCropStages(SEED.CROP_ID);
+
+    expect(stages).toHaveLength(2);
+    expect(stages[0].stage_name).toBe('Flowering');
+    expect(stages[0].duration_weeks).toBe(5);
+    expect(stages[0].order_index).toBe(0);
+    expect(stages[1].stage_name).toBe('Fruiting');
+    expect(stages[1].duration_weeks).toBe(3);
+    expect(stages[1].order_index).toBe(1);
   });
 });
 
