@@ -33,6 +33,7 @@ export default function TaskAssessForm() {
   const uncompleteTask = usePlannerStore(s => s.uncompleteTask);
   const deleteTask     = usePlannerStore(s => s.deleteTask);
   const adjustTaskDay  = usePlannerStore(s => s.adjustTaskDay);
+  const deleteCrop     = usePlannerStore(s => s.deleteCrop);
 
   const cropRow = rows.find(r => r.type === 'crop_row' && r.crop.id === selectedCropId);
 
@@ -89,6 +90,17 @@ export default function TaskAssessForm() {
 
   const handleAddTask = () => {
     router.push('/(modals)/add-task');
+  };
+
+  const handleDeleteCrop = () => {
+    Alert.alert(
+      'Delete Crop',
+      `Permanently delete "${crop.name}" and all its tasks and completions? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: async () => { await deleteCrop(crop.id); router.back(); } },
+      ]
+    );
   };
 
   if (tasks.length === 0) {
@@ -184,6 +196,9 @@ export default function TaskAssessForm() {
             <Text style={styles.doneBtnText}>Done</Text>
           </Pressable>
         </View>
+        <Pressable style={styles.deleteCropBtn} onPress={handleDeleteCrop}>
+          <Text style={styles.deleteCropBtnText}>Delete Crop</Text>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -257,4 +272,6 @@ const styles = StyleSheet.create({
   addTaskBtnText: { color: '#8fd0f8', fontWeight: '700', fontSize: 15 },
   doneBtn: { flex: 1, paddingVertical: 14, borderRadius: 8, borderWidth: 1, borderColor: '#4a4a4a', backgroundColor: '#262626', alignItems: 'center' },
   doneBtnText: { color: '#ddd', fontWeight: '600', fontSize: 15 },
+  deleteCropBtn: { marginTop: 8, paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
+  deleteCropBtnText: { color: '#664444', fontSize: 13 },
 });
