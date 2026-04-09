@@ -109,6 +109,26 @@ export default function AddCropForm() {
         keyboardShouldPersistTaps="handled"
       >
 
+      <Text style={styles.label}>Section</Text>
+      <View style={styles.sectionList}>
+        {sections.map(sec => {
+          const loc = locations.find(l => l.id === sec.location_id);
+          const label = loc ? `${loc.name} › ${sec.name}` : sec.name;
+          return (
+            <Pressable
+              key={sec.id}
+              style={[styles.sectionOption, sectionId === sec.id && styles.sectionSelected]}
+              onPress={() => setSectionId(sec.id)}
+            >
+              <Text style={[styles.sectionText, sectionId === sec.id && styles.sectionTextSelected]}>
+                {label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+
       <Text style={styles.label}>Crop Name</Text>
       <TextInput
         style={styles.input}
@@ -154,24 +174,7 @@ export default function AddCropForm() {
         </View>
       )}
 
-      <Text style={styles.label}>Section</Text>
-      <View style={styles.sectionList}>
-        {sections.map(sec => {
-          const loc = locations.find(l => l.id === sec.location_id);
-          const label = loc ? `${loc.name} › ${sec.name}` : sec.name;
-          return (
-            <Pressable
-              key={sec.id}
-              style={[styles.sectionOption, sectionId === sec.id && styles.sectionSelected]}
-              onPress={() => setSectionId(sec.id)}
-            >
-              <Text style={[styles.sectionText, sectionId === sec.id && styles.sectionTextSelected]}>
-                {label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+
 
       <Text style={styles.label}>Stages</Text>
       {stages.map((stage, i) => (
