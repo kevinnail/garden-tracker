@@ -1,14 +1,14 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
 
 import {
   CELL_WIDTH,
-  ROW_HEIGHT,
   TOTAL_WEEKS,
   BACKGROUND_COLOR,
 } from '@/src/constants/layout';
 import { todayWeekIndex } from '@/src/utils/dateUtils';
 import { GridRowItem } from '@/src/types';
+import { getRowHeight, getRowOffsets, getVisibleRowRange } from '../../utils/rowLayout';
 import CropCell from './CropCell';
 
 // Must match RowHeader band colors so the full-width strips feel continuous
@@ -37,19 +37,19 @@ export default function GridBody({
   viewWidth,
   viewHeight,
 }: Props) {
-  const rowCount = rows.length;
   const todayCol = todayWeekIndex(calendarStart);
+  const rowOffsets = useMemo(() => getRowOffsets(rows), [rows]);
 
   const colStart = Math.max(0, Math.floor(renderScrollX / CELL_WIDTH) - 1);
   const colEnd   = Math.min(TOTAL_WEEKS - 1, Math.ceil((renderScrollX + viewWidth) / CELL_WIDTH) + 1);
-  const rowStart = Math.max(0, Math.floor(renderScrollY / ROW_HEIGHT) - 1);
-  const rowEnd   = Math.min(rowCount - 1, Math.ceil((renderScrollY + viewHeight) / ROW_HEIGHT) + 1);
+  const { rowStart, rowEnd } = getVisibleRowRange(rowOffsets, renderScrollY, viewHeight);
 
   const elements: React.ReactElement[] = [];
 
   for (let row = rowStart; row <= rowEnd; row++) {
     const rowItem = rows[row];
-    const top = row * ROW_HEIGHT;
+    const top = rowOffsets[row];
+    const height = getRowHeight(rowItem);
 
     if (rowItem?.type === 'crop_row') {
       for (let col = colStart; col <= colEnd; col++) {
@@ -72,20 +72,21 @@ export default function GridBody({
           break;
         case 'location_header':
         case 'location_footer':
+        case 'section_spacer':
           bandColor = LOCATION_BAND;
           break;
         case 'section_header':
+        case 'section_footer':
           bandColor = SECTION_BAND;
           break;
         default:
-          // section_footer — gap between sections
           bandColor = BACKGROUND_COLOR;
       }
 
       elements.push(
         <View
           key={`band-${row}`}
-          style={[styles.bandStrip, { top, backgroundColor: bandColor }]}
+          style={[styles.bandStrip, { top, height, backgroundColor: bandColor }]}
         />
       );
     }
@@ -99,6 +100,5 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     width: TOTAL_WIDTH,
-    height: ROW_HEIGHT,
   },
 });
