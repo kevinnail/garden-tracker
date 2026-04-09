@@ -10,6 +10,7 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -53,6 +54,9 @@ function defaultDayOfWeek(weekDate: string): number {
 
 export default function CellNoteForm({ cropId, weekDate }: CellNoteFormProps) {
   const headerHeight = useHeaderHeight();
+  const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
+
   const rows = usePlannerStore(s => s.rows);
   const saveCellNote = usePlannerStore(s => s.saveCellNote);
   const deleteNote = usePlannerStore(s => s.deleteNote);
@@ -171,7 +175,6 @@ export default function CellNoteForm({ cropId, weekDate }: CellNoteFormProps) {
       Keyboard.dismiss();
       return;
     }
-
     router.back();
   };
 
@@ -195,94 +198,104 @@ export default function CellNoteForm({ cropId, weekDate }: CellNoteFormProps) {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Math.max(0, headerHeight - 16)}
       >
-        <View style={styles.header}>
-          <Text style={styles.cropName}>{cropName}</Text>
-          <Text style={styles.weekLabel}>{formatWeekRangeLabel(weekDate)}</Text>
-          <Text style={styles.helperText}>Each entry gets its own day label so this weekly cell stays readable.</Text>
-        </View>
-
+        {/* Single scrollable column — works in both portrait and landscape */}
         <ScrollView
-          style={styles.list}
-          contentContainerStyle={styles.listContent}
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
         >
-          {entries.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyCardTitle}>No entries yet</Text>
-              <Text style={styles.emptyCardText}>Add short daily notes here instead of mixing the whole week into one paragraph.</Text>
-            </View>
-          ) : (
-            entries.map(entry => (
-              <View key={entry.id} style={[styles.entryCard, editingEntryId === entry.id && styles.entryCardEditing]}>
-                <View style={styles.entryHeader}>
-                  <Text style={styles.entryLabel}>{formatWeekEntryLabel(weekDate, entry)}</Text>
-                  <View style={styles.entryActions}>
-                    <Pressable style={styles.inlineBtn} onPress={() => beginEdit(entry)}>
-                      <Text style={styles.inlineBtnText}>Edit</Text>
-                    </Pressable>
-                    <Pressable style={styles.inlineBtn} onPress={() => handleDeleteEntry(entry.id)}>
-                      <Text style={[styles.inlineBtnText, styles.deleteInlineText]}>Delete</Text>
-                    </Pressable>
-                  </View>
-                </View>
-                <Text style={styles.entryBody}>{entry.text}</Text>
-              </View>
-            ))
-          )}
-        </ScrollView>
-
-        <View style={[styles.composerCard, keyboardOpen && styles.composerCardRaised]}>
-            <View style={styles.composerHeader}>
-            <View style={styles.composerHeaderText}>
-              <Text style={styles.composerTitle}>{editingEntry ? 'Edit entry' : 'New entry'}</Text>
-              {!editingEntry && !keyboardOpen && !draft.trim() && (
-                <Text style={styles.composerSubtitle}>Tap below to add a dated note for this week.</Text>
-              )}
-            </View>
-            </View>
-
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dayPicker} keyboardShouldPersistTaps="handled">
-            {DAYS.map((day, index) => (
-              <Pressable
-                key={day}
-                style={[styles.dayChip, selectedDay === index && styles.dayChipSelected]}
-                onPress={() => setSelectedDay(index)}
-              >
-                <Text style={[styles.dayChipText, selectedDay === index && styles.dayChipTextSelected]}>{day}</Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-
-          <TextInput
-            style={styles.input}
-            multiline
-            value={draft}
-            onChangeText={setDraft}
-            placeholder="What happened, what changed, what to remember next time?"
-            placeholderTextColor="#5a5a5a"
-            textAlignVertical="top"
-            scrollEnabled
-          />
-
-          <View style={styles.actionRow}>
-            {editingEntry ? (
-              <Pressable style={styles.secondaryBtn} onPress={cancelEdit} disabled={saving}>
-                <Text style={styles.secondaryBtnText}>Cancel Edit</Text>
-              </Pressable>
-            ) : (
-              <Pressable style={styles.secondaryBtn} onPress={handleSecondaryAction} disabled={saving}>
-                <Text style={styles.secondaryBtnText}>{keyboardOpen ? 'Done' : 'Close'}</Text>
-              </Pressable>
+          {/* Header — collapsed to one line in landscape to save vertical space */}
+          <View style={[styles.header, isLandscape && styles.headerCompact]}>
+            <Text style={styles.cropName}>{cropName}</Text>
+            <Text style={styles.weekLabel}>{formatWeekRangeLabel(weekDate)}</Text>
+            {!isLandscape && (
+              <Text style={styles.helperText}>Each entry gets its own day label so this weekly cell stays readable.</Text>
             )}
-
-            <Pressable style={styles.primaryBtn} onPress={handleSaveEntry} disabled={saving}>
-              <Text style={styles.primaryBtnText}>
-                {editingEntry ? 'Save Entry' : 'Add Entry'}
-              </Text>
-            </Pressable>
           </View>
-        </View>
+
+          {/* Existing entries */}
+          <View style={styles.list}>
+            {entries.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyCardTitle}>No entries yet</Text>
+                {!isLandscape && (
+                  <Text style={styles.emptyCardText}>Add short daily notes here instead of mixing the whole week into one paragraph.</Text>
+                )}
+              </View>
+            ) : (
+              entries.map(entry => (
+                <View key={entry.id} style={[styles.entryCard, editingEntryId === entry.id && styles.entryCardEditing]}>
+                  <View style={styles.entryHeader}>
+                    <Text style={styles.entryLabel}>{formatWeekEntryLabel(weekDate, entry)}</Text>
+                    <View style={styles.entryActions}>
+                      <Pressable style={styles.inlineBtn} onPress={() => beginEdit(entry)}>
+                        <Text style={styles.inlineBtnText}>Edit</Text>
+                      </Pressable>
+                      <Pressable style={styles.inlineBtn} onPress={() => handleDeleteEntry(entry.id)}>
+                        <Text style={[styles.inlineBtnText, styles.deleteInlineText]}>Delete</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                  <Text style={styles.entryBody}>{entry.text}</Text>
+                </View>
+              ))
+            )}
+          </View>
+
+          {/* Composer */}
+          <View style={styles.composerCard}>
+            <View style={styles.composerHeader}>
+              <View style={styles.composerHeaderText}>
+                <Text style={styles.composerTitle}>{editingEntry ? 'Edit entry' : 'New entry'}</Text>
+                {!editingEntry && !keyboardOpen && !draft.trim() && !isLandscape && (
+                  <Text style={styles.composerSubtitle}>Tap below to add a dated note for this week.</Text>
+                )}
+              </View>
+            </View>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dayPicker} keyboardShouldPersistTaps="handled">
+              {DAYS.map((day, index) => (
+                <Pressable
+                  key={day}
+                  style={[styles.dayChip, selectedDay === index && styles.dayChipSelected]}
+                  onPress={() => setSelectedDay(index)}
+                >
+                  <Text style={[styles.dayChipText, selectedDay === index && styles.dayChipTextSelected]}>{day}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+
+            <TextInput
+              style={[styles.input, isLandscape && styles.inputCompact]}
+              multiline
+              value={draft}
+              onChangeText={setDraft}
+              placeholder="What happened, what changed, what to remember next time?"
+              placeholderTextColor="#5a5a5a"
+              textAlignVertical="top"
+              scrollEnabled
+            />
+
+            <View style={styles.actionRow}>
+              {editingEntry ? (
+                <Pressable style={styles.secondaryBtn} onPress={cancelEdit} disabled={saving}>
+                  <Text style={styles.secondaryBtnText}>Cancel Edit</Text>
+                </Pressable>
+              ) : (
+                <Pressable style={styles.secondaryBtn} onPress={handleSecondaryAction} disabled={saving}>
+                  <Text style={styles.secondaryBtnText}>{keyboardOpen ? 'Done' : 'Close'}</Text>
+                </Pressable>
+              )}
+
+              <Pressable style={styles.primaryBtn} onPress={handleSaveEntry} disabled={saving}>
+                <Text style={styles.primaryBtnText}>
+                  {editingEntry ? 'Save Entry' : 'Add Entry'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -296,12 +309,26 @@ const styles = StyleSheet.create({
   keyboardAvoider: {
     flex: 1,
   },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 24,
+  },
   header: {
     paddingHorizontal: 16,
     paddingTop: 8,
     paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#242424',
+  },
+  headerCompact: {
+    paddingTop: 6,
+    paddingBottom: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   cropName: {
     color: '#e7e7e7',
@@ -320,9 +347,6 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   list: {
-    flex: 1,
-  },
-  listContent: {
     padding: 16,
     gap: 12,
   },
@@ -350,6 +374,7 @@ const styles = StyleSheet.create({
     borderColor: '#2e2e2e',
     borderRadius: 12,
     padding: 14,
+    marginBottom: 12,
   },
   entryCardEditing: {
     borderColor: '#2f6b86',
@@ -399,9 +424,7 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     paddingBottom: 16,
     backgroundColor: '#101416',
-  },
-  composerCardRaised: {
-    marginBottom: 96,
+    marginTop: 8,
   },
   composerHeader: {
     marginBottom: 10,
@@ -455,6 +478,9 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     paddingHorizontal: 12,
     paddingVertical: 12,
+  },
+  inputCompact: {
+    minHeight: 60,
   },
   actionRow: {
     flexDirection: 'row',

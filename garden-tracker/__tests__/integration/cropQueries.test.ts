@@ -310,3 +310,4 @@ describe('archiveCrop', () => {
     expect(active[0].id).toBe(otherId);
   });
 });
+
