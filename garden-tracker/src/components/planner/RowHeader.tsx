@@ -109,7 +109,10 @@ export default function RowHeader({ rows }: Props) {
             <Pressable
               key={i}
               style={[rowStyle, { backgroundColor: isSelected ? '#1a2a3a' : CROP_BG }]}
-              onPress={() => setSelectedCrop(item.crop.id)}
+              onPress={() => {
+                setSelectedCrop(item.crop.id);
+                router.push('/(modals)/manage-tasks');
+              }}
               onLongPress={() => {
                 setSelectedCrop(item.crop.id);
                 router.push('/(modals)/edit-crop');

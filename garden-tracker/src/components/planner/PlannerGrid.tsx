@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
@@ -14,12 +14,13 @@ import {
   CELL_WIDTH,
   TOTAL_WEEKS,
   TOTAL_HEADER_HEIGHT,
+  ROW_HEIGHT,
   ROW_HEADER_WIDTH,
   BACKGROUND_COLOR,
 } from '@/src/constants/layout';
-import { todayWeekIndex } from '@/src/utils/dateUtils';
+import { parseDateKey, todayWeekIndex, dateToWeekIndex } from '@/src/utils/dateUtils';
 import { usePlannerStore } from '@/src/store/plannerStore';
-import { getTotalRowsHeight } from '../../utils/rowLayout';
+import { getRowOffsets, getTotalRowsHeight } from '../../utils/rowLayout';
 
 import ColumnHeader from './ColumnHeader';
 import RowHeader from './RowHeader';
@@ -32,9 +33,13 @@ export default function PlannerGrid() {
   const rows         = usePlannerStore(s => s.rows);
   const allTaskLines = usePlannerStore(s => s.allTaskLines);
   const calendarStart = usePlannerStore(s => s.calendarStart);
+  const plannerFocusCropId = usePlannerStore(s => s.plannerFocusCropId);
+  const plannerFocusDate = usePlannerStore(s => s.plannerFocusDate);
+  const clearPlannerFocus = usePlannerStore(s => s.clearPlannerFocus);
 
   const totalWidth  = TOTAL_WEEKS * CELL_WIDTH;
   const totalHeight = Math.max(getTotalRowsHeight(rows), 1);
+  const rowOffsets = useMemo(() => getRowOffsets(rows), [rows]);
 
   // ── Shared values (UI thread) ─────────────────────────────────────────────
   const scrollX      = useSharedValue(0);
@@ -106,6 +111,40 @@ export default function PlannerGrid() {
       setRenderScrollX(initialX);
     }
   };
+
+  useEffect(() => {
+    if (!plannerFocusCropId || viewDims.height <= 1 || viewDims.width <= 1) {
+      return;
+    }
+
+    const rowIndex = rows.findIndex(
+      row => row.type === 'crop_row' && row.crop.id === plannerFocusCropId
+    );
+
+    if (rowIndex < 0) {
+      clearPlannerFocus();
+      return;
+    }
+
+    const targetTop = rowOffsets[rowIndex] ?? 0;
+    const maxY = Math.max(0, totalHeight - viewDims.height);
+    const centeredY = Math.max(0, targetTop - Math.max(0, (viewDims.height - ROW_HEIGHT) / 2));
+    const nextY = Math.min(centeredY, maxY);
+
+    const parsedFocusDate = plannerFocusDate ? parseDateKey(plannerFocusDate) : null;
+    const focusCol = parsedFocusDate
+      ? dateToWeekIndex(calendarStart, parsedFocusDate)
+      : todayWeekIndex(calendarStart);
+    const maxX = Math.max(0, totalWidth - viewDims.width);
+    const centeredX = Math.max(0, focusCol * CELL_WIDTH - Math.max(0, (viewDims.width - CELL_WIDTH) / 2));
+    const nextX = Math.min(centeredX, maxX);
+
+    scrollX.value = nextX;
+    scrollY.value = nextY;
+    setRenderScrollX(nextX);
+    setRenderScrollY(nextY);
+    clearPlannerFocus();
+  }, [calendarStart, clearPlannerFocus, plannerFocusCropId, plannerFocusDate, rowOffsets, rows, scrollX, scrollY, totalHeight, totalWidth, viewDims.height, viewDims.width]);
 
   const todayLabel = new Date().toLocaleDateString('en-US', {
     month: 'numeric', day: 'numeric', year: '2-digit',

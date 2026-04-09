@@ -16,6 +16,8 @@ import {
   insertCompletion,
   deleteCompletion,
   deleteTask,
+  getDueToday,
+  getOverdue,
 } from '@/src/db/queries/taskQueries';
 import { getDb } from '@/src/db/database';
 import { setupTestDb, SEED } from '../setup';
@@ -222,5 +224,47 @@ describe('deleteTask', () => {
 
   it('does nothing when the task does not exist', async () => {
     await expect(deleteTask(999)).resolves.toBeUndefined();
+  });
+});
+
+// ── dashboard queries ────────────────────────────────────────────────────────
+
+describe('getDueToday', () => {
+  it('returns a seeded task whose day matches the reference date', async () => {
+    const tasks = await getDueToday(new Date('2025-03-05T12:00:00'));
+
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].task_id).toBe(SEED.TASK_ID);
+    expect(tasks[0].crop_instance_id).toBe(SEED.CROP_ID);
+    expect(tasks[0].crop_name).toBe(SEED.CROP_NAME);
+    expect(tasks[0].section_name).toBe('Section A');
+    expect(tasks[0].due_date).toBe('2025-03-05');
+    expect(tasks[0].week_date).toBe(SEED.START_DATE);
+  });
+
+  it('does not return the task after completion is recorded for that week', async () => {
+    await insertCompletion(SEED.TASK_ID, SEED.START_DATE);
+
+    const tasks = await getDueToday(new Date('2025-03-05T12:00:00'));
+
+    expect(tasks).toHaveLength(0);
+  });
+});
+
+describe('getOverdue', () => {
+  it('returns a task due earlier this week when incomplete', async () => {
+    const tasks = await getOverdue(new Date('2025-03-06T12:00:00'));
+
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].task_id).toBe(SEED.TASK_ID);
+    expect(tasks[0].due_date).toBe('2025-03-05');
+  });
+
+  it('does not return the task when that week is completed', async () => {
+    await insertCompletion(SEED.TASK_ID, SEED.START_DATE);
+
+    const tasks = await getOverdue(new Date('2025-03-06T12:00:00'));
+
+    expect(tasks).toHaveLength(0);
   });
 });

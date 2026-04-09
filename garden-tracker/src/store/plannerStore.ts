@@ -7,6 +7,7 @@ import {
   Note,
   PrecomputedTaskLine,
   StageDefinition,
+  TodayTaskItem,
   TaskType,
 } from '@/src/types';
 import { ROW_HEIGHT } from '@/src/constants/layout';
@@ -16,7 +17,7 @@ import { getTaskLineOccurrences } from '@/src/utils/taskUtils';
 
 import { getAllLocationGroups, getAllLocations, getAllSections, insertLocationGroup, insertLocation, insertSection, deleteLocationGroup, deleteLocation, deleteSection } from '@/src/db/queries/locationQueries';
 import { archiveCrop as archiveCropQuery, getCropsForSection, getCropStages, getStageDefs, insertCropInstance, insertCropStage, deleteCropInstance, replaceCropStages, updateCropInstance } from '@/src/db/queries/cropQueries';
-import { getTasksForCrop, getCompletionsForCrop, getTaskTypes, insertTask, insertCompletion, deleteCompletion, deleteTask as dbDeleteTask, updateTaskDay } from '@/src/db/queries/taskQueries';
+import { getTasksForCrop, getCompletionsForCrop, getTaskTypes, insertTask, insertCompletion, deleteCompletion, deleteTask as dbDeleteTask, updateTaskDay, getDueToday, getOverdue } from '@/src/db/queries/taskQueries';
 import { deleteNote as deleteNoteQuery, getAllNotesForCrop, upsertNote } from '@/src/db/queries/noteQueries';
 
 interface PlannerState {
@@ -26,9 +27,13 @@ interface PlannerState {
   stageDefinitions: StageDefinition[];
   taskTypes: TaskType[];
   notes: Note[];
+  todayDueTasks: TodayTaskItem[];
+  todayOverdueTasks: TodayTaskItem[];
   showArchivedRows: boolean;
   isLoaded: boolean;
   selectedCropId: number | null;
+  plannerFocusCropId: number | null;
+  plannerFocusDate: string | null;
 
   loadData: () => Promise<void>;
   addCrop: (data: NewCropData) => Promise<void>;
@@ -49,6 +54,8 @@ interface PlannerState {
   removeLocation: (id: number) => Promise<void>;
   removeSection: (id: number) => Promise<void>;
   setSelectedCrop: (id: number | null) => void;
+  focusPlannerCrop: (id: number | null, focusDate?: string | null) => void;
+  clearPlannerFocus: () => void;
   toggleArchivedRows: () => void;
 }
 
@@ -59,9 +66,13 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
   stageDefinitions: [],
   taskTypes: [],
   notes: [],
+  todayDueTasks: [],
+  todayOverdueTasks: [],
   showArchivedRows: false,
   isLoaded: false,
   selectedCropId: null,
+  plannerFocusCropId: null,
+  plannerFocusDate: null,
 
   addLocationGroup: async (name) => {
     await insertLocationGroup(name);
@@ -94,6 +105,14 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
   },
 
   setSelectedCrop: (id) => set({ selectedCropId: id }),
+
+  focusPlannerCrop: (id, focusDate = null) => set({
+    plannerFocusCropId: id,
+    plannerFocusDate: focusDate,
+    selectedCropId: id,
+  }),
+
+  clearPlannerFocus: () => set({ plannerFocusCropId: null, plannerFocusDate: null }),
 
   addTask: async (data: NewTaskData) => {
     await insertTask(data.crop_instance_id, data.task_type_id, data.day_of_week, data.frequency_weeks, data.start_offset_weeks);
@@ -170,12 +189,14 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
     const calendarStart = get().calendarStart;
     const showArchived  = get().showArchivedRows;
 
-    const [groups, locations, sections, stageDefs, taskTypeList] = await Promise.all([
+    const [groups, locations, sections, stageDefs, taskTypeList, todayDueTasks, todayOverdueTasks] = await Promise.all([
       getAllLocationGroups(),
       getAllLocations(),
       getAllSections(),
       getStageDefs(),
       getTaskTypes(),
+      getDueToday(),
+      getOverdue(),
     ]);
 
     const rows: GridRowItem[]           = [];
@@ -281,6 +302,15 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
       pushRow({ type: 'group_footer' });
     }
 
-    set({ rows, allTaskLines, notes, stageDefinitions: stageDefs, taskTypes: taskTypeList, isLoaded: true });
+    set({
+      rows,
+      allTaskLines,
+      notes,
+      todayDueTasks,
+      todayOverdueTasks,
+      stageDefinitions: stageDefs,
+      taskTypes: taskTypeList,
+      isLoaded: true,
+    });
   },
 }));

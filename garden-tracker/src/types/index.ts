@@ -78,6 +78,23 @@ export interface TaskCompletion {
   completed_date: string; // ISO date — the Sunday of the week this was completed
 }
 
+export interface TodayTaskItem {
+  task_id: number;
+  crop_instance_id: number;
+  task_type_id: number;
+  task_type_name: string;
+  color: string;
+  crop_name: string;
+  section_name: string;
+  location_name: string;
+  day_of_week: number;
+  frequency_weeks: number;
+  start_offset_weeks: number;
+  due_date: string;
+  week_date: string;
+  missed_count: number; // 1 = missed once (just last week); >1 = consecutive misses
+}
+
 export interface Note {
   id: number;
   entity_type: 'crop_instance' | 'task' | 'week_cell';

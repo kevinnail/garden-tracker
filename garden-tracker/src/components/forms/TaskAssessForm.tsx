@@ -16,9 +16,7 @@ interface TaskAssessFormProps {
 }
 
 const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-// Show occurrences from 4 weeks ago through 8 weeks ahead
-const WINDOW_PAST  = 4;
+const WINDOW_PAST = 4;
 const WINDOW_AHEAD = 8;
 
 function formatOccurrenceDate(weekSunday: string, dayOfWeek: number): string {
@@ -30,33 +28,44 @@ function formatOccurrenceDate(weekSunday: string, dayOfWeek: number): string {
 }
 
 export default function TaskAssessForm({ embedded = false }: TaskAssessFormProps) {
-  const rows           = usePlannerStore(s => s.rows);
-  const calendarStart  = usePlannerStore(s => s.calendarStart);
+  const rows = usePlannerStore(s => s.rows);
+  const calendarStart = usePlannerStore(s => s.calendarStart);
   const selectedCropId = usePlannerStore(s => s.selectedCropId);
-  const completeTask   = usePlannerStore(s => s.completeTask);
+  const completeTask = usePlannerStore(s => s.completeTask);
   const uncompleteTask = usePlannerStore(s => s.uncompleteTask);
-  const deleteTask     = usePlannerStore(s => s.deleteTask);
-  const adjustTaskDay  = usePlannerStore(s => s.adjustTaskDay);
+  const deleteTask = usePlannerStore(s => s.deleteTask);
+  const adjustTaskDay = usePlannerStore(s => s.adjustTaskDay);
 
   const cropRow = rows.find(r => r.type === 'crop_row' && r.crop.id === selectedCropId);
 
-  if (cropRow?.type !== 'crop_row') {
+  const wrapInSafeArea = (content: React.ReactNode) => {
+    if (embedded) {
+      return content;
+    }
+
     return (
       <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
+        {content}
+      </SafeAreaView>
+    );
+  };
+
+  if (cropRow?.type !== 'crop_row') {
+    return wrapInSafeArea(
+      <View style={styles.container}>
         <Text style={styles.empty}>No crop selected.</Text>
         {!embedded && (
           <Pressable style={styles.doneBtn} onPress={() => router.back()}>
             <Text style={styles.doneBtnText}>Done</Text>
           </Pressable>
         )}
-      </SafeAreaView>
+      </View>
     );
   }
 
   const { tasks, completions, crop, weekColorMap } = cropRow;
   const completionSet = new Set(completions.map(c => `${c.task_id}:${c.completed_date}`));
 
-  // Derive crop week span from weekColorMap
   const colorKeys = Object.keys(weekColorMap).map(Number);
   const cropStartWeek = colorKeys.length > 0 ? Math.min(...colorKeys) : dateToWeekIndex(calendarStart, (() => {
     const d = parseDateKey(crop.start_date);
@@ -64,10 +73,9 @@ export default function TaskAssessForm({ embedded = false }: TaskAssessFormProps
   })());
   const cropEndWeek = colorKeys.length > 0 ? Math.max(...colorKeys) : cropStartWeek;
 
-  // Window: 4 weeks before today through 8 weeks ahead
-  const todayWeek    = dateToWeekIndex(calendarStart, toSunday(new Date()));
-  const windowStart  = Math.max(cropStartWeek, todayWeek - WINDOW_PAST);
-  const windowEnd    = Math.min(cropEndWeek, todayWeek + WINDOW_AHEAD);
+  const todayWeek = dateToWeekIndex(calendarStart, toSunday(new Date()));
+  const windowStart = Math.max(cropStartWeek, todayWeek - WINDOW_PAST);
+  const windowEnd = Math.min(cropEndWeek, todayWeek + WINDOW_AHEAD);
 
   const handleToggle = async (task: Task, weekSunday: string) => {
     const key = `${task.id}:${weekSunday}`;
@@ -98,8 +106,8 @@ export default function TaskAssessForm({ embedded = false }: TaskAssessFormProps
   };
 
   if (tasks.length === 0) {
-    return (
-      <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
+    return wrapInSafeArea(
+      <View style={styles.container}>
         <Text style={styles.empty}>
           No tasks for {crop.name}.{"\n"}Tap + Task to add your first one.
         </Text>
@@ -113,95 +121,92 @@ export default function TaskAssessForm({ embedded = false }: TaskAssessFormProps
             </Pressable>
           )}
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
-  return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.cropLabel}>{crop.name}</Text>
+  return wrapInSafeArea(
+    <ScrollView contentContainerStyle={[styles.content, embedded && styles.embeddedContent]}>
+      <Text style={styles.cropLabel}>{crop.name}</Text>
 
-        {tasks.map(task => {
-          const occurrences = getTaskLineOccurrences(task, cropStartWeek, cropEndWeek, calendarStart)
-            .filter(occ => occ.weekIndex >= windowStart && occ.weekIndex <= windowEnd);
+      {tasks.map(task => {
+        const occurrences = getTaskLineOccurrences(task, cropStartWeek, cropEndWeek, calendarStart)
+          .filter(occ => occ.weekIndex >= windowStart && occ.weekIndex <= windowEnd);
 
-          return (
-            <View key={task.id} style={styles.taskBlock}>
-              {/* Task type header row */}
-              <View style={styles.taskTypeHeader}>
-                <View style={[styles.colorDot, { backgroundColor: task.color }]} />
-                <Text style={styles.taskTypeName}>{task.task_type_name}</Text>
-                <View style={styles.dayAdjuster}>
-                  <Pressable style={styles.adjBtn} onPress={() => handleAdjustDay(task, -1)}>
-                    <Text style={styles.adjBtnText}>◀</Text>
-                  </Pressable>
-                  <Text style={styles.dayLabel}>{DAYS_SHORT[task.day_of_week]}</Text>
-                  <Pressable style={styles.adjBtn} onPress={() => handleAdjustDay(task, 1)}>
-                    <Text style={styles.adjBtnText}>▶</Text>
-                  </Pressable>
-                </View>
-                <Text style={styles.freqLabel}>/{task.frequency_weeks}w</Text>
-                <Pressable onPress={() => handleDelete(task)} style={styles.deleteBtn}>
-                  <Text style={styles.deleteBtnText}>✕</Text>
+        return (
+          <View key={task.id} style={styles.taskBlock}>
+            <View style={styles.taskTypeHeader}>
+              <View style={[styles.colorDot, { backgroundColor: task.color }]} />
+              <Text style={styles.taskTypeName}>{task.task_type_name}</Text>
+              <View style={styles.dayAdjuster}>
+                <Pressable style={styles.adjBtn} onPress={() => handleAdjustDay(task, -1)}>
+                  <Text style={styles.adjBtnText}>◀</Text>
+                </Pressable>
+                <Text style={styles.dayLabel}>{DAYS_SHORT[task.day_of_week]}</Text>
+                <Pressable style={styles.adjBtn} onPress={() => handleAdjustDay(task, 1)}>
+                  <Text style={styles.adjBtnText}>▶</Text>
                 </Pressable>
               </View>
-
-              {/* Individual dated occurrences */}
-              {occurrences.length === 0 ? (
-                <Text style={styles.noOccurrences}>No occurrences in this window</Text>
-              ) : (
-                occurrences.map(occ => {
-                  const done = completionSet.has(`${task.id}:${occ.weekSunday}`);
-                  const isPast = occ.weekIndex < todayWeek;
-                  return (
-                    <Pressable
-                      key={occ.weekSunday}
-                      style={[styles.occurrenceRow, done && styles.occurrenceRowDone]}
-                      onPress={() => handleToggle(task, occ.weekSunday)}
-                    >
-                      <View style={[styles.checkBox, done && { backgroundColor: task.color, borderColor: task.color }]}>
-                        {done && <Text style={styles.checkMark}>✓</Text>}
-                      </View>
-                      <Text style={[styles.occurrenceDate, done && styles.occurrenceDateDone, isPast && !done && styles.occurrenceDateOverdue]}>
-                        {formatOccurrenceDate(occ.weekSunday, task.day_of_week)}
-                      </Text>
-                      {isPast && !done && (
-                        <View style={styles.overdueBadge}>
-                          <Text style={styles.overdueBadgeText}>Overdue</Text>
-                        </View>
-                      )}
-                      {!isPast && !done && (
-                        <View style={styles.dueBadge}>
-                          <Text style={styles.dueBadgeText}>Due</Text>
-                        </View>
-                      )}
-                    </Pressable>
-                  );
-                })
-              )}
+              <Text style={styles.freqLabel}>/{task.frequency_weeks}w</Text>
+              <Pressable onPress={() => handleDelete(task)} style={styles.deleteBtn}>
+                <Text style={styles.deleteBtnText}>✕</Text>
+              </Pressable>
             </View>
-          );
-        })}
 
-        <View style={styles.actionRow}>
-          <Pressable style={styles.addTaskBtn} onPress={handleAddTask}>
-            <Text style={styles.addTaskBtnText}>+ Task</Text>
+            {occurrences.length === 0 ? (
+              <Text style={styles.noOccurrences}>No occurrences in this window</Text>
+            ) : (
+              occurrences.map(occ => {
+                const done = completionSet.has(`${task.id}:${occ.weekSunday}`);
+                const isPast = occ.weekIndex < todayWeek;
+                return (
+                  <Pressable
+                    key={occ.weekSunday}
+                    style={[styles.occurrenceRow, done && styles.occurrenceRowDone]}
+                    onPress={() => handleToggle(task, occ.weekSunday)}
+                  >
+                    <View style={[styles.checkBox, done && { backgroundColor: task.color, borderColor: task.color }]}>
+                      {done && <Text style={styles.checkMark}>✓</Text>}
+                    </View>
+                    <Text style={[styles.occurrenceDate, done && styles.occurrenceDateDone, isPast && !done && styles.occurrenceDateOverdue]}>
+                      {formatOccurrenceDate(occ.weekSunday, task.day_of_week)}
+                    </Text>
+                    {isPast && !done && (
+                      <View style={styles.overdueBadge}>
+                        <Text style={styles.overdueBadgeText}>Overdue</Text>
+                      </View>
+                    )}
+                    {!isPast && !done && (
+                      <View style={styles.dueBadge}>
+                        <Text style={styles.dueBadgeText}>Due</Text>
+                      </View>
+                    )}
+                  </Pressable>
+                );
+              })
+            )}
+          </View>
+        );
+      })}
+
+      <View style={styles.actionRow}>
+        <Pressable style={styles.addTaskBtn} onPress={handleAddTask}>
+          <Text style={styles.addTaskBtnText}>+ Task</Text>
+        </Pressable>
+        {!embedded && (
+          <Pressable style={styles.doneBtn} onPress={() => router.back()}>
+            <Text style={styles.doneBtnText}>Done</Text>
           </Pressable>
-          {!embedded && (
-            <Pressable style={styles.doneBtn} onPress={() => router.back()}>
-              <Text style={styles.doneBtnText}>Done</Text>
-            </Pressable>
-          )}
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+        )}
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#1a1a1a' },
   content: { padding: 16, paddingBottom: 40 },
+  embeddedContent: { paddingBottom: 20 },
   cropLabel: { color: '#aaa', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 16 },
   empty: { color: '#555', fontSize: 14, padding: 24, textAlign: 'center', lineHeight: 22 },
 
