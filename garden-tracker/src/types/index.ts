@@ -98,6 +98,7 @@ export type GridRowItem =
   | { type: 'location_footer' }
   | { type: 'section_header';  section: Section }
   | { type: 'section_footer' }
+  | { type: 'section_spacer' }
   | { type: 'crop_row';        crop: CropInstance; weekColorMap: Record<number, string>; tasks: Task[]; completions: TaskCompletion[] }
   | { type: 'placeholder';     index: number };
 
