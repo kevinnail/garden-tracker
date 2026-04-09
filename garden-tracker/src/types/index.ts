@@ -92,6 +92,7 @@ export interface TodayTaskItem {
   start_offset_weeks: number;
   due_date: string;
   week_date: string;
+  missed_count: number; // 1 = missed once (just last week); >1 = consecutive misses
 }
 
 export interface Note {
