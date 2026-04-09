@@ -12,7 +12,7 @@ import { getStageColorAtWeek } from '@/src/utils/stageUtils';
 import { getTaskLineOccurrences } from '@/src/utils/taskUtils';
 
 import { getAllLocationGroups, getAllLocations, getAllSections } from '@/src/db/queries/locationQueries';
-import { getCropsForSection, getCropStages, getStageDefs, insertCropInstance, insertCropStage } from '@/src/db/queries/cropQueries';
+import { getCropsForSection, getCropStages, getStageDefs, insertCropInstance, insertCropStage, deleteCropInstance } from '@/src/db/queries/cropQueries';
 import { getTasksForCrop, getCompletionsForCrop, getTaskTypes, insertTask, insertCompletion, deleteCompletion, deleteTask as dbDeleteTask, updateTaskDay } from '@/src/db/queries/taskQueries';
 import { NewCropData, NewTaskData } from '@/src/types';
 
@@ -28,6 +28,7 @@ interface PlannerState {
 
   loadData: () => Promise<void>;
   addCrop: (data: NewCropData) => Promise<void>;
+  deleteCrop: (cropId: number) => Promise<void>;
   addTask: (data: NewTaskData) => Promise<void>;
   completeTask: (taskId: number, weekDate: string) => Promise<void>;
   uncompleteTask: (taskId: number, weekDate: string) => Promise<void>;
@@ -71,6 +72,12 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
 
   adjustTaskDay: async (taskId, dayOfWeek) => {
     await updateTaskDay(taskId, dayOfWeek);
+    await get().loadData();
+  },
+
+  deleteCrop: async (cropId) => {
+    await deleteCropInstance(cropId);
+    set({ selectedCropId: null });
     await get().loadData();
   },
 
