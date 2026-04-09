@@ -4,18 +4,35 @@ import { PRESET_TASK_TYPES } from '@/src/constants/taskTypes';
 import { toSunday, formatDateKey } from '@/src/utils/dateUtils';
 
 let _db: SQLite.SQLiteDatabase | null = null;
+let _dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
 export async function getDb(): Promise<SQLite.SQLiteDatabase> {
   if (_db) return _db;
-  _db = await SQLite.openDatabaseAsync('garden_tracker.db');
-  await initSchema(_db);
-  await seedIfNeeded(_db);
-  await removeDemoData(_db);
-  return _db;
+  if (_dbPromise) return _dbPromise;
+
+  _dbPromise = (async () => {
+    const db = await SQLite.openDatabaseAsync('garden_tracker.db');
+    await initSchema(db);
+    await seedIfNeeded(db);
+    await removeDemoData(db);
+    _db = db;
+    return db;
+  })();
+
+  try {
+    return await _dbPromise;
+  } catch (error) {
+    _dbPromise = null;
+    throw error;
+  }
 }
 
 async function initSchema(db: SQLite.SQLiteDatabase) {
-  await db.runAsync('PRAGMA journal_mode = WAL');
+  try {
+    await db.runAsync('PRAGMA journal_mode = WAL');
+  } catch {
+    // Expo SQLite web support is still alpha; continue if WAL is unavailable.
+  }
 
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS settings (
