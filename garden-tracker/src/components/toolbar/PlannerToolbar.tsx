@@ -6,7 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { usePlannerStore } from '@/src/store/plannerStore';
 
 export default function PlannerToolbar() {
-  const selectedCropId = usePlannerStore(s => s.selectedCropId);
+  const showArchivedRows = usePlannerStore(s => s.showArchivedRows);
+  const toggleArchivedRows = usePlannerStore(s => s.toggleArchivedRows);
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
@@ -17,11 +18,14 @@ export default function PlannerToolbar() {
         <Pressable style={styles.locationBtn} onPress={() => router.push('/(modals)/add-garden')}>
           <Text style={styles.locationBtnText}>Gardens ⚙ </Text>
         </Pressable>
-        {selectedCropId != null && (
-          <Pressable style={styles.taskBtn} onPress={() => router.push('/(modals)/add-task')}>
-            <Text style={styles.taskBtnText}>+ Task</Text>
-          </Pressable>
-        )}
+        <Pressable
+          style={[styles.archiveBtn, showArchivedRows && styles.archiveBtnActive]}
+          onPress={toggleArchivedRows}
+        >
+          <Text style={[styles.archiveBtnText, showArchivedRows && styles.archiveBtnTextActive]}>
+            {showArchivedRows ? 'Archived On' : 'Archived'}
+          </Text>
+        </Pressable>
       </View>
     </SafeAreaView>
   );
@@ -62,15 +66,24 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 13,
   },
-  taskBtn: {
+  archiveBtn: {
     paddingHorizontal: 14,
     paddingVertical: 6,
-    backgroundColor: '#3498db',
+    backgroundColor: '#2e2a16',
     borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#4b4420',
   },
-  taskBtnText: {
-    color: '#fff',
+  archiveBtnActive: {
+    backgroundColor: '#d8d0bf',
+    borderColor: '#d8d0bf',
+  },
+  archiveBtnText: {
+    color: '#d8c36a',
     fontWeight: 'bold',
     fontSize: 13,
+  },
+  archiveBtnTextActive: {
+    color: '#111',
   },
 });
