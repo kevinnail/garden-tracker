@@ -10,6 +10,7 @@ export async function getDb(): Promise<SQLite.SQLiteDatabase> {
   _db = await SQLite.openDatabaseAsync('garden_tracker.db');
   await initSchema(_db);
   await seedIfNeeded(_db);
+  await removeDemoData(_db);
   return _db;
 }
 
@@ -103,6 +104,21 @@ async function initSchema(db: SQLite.SQLiteDatabase) {
       updated_at       TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `);
+}
+
+async function removeDemoData(db: SQLite.SQLiteDatabase) {
+  const done = await db.getFirstAsync<{ value: string }>(
+    `SELECT value FROM settings WHERE key = 'demo_removed'`
+  );
+  if (done) return;
+
+  // Remove the seeded demo location hierarchy (My Garden → Raised Beds → Bed 1)
+  // Safe to run even if already gone — DELETE WHERE matches nothing is a no-op
+  await db.runAsync(`DELETE FROM sections WHERE name = 'Bed 1' AND location_id IN (SELECT id FROM locations WHERE name = 'Raised Beds')`);
+  await db.runAsync(`DELETE FROM locations WHERE name = 'Raised Beds'`);
+  await db.runAsync(`DELETE FROM location_groups WHERE name = 'My Garden'`);
+
+  await db.runAsync(`INSERT INTO settings (key, value) VALUES ('demo_removed', '1')`);
 }
 
 async function seedIfNeeded(db: SQLite.SQLiteDatabase) {
