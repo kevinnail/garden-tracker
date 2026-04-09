@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { router } from 'expo-router';
 
 import {
   ROW_HEIGHT,
@@ -48,7 +49,13 @@ export default function RowHeader({ rows }: Props) {
             <Pressable
               key={i}
               style={[styles.row, isSelected && styles.rowSelected]}
-              onLongPress={() => setSelectedCrop(isSelected ? null : item.crop.id)}
+              onLongPress={() => {
+                setSelectedCrop(item.crop.id);
+                const targetRoute = item.tasks.length > 0
+                  ? '/(modals)/manage-tasks'
+                  : '/(modals)/add-task';
+                router.push(targetRoute);
+              }}
             >
               <View style={styles.countCell}>
                 <Text style={styles.countText}>{item.crop.plant_count}</Text>
