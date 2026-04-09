@@ -71,7 +71,26 @@ function isTaskScheduledOnDate(task: DashboardTaskRow, dueDate: Date): boolean {
   return (weekOffset - task.start_offset_weeks) % task.frequency_weeks === 0;
 }
 
-function buildDashboardItem(task: DashboardTaskRow, dueDate: Date): TodayTaskItem {
+function countMissedOccurrences(
+  task: DashboardTaskRow,
+  mostRecentDueDate: Date,
+  completions: Set<string>
+): number {
+  const stepDays = task.frequency_weeks * 7;
+  let count = 0;
+  let date = mostRecentDueDate;
+
+  for (let i = 0; i < 52; i++) {
+    if (!isTaskScheduledOnDate(task, date)) break;
+    if (completions.has(`${task.task_id}:${formatDateKey(toSunday(date))}`)) break;
+    count++;
+    date = addDays(date, -stepDays);
+  }
+
+  return count;
+}
+
+function buildDashboardItem(task: DashboardTaskRow, dueDate: Date, missed_count = 1): TodayTaskItem {
   return {
     task_id: task.task_id,
     crop_instance_id: task.crop_instance_id,
@@ -86,6 +105,7 @@ function buildDashboardItem(task: DashboardTaskRow, dueDate: Date): TodayTaskIte
     start_offset_weeks: task.start_offset_weeks,
     due_date: formatDateKey(dueDate),
     week_date: formatDateKey(toSunday(dueDate)),
+    missed_count,
   };
 }
 
@@ -258,6 +278,6 @@ export async function getOverdue(referenceDate: Date = new Date()): Promise<Toda
     .filter(({ dueDate }) => utcMidnightMs(dueDate) >= utcMidnightMs(overdueFloor))
     .filter(({ task, dueDate }) => isTaskScheduledOnDate(task, dueDate))
     .filter(({ task, dueDate }) => !completions.has(`${task.task_id}:${formatDateKey(toSunday(dueDate))}`))
-    .map(({ task, dueDate }) => buildDashboardItem(task, dueDate))
+    .map(({ task, dueDate }) => buildDashboardItem(task, dueDate, countMissedOccurrences(task, dueDate, completions)))
     .sort(compareDashboardItems);
 }
