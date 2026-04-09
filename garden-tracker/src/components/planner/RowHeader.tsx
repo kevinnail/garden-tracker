@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { router } from 'expo-router';
 
@@ -10,6 +10,7 @@ import {
 } from '@/src/constants/layout';
 import { GridRowItem } from '@/src/types';
 import { usePlannerStore } from '@/src/store/plannerStore';
+import { getRowHeight, getRowOffsets, getTotalRowsHeight } from '../../utils/rowLayout';
 
 interface Props {
   rows: GridRowItem[];
@@ -38,26 +39,33 @@ const CROP_BG = '#191928';
 export default function RowHeader({ rows }: Props) {
   const selectedCropId = usePlannerStore(s => s.selectedCropId);
   const setSelectedCrop = usePlannerStore(s => s.setSelectedCrop);
+  const rowOffsets = useMemo(() => getRowOffsets(rows), [rows]);
+  const totalHeight = useMemo(() => getTotalRowsHeight(rows), [rows]);
 
   return (
-    <View style={[styles.container, { height: rows.length * ROW_HEIGHT }]}>
+    <View style={[styles.container, { height: totalHeight }] }>
       {rows.map((item, i) => {
+        const rowHeight = getRowHeight(item);
+        const rowStyle = [
+          styles.row,
+          { top: rowOffsets[i], height: rowHeight },
+        ] as const;
 
         // ── Garden top band ────────────────────────────────────────────────
         if (item.type === 'group_header') return (
-          <View key={i} style={[styles.row, { backgroundColor: GARDEN_BAND }]}>
+          <View key={i} style={[rowStyle, { backgroundColor: GARDEN_BAND }]}>
             <Text style={styles.gardenText} numberOfLines={1}>{item.group.name}</Text>
           </View>
         );
 
         // ── Garden bottom band ─────────────────────────────────────────────
         if (item.type === 'group_footer') return (
-          <View key={i} style={[styles.row, { backgroundColor: GARDEN_BAND }]} />
+          <View key={i} style={[rowStyle, { backgroundColor: GARDEN_BAND }]} />
         );
 
         // ── Location top band (garden bar on left connects to garden bands) ─
         if (item.type === 'location_header') return (
-          <View key={i} style={[styles.row, { backgroundColor: LOCATION_BAND }]}>
+          <View key={i} style={[rowStyle, { backgroundColor: LOCATION_BAND }]}>
             <View style={[styles.bar, { width: 5, backgroundColor: GARDEN_BAR }]} />
             <Text style={styles.locationText} numberOfLines={1}>{item.location.name}</Text>
           </View>
@@ -65,25 +73,32 @@ export default function RowHeader({ rows }: Props) {
 
         // ── Location bottom band ───────────────────────────────────────────
         if (item.type === 'location_footer') return (
-          <View key={i} style={[styles.row, { backgroundColor: LOCATION_BAND }]}>
+          <View key={i} style={[rowStyle, { backgroundColor: LOCATION_BAND }]}>
             <View style={[styles.bar, { width: 5, backgroundColor: GARDEN_BAR }]} />
           </View>
         );
 
         // ── Section top band ───────────────────────────────────────────────
         if (item.type === 'section_header') return (
-          <View key={i} style={[styles.row, { backgroundColor: SECTION_BAND }]}>
+          <View key={i} style={[rowStyle, { backgroundColor: SECTION_BAND }]}>
             <View style={[styles.bar, { width: 5, backgroundColor: GARDEN_BAR }]} />
             <View style={[styles.bar, { width: 4, backgroundColor: LOCATION_BAR }]} />
             <Text style={styles.sectionText} numberOfLines={1}>{item.section.name}</Text>
           </View>
         );
 
-        // ── Section gap (left bars visible through the gap) ────────────────
+        // ── Section bottom band ────────────────────────────────────────────
         if (item.type === 'section_footer') return (
-          <View key={i} style={[styles.row, { backgroundColor: BACKGROUND_COLOR }]}>
+          <View key={i} style={[rowStyle, { backgroundColor: SECTION_BAND }]}>
             <View style={[styles.bar, { width: 5, backgroundColor: GARDEN_BAR }]} />
             <View style={[styles.bar, { width: 4, backgroundColor: LOCATION_BAR }]} />
+          </View>
+        );
+
+        // ── Section spacer between framed sections ────────────────────────
+        if (item.type === 'section_spacer') return (
+          <View key={i} style={[rowStyle, { backgroundColor: LOCATION_BAND }] }>
+            <View style={[styles.bar, { width: 5, backgroundColor: GARDEN_BAR }]} />
           </View>
         );
 
@@ -93,7 +108,7 @@ export default function RowHeader({ rows }: Props) {
           return (
             <Pressable
               key={i}
-              style={[styles.row, { backgroundColor: isSelected ? '#1a2a3a' : CROP_BG }]}
+              style={[rowStyle, { backgroundColor: isSelected ? '#1a2a3a' : CROP_BG }]}
               onLongPress={() => {
                 setSelectedCrop(item.crop.id);
                 router.push(item.tasks.length > 0 ? '/(modals)/manage-tasks' : '/(modals)/add-task');
@@ -114,7 +129,7 @@ export default function RowHeader({ rows }: Props) {
           );
         }
 
-        return <View key={i} style={[styles.row, { backgroundColor: BACKGROUND_COLOR }]} />;
+        return <View key={i} style={[rowStyle, { backgroundColor: BACKGROUND_COLOR }]} />;
       })}
     </View>
   );
@@ -124,17 +139,18 @@ const CROP_NAME_WIDTH = ROW_HEADER_WIDTH - PLANT_COUNT_WIDTH - 5 - 4 - 3; // 200
 
 const styles = StyleSheet.create({
   container: {
+    position: 'relative',
     width: ROW_HEADER_WIDTH,
     backgroundColor: BACKGROUND_COLOR,
   },
   row: {
+    position: 'absolute',
     flexDirection: 'row',
     width: ROW_HEADER_WIDTH,
-    height: ROW_HEIGHT,
     alignItems: 'center',
   },
   bar: {
-    height: ROW_HEIGHT,
+    height: '100%',
     flexShrink: 0,
   },
 
