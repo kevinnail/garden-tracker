@@ -10,6 +10,7 @@ export default function RootLayout() {
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="(modals)/add-crop" options={{ presentation: 'modal', title: 'Add Crop', headerStyle: { backgroundColor: '#1a1a1a' }, headerTintColor: '#ddd' }} />
+        <Stack.Screen name="(modals)/edit-crop" options={{ presentation: 'modal', title: 'Crop', headerStyle: { backgroundColor: '#111' }, headerTintColor: '#ddd' }} />
         <Stack.Screen name="(modals)/add-task" options={{ presentation: 'modal', title: 'Add Task', headerStyle: { backgroundColor: '#1a1a1a' }, headerTintColor: '#ddd' }} />
         <Stack.Screen name="(modals)/manage-tasks" options={{ presentation: 'modal', title: 'Manage Tasks', headerStyle: { backgroundColor: '#1a1a1a' }, headerTintColor: '#ddd' }} />
         <Stack.Screen name="(modals)/add-garden" options={{ presentation: 'modal', title: 'Add Garden', headerStyle: { backgroundColor: '#1a1a1a' }, headerTintColor: '#ddd' }} />
