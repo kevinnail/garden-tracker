@@ -23,6 +23,9 @@ export const SEED = {
   PLANT_COUNT: 6,
   START_DATE: '2025-03-02', // a Sunday
   STAGE_COUNT: 2,           // Seedling + Vegetative
+  TASK_ID: 1,
+  TASK_TYPE_ID: 1,          // Watering (first in PRESET_TASK_TYPES)
+  TASK_DAY_OF_WEEK: 3,      // Wednesday
 };
 
 // Adapter that wraps better-sqlite3's sync API to match expo-sqlite's async API
@@ -93,6 +96,31 @@ export function setupTestDb() {
       duration_weeks      INTEGER NOT NULL,
       order_index         INTEGER NOT NULL DEFAULT 0
     );
+    CREATE TABLE tasks (
+      id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+      crop_instance_id   INTEGER NOT NULL,
+      task_type_id       INTEGER NOT NULL,
+      day_of_week        INTEGER NOT NULL,
+      frequency_weeks    INTEGER NOT NULL DEFAULT 1,
+      start_offset_weeks INTEGER NOT NULL DEFAULT 0,
+      created_at         TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE task_completions (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      task_id        INTEGER NOT NULL,
+      completed_date TEXT NOT NULL,
+      UNIQUE(task_id, completed_date)
+    );
+    CREATE TABLE notes (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      entity_type      TEXT NOT NULL,
+      entity_id        INTEGER,
+      week_date        TEXT,
+      crop_instance_id INTEGER,
+      content          TEXT NOT NULL,
+      created_at       TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at       TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
 
   // Stage definitions (all 7 presets)
@@ -122,6 +150,12 @@ export function setupTestDb() {
   const vegetativeId = (db.prepare("SELECT id FROM stage_definitions WHERE name = 'Vegetative'").get() as any).id;
   db.prepare('INSERT INTO crop_stages (crop_instance_id, stage_definition_id, duration_weeks, order_index) VALUES (?, ?, ?, ?)').run(SEED.CROP_ID, seedlingId, 3, 0);
   db.prepare('INSERT INTO crop_stages (crop_instance_id, stage_definition_id, duration_weeks, order_index) VALUES (?, ?, ?, ?)').run(SEED.CROP_ID, vegetativeId, 6, 1);
+
+  // One seeded task: Watering on Wednesday, every week, no offset
+  db.prepare('INSERT INTO tasks (crop_instance_id, task_type_id, day_of_week, frequency_weeks, start_offset_weeks) VALUES (?, ?, ?, ?, ?)').run(
+    SEED.CROP_ID, SEED.TASK_TYPE_ID, SEED.TASK_DAY_OF_WEEK, 1, 0
+  );
+  // → task_id = 1 = SEED.TASK_ID
 
   return { db, adapter: createTestAdapter(db) };
 }
