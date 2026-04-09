@@ -2,19 +2,20 @@ import { create } from 'zustand';
 
 import {
   GridRowItem,
+  NewCropData,
+  NewTaskData,
   PrecomputedTaskLine,
   StageDefinition,
   TaskType,
 } from '@/src/types';
 import { ROW_HEIGHT } from '@/src/constants/layout';
 import { defaultCalendarStart, dateToWeekIndex, parseDateKey, toSunday } from '@/src/utils/dateUtils';
-import { getStageColorAtWeek } from '@/src/utils/stageUtils';
+import { getRowHeight } from '../utils/rowLayout';
 import { getTaskLineOccurrences } from '@/src/utils/taskUtils';
 
 import { getAllLocationGroups, getAllLocations, getAllSections, insertLocationGroup, insertLocation, insertSection, deleteLocationGroup, deleteLocation, deleteSection } from '@/src/db/queries/locationQueries';
 import { getCropsForSection, getCropStages, getStageDefs, insertCropInstance, insertCropStage, deleteCropInstance } from '@/src/db/queries/cropQueries';
 import { getTasksForCrop, getCompletionsForCrop, getTaskTypes, insertTask, insertCompletion, deleteCompletion, deleteTask as dbDeleteTask, updateTaskDay } from '@/src/db/queries/taskQueries';
-import { NewCropData, NewTaskData } from '@/src/types';
 
 interface PlannerState {
   rows: GridRowItem[];
@@ -144,28 +145,35 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
 
     const rows: GridRowItem[]           = [];
     const allTaskLines: PrecomputedTaskLine[] = [];
+    let currentTop = 0;
+
+    const pushRow = (row: GridRowItem) => {
+      rows.push(row);
+      currentTop += getRowHeight(row);
+    };
 
     for (const group of groups) {
-      rows.push({ type: 'group_header', group });
+      pushRow({ type: 'group_header', group });
 
       const groupLocations = locations.filter(l => l.location_group_id === group.id);
 
       for (const location of groupLocations) {
         const locationSections = sections.filter(s => s.location_id === location.id);
 
-        rows.push({ type: 'location_header', location });
+        pushRow({ type: 'location_header', location });
 
         for (const section of locationSections) {
-          rows.push({ type: 'section_header', section });
+          pushRow({ type: 'section_header', section });
 
           const crops = await getCropsForSection(section.id, showArchived);
 
           if (crops.length === 0) {
-            rows.push({ type: 'section_footer' });
+            pushRow({ type: 'section_footer' });
+            pushRow({ type: 'section_spacer' });
           }
 
           for (const crop of crops) {
-            const rowIndex = rows.length; // this row's position in the flat list
+            const y1 = currentTop;
 
             const [stages, tasks, completions] = await Promise.all([
               getCropStages(crop.id),
@@ -194,13 +202,12 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
             }
             const cropEndWeek = cursor - 1;
 
-            rows.push({ type: 'crop_row', crop, weekColorMap, tasks, completions });
+            pushRow({ type: 'crop_row', crop, weekColorMap, tasks, completions });
 
             // Precompute task lines for this row — zero work at render time
             const completionSet = new Set(
               completions.map(c => `${c.task_id}:${c.completed_date}`)
             );
-            const y1 = rowIndex * ROW_HEIGHT;
             const y2 = y1 + ROW_HEIGHT;
 
             for (const task of tasks) {
@@ -219,13 +226,14 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
           }
 
           if (crops.length > 0) {
-            rows.push({ type: 'section_footer' });
+            pushRow({ type: 'section_footer' });
+            pushRow({ type: 'section_spacer' });
           }
         }
 
-        rows.push({ type: 'location_footer' });
+        pushRow({ type: 'location_footer' });
       }
-      rows.push({ type: 'group_footer' });
+      pushRow({ type: 'group_footer' });
     }
 
     set({ rows, allTaskLines, stageDefinitions: stageDefs, taskTypes: taskTypeList, isLoaded: true });
