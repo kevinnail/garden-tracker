@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, ViewStyle } from 'react-native';
+import { Pressable, View, StyleSheet, ViewStyle } from 'react-native';
 import Svg, { Defs, Pattern, Line, Rect, Polygon } from 'react-native-svg';
 
 import { CELL_WIDTH, ROW_HEIGHT, EMPTY_CELL_COLOR } from '@/src/constants/layout';
@@ -9,6 +9,8 @@ interface Props {
   isPast: boolean;           // true = left of today's column
   hasNote?: boolean;         // shows red triangle in top-right corner
   style?: ViewStyle;         // position: absolute left/top injected by GridBody
+  onPress?: () => void;
+  onLongPress?: () => void;
 }
 
 /**
@@ -22,11 +24,16 @@ interface Props {
  * Past hatch applies regardless of stage color — empty past cells also get hatched.
  * Per VBA: ALL cells left of today get the hatch, inside AND outside crop spans.
  */
-export default function CropCell({ stageColor, isPast, hasNote = false, style }: Props) {
+export default function CropCell({ stageColor, isPast, hasNote = false, style, onPress, onLongPress }: Props) {
   const bg = stageColor ?? EMPTY_CELL_COLOR;
 
   return (
-    <View style={[styles.cell, { backgroundColor: bg }, style]}>
+    <Pressable
+      style={[styles.cell, { backgroundColor: bg }, style]}
+      onPress={hasNote ? onPress : undefined}
+      onLongPress={onLongPress}
+      delayLongPress={250}
+    >
       {isPast && (
         <Svg style={StyleSheet.absoluteFill} width={CELL_WIDTH} height={ROW_HEIGHT}>
           <Defs>
@@ -49,7 +56,7 @@ export default function CropCell({ stageColor, isPast, hasNote = false, style }:
           <Polygon points="0,0 8,0 8,8" fill="#FF0000" />
         </Svg>
       )}
-    </View>
+    </Pressable>
   );
 }
 
