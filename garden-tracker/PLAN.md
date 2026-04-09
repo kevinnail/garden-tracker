@@ -147,6 +147,28 @@ When implementing any feature, read the corresponding VBA file first to understa
 
 ---
 
+## Testing Convention
+
+Every slice that adds business logic or database access gets tests written as part of that slice — not after. CI must pass before merging.
+
+**Three categories — pick the right one:**
+
+| Category | When to use | Mock? | Style reference |
+|---|---|---|---|
+| Pure unit | Pure functions (date math, stage color logic, task position math) | No mocks | `__tests__/unit/dateUtils.test.ts` |
+| DB unit | Query functions in isolation | Mock `getDb` | `__tests__/unit/cropQueries.test.ts`, `EXAMPLE TESTS/Unit/Models/` |
+| Integration | Full round-trip through real SQLite | `getDb` returns real adapter from `setupTestDb()` | `__tests__/integration/cropQueries.test.ts`, `EXAMPLE TESTS/Integration/_controllers/` |
+
+**Rules:**
+- Use `jest.clearAllMocks()` in `beforeEach`, not `resetAllMocks`
+- Use `mockResolvedValueOnce` per test, not `mockResolvedValue` in beforeEach
+- Every query function gets an error-handling test: `rejects.toThrow('Database error')`
+- Integration tests assert on actual values from seed data — not SQL strings or call counts
+- New query files get both a unit suite and an integration suite
+- Add tests to existing suites when the slice only extends an existing query file
+
+---
+
 ## Slices
 
 ---
@@ -207,6 +229,10 @@ dayXOffset(dayOfWeek)        // px from left edge of cell: (day/7)*CELL_WIDTH + 
 - Renders a grid of empty cells (all `EMPTY_CELL_COLOR`) for visible range only
 - Total canvas: `TOTAL_WEEKS * CELL_WIDTH` wide × `rows.length * ROW_HEIGHT` tall (use placeholder row count for now)
 
+#### Tests
+**Pure unit** — `__tests__/unit/dateUtils.test.ts` ✓ already complete.
+Covers `toSunday`, `formatDateKey`, `parseDateKey`, `dayXOffset`, `defaultCalendarStart`, `weekIndexToDate`, `dateToWeekIndex`.
+
 #### Verify
 - [ ] App opens without errors
 - [ ] Grid is dark with a grid of cells visible
@@ -242,6 +268,9 @@ src/utils/dateUtils.ts                    ← modified: add dayXOffset if not al
 - Absolutely positioned `<Svg>` covering the full virtual canvas
 - Translates with `scrollX`/`scrollY` via `useAnimatedStyle`
 - For this slice: renders only `TodayCursor`
+
+#### Tests
+No new testable logic beyond Slice 1. `TodayCursor` is purely visual. No tests required for this slice.
 
 #### Verify
 - [ ] A red vertical line is visible on the grid
@@ -307,6 +336,15 @@ const DEMO_CROP = {
 };
 ```
 
+#### Tests
+**Pure unit** — create `__tests__/unit/stageUtils.test.ts`. No mocking needed.
+- `getStageColorAtWeek` returns correct color for a week inside a stage span
+- Returns null for a week before crop start
+- Returns null for a week after all stages end
+- Returns correct color at stage boundaries (first and last week of each stage)
+- Handles a crop with a single stage
+- Handles empty stages array
+
 #### Verify
 - [ ] One crop row is visible on the grid
 - [ ] Stage colors are correct: light green → bright green → dark green across the row
@@ -355,6 +393,15 @@ const DEMO_TASKS = [
 // Mark one watering as completed (use a specific week's Sunday date)
 const DEMO_COMPLETIONS = [{ task_id: 0, completed_date: '<last sunday ISO string>' }];
 ```
+
+#### Tests
+**Pure unit** — create `__tests__/unit/taskUtils.test.ts`. No mocking needed.
+- `getTaskLinePositions` returns one position per week across the crop span for frequency=1
+- Respects `start_offset_weeks` — no lines in first N weeks
+- Respects `frequency_weeks` — every-2-week task skips alternating columns
+- Stops at `cropEndWeekIndex` — no lines beyond the crop span
+- Returns empty array when crop span is zero weeks
+- `x` position matches `weekCol * CELL_WIDTH + dayXOffset(task.day_of_week)`
 
 #### Verify
 - [ ] Blue vertical lines appear at Wednesday position in each week cell of the crop span
@@ -464,6 +511,15 @@ GridRowItem  // union: group_header | section_header | crop_row
 NewCropData, NewTaskData  // input shapes for insert functions
 ```
 
+#### Tests
+**Already complete** — written ahead of schedule as the first full-stack slice.
+- `__tests__/unit/cropQueries.test.ts` — `getCropsForSection`, `getCropStages`, `getStageDefs`
+- `__tests__/unit/cropMutations.test.ts` — `insertCropInstance` (incl. Sunday-snap), `insertCropStage`, `updateCropInstance`, `archiveCrop`
+- `__tests__/unit/dateUtils.test.ts` — all date utilities
+- `__tests__/integration/cropQueries.test.ts` — full round-trip against real SQLite
+
+When adding `taskQueries.ts` and `locationQueries.ts` in this slice, create their unit and integration suites (see Slices 7 and 9).
+
 #### Verify
 - [ ] Grid renders the same visually as after Slice 4
 - [ ] Open SQLite (using Expo DevTools or a DB viewer) — you can see rows in all tables
@@ -515,6 +571,15 @@ On submit:
 For this slice: one button — "+ Crop" — that navigates to `/(modals)/add-crop`.
 (More buttons added in later slices.)
 
+#### Tests
+`insertCropInstance` and `insertCropStage` are already covered in the Slice 5 suites.
+
+**Integration** — add to `__tests__/integration/cropQueries.test.ts`:
+- Insert a crop instance + two stages → `getCropStages` returns both stages in order with correct joined color
+- Insert crop with a non-Sunday date → `getCropsForSection` returns it with `start_date` snapped to Sunday
+
+No unit tests needed for `AddCropForm` (UI logic) or the store action (tested implicitly via integration).
+
 #### Verify
 - [ ] "+ Crop" button is visible on the planner screen
 - [ ] Tapping it opens the add crop modal
@@ -560,6 +625,21 @@ On submit:
 **`plannerStore.addTask(data: NewTaskData)`:**
 1. `insertTask(data)` → new `id`
 2. Call `loadData()`
+
+#### Tests
+**DB unit** — create `__tests__/unit/taskQueries.test.ts`. Mock `getDb`.
+- `getTasksForCrop` returns tasks joined with `task_types` color and name
+- `getTasksForCrop` returns empty array for a crop with no tasks
+- `getTaskTypes` returns all seeded task types
+- `getCompletionsForCrop` returns completions for the given crop
+- `getCompletionsForCrop` returns empty array when none exist
+- `insertTask` calls db with correct params and returns new id
+- Error handling test on each function
+
+**Integration** — create `__tests__/integration/taskQueries.test.ts`. Use `setupTestDb()`.
+- Insert a task → `getTasksForCrop` returns it with joined color from `task_types`
+- `getTaskTypes` returns all 7 preset task types
+- `getCompletionsForCrop` returns empty array before any completions are added
 
 #### Verify
 - [ ] Long-pressing a crop row highlights it (visual selection feedback)
@@ -609,6 +689,18 @@ Actions per item:
 1. `deleteCompletion(taskId, weekDate)`
 2. `loadData()`
 
+#### Tests
+**DB unit** — add to `__tests__/unit/taskQueries.test.ts`:
+- `insertCompletion` calls db with correct task id and week date
+- `deleteCompletion` calls db with correct params
+- `deleteTask` calls db with the correct task id
+- Error handling on each
+
+**Integration** — add to `__tests__/integration/taskQueries.test.ts`:
+- Insert completion → `getCompletionsForCrop` returns it
+- Delete completion → `getCompletionsForCrop` no longer returns it (toggle round-trip)
+- Delete task → `getTasksForCrop` no longer returns it
+
 #### Verify
 - [ ] Long-pressing a crop opens the task list
 - [ ] All tasks for that crop are listed with correct names and colors
@@ -646,6 +738,22 @@ Three modes controlled by a tab or segmented control at top:
 1. New Group — just a name input
 2. New Location — name input + group picker
 3. New Section — name input + location picker
+
+#### Tests
+**DB unit** — create `__tests__/unit/locationQueries.test.ts`. Mock `getDb`.
+- `getAllLocationGroups` returns groups from db
+- `getAllLocations` returns locations from db
+- `getAllSections` returns sections from db
+- `insertLocationGroup` calls db with correct name and returns new id
+- `insertLocation` calls db with groupId and name
+- `insertSection` calls db with locationId and name
+- Error handling on each
+
+**Integration** — create `__tests__/integration/locationQueries.test.ts`. Use `setupTestDb()`.
+- `getAllLocationGroups` returns the seeded group
+- `getAllSections` returns the seeded section
+- Insert group → insert location → insert section → `getAllSections` returns the new section
+- Inserted section is retrievable and has correct `location_id`
 
 #### Verify
 - [ ] "+ Location" button opens the form
@@ -687,6 +795,13 @@ src/components/toolbar/PlannerToolbar.tsx ← modified: add archive toggle butto
 **`plannerStore.toggleArchivedRows()`:**
 1. Flip `showArchivedRows` bool
 2. `loadData()` — rebuilds rows with or without archived crops
+
+#### Tests
+`updateCropInstance` and `archiveCrop` are already covered. Add the stage replacement pattern:
+
+**Integration** — add to `__tests__/integration/cropQueries.test.ts`:
+- Delete all stages for a crop then re-insert → `getCropStages` returns only the new stages in the new order
+- `archiveCrop` then `toggleArchivedRows` round-trip: archived crop hidden by default, visible with `includeArchived=true` (already covered — confirm still passes)
 
 #### Verify
 - [ ] Long-pressing crop name opens edit form pre-filled with existing values
@@ -733,6 +848,21 @@ getAllNotesForCrop(cropInstanceId)         // used to populate hasNote flags
 **`plannerStore`:**
 Load notes for all crops during `loadData()` and include `hasNote: boolean` per `(cropInstanceId, weekDate)` combination. Pass this into `GridRowItem` so `CropCell` can receive it.
 
+#### Tests
+**DB unit** — create `__tests__/unit/noteQueries.test.ts`. Mock `getDb`.
+- `getNoteForCell` calls db with correct cropInstanceId and weekDate
+- `getNoteForCell` returns null when no note exists
+- `upsertNote` calls db with correct params
+- `deleteNote` calls db with correct id
+- `getAllNotesForCrop` returns all notes for a given crop
+- Error handling on each
+
+**Integration** — create `__tests__/integration/noteQueries.test.ts`. Use `setupTestDb()`.
+- Upsert a note → `getNoteForCell` returns it with correct content
+- Upsert same cell twice → only one note exists (upsert behavior)
+- Delete a note → `getNoteForCell` returns null
+- `getAllNotesForCrop` returns all notes for that crop, none for a different crop
+
 #### Verify
 - [ ] Long-pressing a week cell opens the note editor
 - [ ] Saving a note closes the modal and a red triangle appears in that cell
@@ -764,6 +894,16 @@ src/db/queries/taskQueries.ts             ← modified: getDueToday(), getOverdu
 - Each item: color dot, task type, crop name, section name
 - Tap item: switch to planner tab and scroll to that crop row (pass `cropId` to planner, which scrolls `scrollY` to that row's position)
 
+#### Tests
+**DB unit** — add to `__tests__/unit/taskQueries.test.ts`:
+- `getDueToday` calls db filtering by `day_of_week = today.getDay()`
+- `getOverdue` calls db filtering by past Sunday dates with no completion
+
+**Integration** — add to `__tests__/integration/taskQueries.test.ts`:
+- Seed a task with `day_of_week` matching today → `getDueToday` returns it
+- Add a completion for that task → `getDueToday` no longer returns it
+- Seed a task with a past weekday and no completion → `getOverdue` returns it
+
 #### Verify
 - [ ] Today tab shows tasks due on the current day of the week
 - [ ] Overdue section shows tasks from recent weeks that were never completed
@@ -787,6 +927,11 @@ src/store/plannerStore.ts                 ← modified: shiftCrop(id, weekDelta)
 - While dragging: render ghost preview of new position
 - On release: `shiftCrop(id, weekDelta)` — updates `start_date` by `weekDelta * 7` days, calls `loadData()`
 - Tasks automatically follow since they're computed from `start_date`
+
+#### Tests
+**Integration** — add to `__tests__/integration/cropQueries.test.ts`:
+- `updateCropInstance` with new `start_date` → `getCropsForSection` returns updated date snapped to Sunday
+- Shift by +2 weeks → new `start_date` is exactly 14 days later than original
 
 #### Verify
 - [ ] Long-press + drag on a crop row moves it left or right
