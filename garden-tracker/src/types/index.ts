@@ -85,6 +85,16 @@ export interface Note {
   week_date?: string;
   crop_instance_id?: number;
   content: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface WeeklyNoteEntry {
+  id: string;
+  day_of_week: number;
+  text: string;
+  created_at: string;
+  updated_at: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -99,7 +109,7 @@ export type GridRowItem =
   | { type: 'section_header';  section: Section }
   | { type: 'section_footer' }
   | { type: 'section_spacer' }
-  | { type: 'crop_row';        crop: CropInstance; weekColorMap: Record<number, string>; tasks: Task[]; completions: TaskCompletion[] }
+  | { type: 'crop_row';        crop: CropInstance; weekColorMap: Record<number, string>; tasks: Task[]; completions: TaskCompletion[]; notesByWeek: Record<string, Note> }
   | { type: 'placeholder';     index: number };
 
 // Precomputed task line ready to hand directly to the SVG renderer — zero work at render time

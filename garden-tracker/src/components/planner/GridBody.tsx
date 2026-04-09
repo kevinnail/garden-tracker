@@ -1,12 +1,13 @@
 import React, { useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
+import { router } from 'expo-router';
 
 import {
   CELL_WIDTH,
   TOTAL_WEEKS,
   BACKGROUND_COLOR,
 } from '@/src/constants/layout';
-import { todayWeekIndex } from '@/src/utils/dateUtils';
+import { formatDateKey, todayWeekIndex, weekIndexToDate } from '@/src/utils/dateUtils';
 import { GridRowItem } from '@/src/types';
 import { getRowHeight, getRowOffsets, getVisibleRowRange } from '../../utils/rowLayout';
 import CropCell from './CropCell';
@@ -53,12 +54,28 @@ export default function GridBody({
 
     if (rowItem?.type === 'crop_row') {
       for (let col = colStart; col <= colEnd; col++) {
+        const weekDate = formatDateKey(weekIndexToDate(calendarStart, col));
+        const hasNote = Boolean(rowItem.notesByWeek[weekDate]);
+
+        const openNote = () => {
+          router.push({
+            pathname: '/(modals)/cell-note',
+            params: {
+              cropId: String(rowItem.crop.id),
+              weekDate,
+            },
+          });
+        };
+
         elements.push(
           <CropCell
             key={`${row}-${col}`}
             stageColor={rowItem.weekColorMap[col] ?? null}
             isPast={col < todayCol}
+            hasNote={hasNote}
             style={{ left: col * CELL_WIDTH, top }}
+            onPress={openNote}
+            onLongPress={openNote}
           />
         );
       }
