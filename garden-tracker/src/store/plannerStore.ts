@@ -11,7 +11,7 @@ import { defaultCalendarStart, dateToWeekIndex, parseDateKey, toSunday } from '@
 import { getStageColorAtWeek } from '@/src/utils/stageUtils';
 import { getTaskLineOccurrences } from '@/src/utils/taskUtils';
 
-import { getAllLocationGroups, getAllLocations, getAllSections } from '@/src/db/queries/locationQueries';
+import { getAllLocationGroups, getAllLocations, getAllSections, insertLocationGroup, insertLocation, insertSection, deleteLocationGroup, deleteLocation, deleteSection } from '@/src/db/queries/locationQueries';
 import { getCropsForSection, getCropStages, getStageDefs, insertCropInstance, insertCropStage, deleteCropInstance } from '@/src/db/queries/cropQueries';
 import { getTasksForCrop, getCompletionsForCrop, getTaskTypes, insertTask, insertCompletion, deleteCompletion, deleteTask as dbDeleteTask, updateTaskDay } from '@/src/db/queries/taskQueries';
 import { NewCropData, NewTaskData } from '@/src/types';
@@ -34,6 +34,12 @@ interface PlannerState {
   uncompleteTask: (taskId: number, weekDate: string) => Promise<void>;
   deleteTask: (taskId: number) => Promise<void>;
   adjustTaskDay: (taskId: number, dayOfWeek: number) => Promise<void>;
+  addLocationGroup: (name: string) => Promise<void>;
+  addLocation: (groupId: number, name: string) => Promise<void>;
+  addSection: (locationId: number, name: string) => Promise<void>;
+  removeLocationGroup: (id: number) => Promise<void>;
+  removeLocation: (id: number) => Promise<void>;
+  removeSection: (id: number) => Promise<void>;
   setSelectedCrop: (id: number | null) => void;
   toggleArchivedRows: () => void;
 }
@@ -47,6 +53,36 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
   showArchivedRows: false,
   isLoaded: false,
   selectedCropId: null,
+
+  addLocationGroup: async (name) => {
+    await insertLocationGroup(name);
+    await get().loadData();
+  },
+
+  addLocation: async (groupId, name) => {
+    await insertLocation(groupId, name);
+    await get().loadData();
+  },
+
+  addSection: async (locationId, name) => {
+    await insertSection(locationId, name);
+    await get().loadData();
+  },
+
+  removeLocationGroup: async (id) => {
+    await deleteLocationGroup(id);
+    await get().loadData();
+  },
+
+  removeLocation: async (id) => {
+    await deleteLocation(id);
+    await get().loadData();
+  },
+
+  removeSection: async (id) => {
+    await deleteSection(id);
+    await get().loadData();
+  },
 
   setSelectedCrop: (id) => set({ selectedCropId: id }),
 
@@ -117,10 +153,16 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
       for (const location of groupLocations) {
         const locationSections = sections.filter(s => s.location_id === location.id);
 
+        rows.push({ type: 'location_header', location });
+
         for (const section of locationSections) {
-          rows.push({ type: 'section_header', section, location });
+          rows.push({ type: 'section_header', section });
 
           const crops = await getCropsForSection(section.id, showArchived);
+
+          if (crops.length === 0) {
+            rows.push({ type: 'section_footer' });
+          }
 
           for (const crop of crops) {
             const rowIndex = rows.length; // this row's position in the flat list
@@ -175,8 +217,15 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
               }
             }
           }
+
+          if (crops.length > 0) {
+            rows.push({ type: 'section_footer' });
+          }
         }
+
+        rows.push({ type: 'location_footer' });
       }
+      rows.push({ type: 'group_footer' });
     }
 
     set({ rows, allTaskLines, stageDefinitions: stageDefs, taskTypes: taskTypeList, isLoaded: true });
