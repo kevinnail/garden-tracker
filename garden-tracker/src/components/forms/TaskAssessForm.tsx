@@ -11,6 +11,10 @@ import { toSunday, dateToWeekIndex, parseDateKey } from '@/src/utils/dateUtils';
 import { getTaskLineOccurrences } from '@/src/utils/taskUtils';
 import { Task } from '@/src/types';
 
+interface TaskAssessFormProps {
+  embedded?: boolean;
+}
+
 const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 // Show occurrences from 4 weeks ago through 8 weeks ahead
@@ -25,7 +29,7 @@ function formatOccurrenceDate(weekSunday: string, dayOfWeek: number): string {
   return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
-export default function TaskAssessForm() {
+export default function TaskAssessForm({ embedded = false }: TaskAssessFormProps) {
   const rows           = usePlannerStore(s => s.rows);
   const calendarStart  = usePlannerStore(s => s.calendarStart);
   const selectedCropId = usePlannerStore(s => s.selectedCropId);
@@ -33,7 +37,6 @@ export default function TaskAssessForm() {
   const uncompleteTask = usePlannerStore(s => s.uncompleteTask);
   const deleteTask     = usePlannerStore(s => s.deleteTask);
   const adjustTaskDay  = usePlannerStore(s => s.adjustTaskDay);
-  const deleteCrop     = usePlannerStore(s => s.deleteCrop);
 
   const cropRow = rows.find(r => r.type === 'crop_row' && r.crop.id === selectedCropId);
 
@@ -41,9 +44,11 @@ export default function TaskAssessForm() {
     return (
       <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
         <Text style={styles.empty}>No crop selected.</Text>
-        <Pressable style={styles.doneBtn} onPress={() => router.back()}>
-          <Text style={styles.doneBtnText}>Done</Text>
-        </Pressable>
+        {!embedded && (
+          <Pressable style={styles.doneBtn} onPress={() => router.back()}>
+            <Text style={styles.doneBtnText}>Done</Text>
+          </Pressable>
+        )}
       </SafeAreaView>
     );
   }
@@ -92,17 +97,6 @@ export default function TaskAssessForm() {
     router.push('/(modals)/add-task');
   };
 
-  const handleDeleteCrop = () => {
-    Alert.alert(
-      'Delete Crop',
-      `Permanently delete "${crop.name}" and all its tasks and completions? This cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: async () => { await deleteCrop(crop.id); router.back(); } },
-      ]
-    );
-  };
-
   if (tasks.length === 0) {
     return (
       <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
@@ -113,9 +107,11 @@ export default function TaskAssessForm() {
           <Pressable style={styles.addTaskBtn} onPress={handleAddTask}>
             <Text style={styles.addTaskBtnText}>+ Task</Text>
           </Pressable>
-          <Pressable style={styles.doneBtn} onPress={() => router.back()}>
-            <Text style={styles.doneBtnText}>Done</Text>
-          </Pressable>
+          {!embedded && (
+            <Pressable style={styles.doneBtn} onPress={() => router.back()}>
+              <Text style={styles.doneBtnText}>Done</Text>
+            </Pressable>
+          )}
         </View>
       </SafeAreaView>
     );
@@ -192,13 +188,12 @@ export default function TaskAssessForm() {
           <Pressable style={styles.addTaskBtn} onPress={handleAddTask}>
             <Text style={styles.addTaskBtnText}>+ Task</Text>
           </Pressable>
-          <Pressable style={styles.doneBtn} onPress={() => router.back()}>
-            <Text style={styles.doneBtnText}>Done</Text>
-          </Pressable>
+          {!embedded && (
+            <Pressable style={styles.doneBtn} onPress={() => router.back()}>
+              <Text style={styles.doneBtnText}>Done</Text>
+            </Pressable>
+          )}
         </View>
-        <Pressable style={styles.deleteCropBtn} onPress={handleDeleteCrop}>
-          <Text style={styles.deleteCropBtnText}>Delete Crop</Text>
-        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -272,6 +267,4 @@ const styles = StyleSheet.create({
   addTaskBtnText: { color: '#8fd0f8', fontWeight: '700', fontSize: 15 },
   doneBtn: { flex: 1, paddingVertical: 14, borderRadius: 8, borderWidth: 1, borderColor: '#4a4a4a', backgroundColor: '#262626', alignItems: 'center' },
   doneBtnText: { color: '#ddd', fontWeight: '600', fontSize: 15 },
-  deleteCropBtn: { marginTop: 8, paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
-  deleteCropBtnText: { color: '#664444', fontSize: 13 },
 });

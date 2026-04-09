@@ -8,9 +8,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import type { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
-import { toSunday, formatDateKey } from '@/src/utils/dateUtils';
+import { formatDateKey, parseDateKey, toSunday } from '@/src/utils/dateUtils';
 import { usePlannerStore } from '@/src/store/plannerStore';
 import { getAllSections, getAllLocations } from '@/src/db/queries/locationQueries';
+import { getCropStages } from '@/src/db/queries/cropQueries';
 import { Section, Location } from '@/src/types';
 
 interface StageRow {
@@ -24,9 +25,21 @@ const DEFAULT_STAGES: StageRow[] = [
   { stage_definition_id: 3, duration_weeks: '8' }, // Flowering
 ];
 
-export default function AddCropForm() {
+interface AddCropFormProps {
+  cropId?: number;
+}
+
+export default function AddCropForm({ cropId }: AddCropFormProps) {
   const stageDefs    = usePlannerStore(s => s.stageDefinitions);
+  const rows         = usePlannerStore(s => s.rows);
   const addCrop      = usePlannerStore(s => s.addCrop);
+  const editCrop     = usePlannerStore(s => s.editCrop);
+  const archiveCrop  = usePlannerStore(s => s.archiveCrop);
+  const deleteCrop   = usePlannerStore(s => s.deleteCrop);
+  const isEditMode   = cropId != null;
+  const cropRow = isEditMode
+    ? rows.find(row => row.type === 'crop_row' && row.crop.id === cropId)
+    : null;
 
   const [name, setName]             = useState('');
   const [plantCount, setPlantCount] = useState('1');
@@ -37,14 +50,59 @@ export default function AddCropForm() {
   const [sections, setSections]     = useState<Section[]>([]);
   const [locations, setLocations]   = useState<Location[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [loadingInitial, setLoadingInitial] = useState(isEditMode);
 
   useEffect(() => {
-    Promise.all([getAllSections(), getAllLocations()]).then(([secs, locs]) => {
+    let isCancelled = false;
+
+    const loadFormData = async () => {
+      const [secs, locs, existingStages] = await Promise.all([
+        getAllSections(),
+        getAllLocations(),
+        isEditMode && cropId != null ? getCropStages(cropId) : Promise.resolve([]),
+      ]);
+
+      if (isCancelled) {
+        return;
+      }
+
       setSections(secs);
       setLocations(locs);
-      if (secs.length > 0) setSectionId(secs[0].id);
+
+      if (isEditMode && cropRow?.type === 'crop_row') {
+        const parsedStart = parseDateKey(cropRow.crop.start_date);
+        setName(cropRow.crop.name);
+        setPlantCount(String(cropRow.crop.plant_count));
+        setStartDate(parsedStart ?? toSunday(new Date(cropRow.crop.start_date)));
+        setSectionId(cropRow.crop.section_id);
+        setStages(
+          existingStages.length > 0
+            ? existingStages.map(stage => ({
+                stage_definition_id: stage.stage_definition_id,
+                duration_weeks: String(stage.duration_weeks),
+              }))
+            : [{ stage_definition_id: stageDefs[0]?.id ?? 1, duration_weeks: '1' }]
+        );
+        setLoadingInitial(false);
+        return;
+      }
+
+      if (secs.length > 0) {
+        setSectionId(secs[0].id);
+      }
+      setLoadingInitial(false);
+    };
+
+    loadFormData().catch(() => {
+      if (!isCancelled) {
+        setLoadingInitial(false);
+      }
     });
-  }, []);
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [cropId, cropRow, isEditMode, stageDefs]);
 
   const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
     if (Platform.OS === 'android') {
@@ -92,14 +150,75 @@ export default function AddCropForm() {
 
     setSubmitting(true);
     try {
-      await addCrop({ name: name.trim(), plant_count: count, start_date: snappedDate, section_id: sectionId, stages: stageData });
+      if (isEditMode && cropId != null) {
+        await editCrop(cropId, {
+          name: name.trim(),
+          plant_count: count,
+          start_date: snappedDate,
+          section_id: sectionId,
+          stages: stageData,
+        });
+      } else {
+        await addCrop({ name: name.trim(), plant_count: count, start_date: snappedDate, section_id: sectionId, stages: stageData });
+      }
       router.back();
     } catch {
-      Alert.alert('Error', 'Failed to save crop.');
+      Alert.alert('Error', `Failed to ${isEditMode ? 'update' : 'save'} crop.`);
     } finally {
       setSubmitting(false);
     }
   };
+
+  const handleArchive = () => {
+    if (!isEditMode || cropId == null) return;
+
+    Alert.alert(
+      'Archive Crop',
+      `Archive "${name.trim() || 'this crop'}"? You can show archived rows again from the toolbar.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Archive',
+          style: 'destructive',
+          onPress: async () => {
+            await archiveCrop(cropId);
+            router.back();
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDelete = () => {
+    if (!isEditMode || cropId == null) return;
+
+    Alert.alert(
+      'Delete Crop',
+      `Permanently delete "${name.trim() || 'this crop'}" and all its tasks and completions? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteCrop(cropId);
+            router.back();
+          },
+        },
+      ]
+    );
+  };
+
+  if (loadingInitial) {
+    return (
+      <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
+        <View style={styles.loadingState}>
+          <ActivityIndicator color="#7dcea0" />
+          <Text style={styles.loadingText}>Loading crop details...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
@@ -109,6 +228,26 @@ export default function AddCropForm() {
         keyboardShouldPersistTaps="handled"
       >
 
+      <Text style={styles.label}>Section</Text>
+      <View style={styles.sectionList}>
+        {sections.map(sec => {
+          const loc = locations.find(l => l.id === sec.location_id);
+          const label = loc ? `${loc.name} › ${sec.name}` : sec.name;
+          return (
+            <Pressable
+              key={sec.id}
+              style={[styles.sectionOption, sectionId === sec.id && styles.sectionSelected]}
+              onPress={() => setSectionId(sec.id)}
+            >
+              <Text style={[styles.sectionText, sectionId === sec.id && styles.sectionTextSelected]}>
+                {label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+
       <Text style={styles.label}>Crop Name</Text>
       <TextInput
         style={styles.input}
@@ -116,7 +255,7 @@ export default function AddCropForm() {
         onChangeText={setName}
         placeholder="e.g. Tomato"
         placeholderTextColor="#555"
-        autoFocus
+        autoFocus={!isEditMode}
       />
 
       <Text style={styles.label}>Plant Count</Text>
@@ -154,24 +293,7 @@ export default function AddCropForm() {
         </View>
       )}
 
-      <Text style={styles.label}>Section</Text>
-      <View style={styles.sectionList}>
-        {sections.map(sec => {
-          const loc = locations.find(l => l.id === sec.location_id);
-          const label = loc ? `${loc.name} › ${sec.name}` : sec.name;
-          return (
-            <Pressable
-              key={sec.id}
-              style={[styles.sectionOption, sectionId === sec.id && styles.sectionSelected]}
-              onPress={() => setSectionId(sec.id)}
-            >
-              <Text style={[styles.sectionText, sectionId === sec.id && styles.sectionTextSelected]}>
-                {label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+
 
       <Text style={styles.label}>Stages</Text>
       {stages.map((stage, i) => (
@@ -217,10 +339,21 @@ export default function AddCropForm() {
         <Pressable style={styles.submitBtn} onPress={handleSubmit} disabled={submitting}>
           {submitting
             ? <ActivityIndicator color="#fff" />
-            : <Text style={styles.submitBtnText}>Add Crop</Text>
+            : <Text style={styles.submitBtnText}>{isEditMode ? 'Save Crop' : 'Add Crop'}</Text>
           }
         </Pressable>
       </View>
+
+      {isEditMode && (
+        <>
+          <Pressable style={styles.archiveBtn} onPress={handleArchive}>
+            <Text style={styles.archiveBtnText}>Archive Crop</Text>
+          </Pressable>
+          <Pressable style={styles.deleteBtn} onPress={handleDelete}>
+            <Text style={styles.deleteBtnText}>Delete Crop</Text>
+          </Pressable>
+        </>
+      )}
 
       </ScrollView>
     </SafeAreaView>
@@ -230,6 +363,8 @@ export default function AddCropForm() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#1a1a1a' },
   content: { paddingTop: 16, paddingHorizontal: 16, paddingBottom: 40 },
+  loadingState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 },
+  loadingText: { color: '#999', fontSize: 13 },
   label: { color: '#888', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 16, marginBottom: 4 },
   input: { backgroundColor: '#2a2a2a', color: '#eee', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14, borderWidth: 1, borderColor: '#3a3a3a' },
   inputSmall: { width: 140 },
@@ -289,4 +424,16 @@ const styles = StyleSheet.create({
   cancelBtnText: { color: '#ddd', fontWeight: '600', fontSize: 15 },
   submitBtn: { flex: 1, backgroundColor: '#2ecc71', borderRadius: 8, paddingVertical: 14, alignItems: 'center' },
   submitBtnText: { color: '#111', fontWeight: 'bold', fontSize: 15 },
+  archiveBtn: {
+    marginTop: 12,
+    borderRadius: 8,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#7b5b16',
+    backgroundColor: '#2f2611',
+  },
+  archiveBtnText: { color: '#e7c46a', fontWeight: '700', fontSize: 14 },
+  deleteBtn: { marginTop: 8, paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
+  deleteBtnText: { color: '#7a5454', fontSize: 13 },
 });

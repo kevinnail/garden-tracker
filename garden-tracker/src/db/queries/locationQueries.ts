@@ -60,3 +60,33 @@ export async function insertSection(locationId: number, name: string): Promise<n
   );
   return result.lastInsertRowId;
 }
+
+export async function deleteSection(id: number): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(`DELETE FROM task_completions WHERE task_id IN (SELECT id FROM tasks WHERE crop_instance_id IN (SELECT id FROM crop_instances WHERE section_id = ?))`, id);
+  await db.runAsync(`DELETE FROM tasks WHERE crop_instance_id IN (SELECT id FROM crop_instances WHERE section_id = ?)`, id);
+  await db.runAsync(`DELETE FROM crop_stages WHERE crop_instance_id IN (SELECT id FROM crop_instances WHERE section_id = ?)`, id);
+  await db.runAsync(`DELETE FROM crop_instances WHERE section_id = ?`, id);
+  await db.runAsync(`DELETE FROM sections WHERE id = ?`, id);
+}
+
+export async function deleteLocation(id: number): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(`DELETE FROM task_completions WHERE task_id IN (SELECT t.id FROM tasks t JOIN crop_instances ci ON ci.id = t.crop_instance_id JOIN sections s ON s.id = ci.section_id WHERE s.location_id = ?)`, id);
+  await db.runAsync(`DELETE FROM tasks WHERE crop_instance_id IN (SELECT ci.id FROM crop_instances ci JOIN sections s ON s.id = ci.section_id WHERE s.location_id = ?)`, id);
+  await db.runAsync(`DELETE FROM crop_stages WHERE crop_instance_id IN (SELECT ci.id FROM crop_instances ci JOIN sections s ON s.id = ci.section_id WHERE s.location_id = ?)`, id);
+  await db.runAsync(`DELETE FROM crop_instances WHERE section_id IN (SELECT id FROM sections WHERE location_id = ?)`, id);
+  await db.runAsync(`DELETE FROM sections WHERE location_id = ?`, id);
+  await db.runAsync(`DELETE FROM locations WHERE id = ?`, id);
+}
+
+export async function deleteLocationGroup(id: number): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(`DELETE FROM task_completions WHERE task_id IN (SELECT t.id FROM tasks t JOIN crop_instances ci ON ci.id = t.crop_instance_id JOIN sections s ON s.id = ci.section_id JOIN locations l ON l.id = s.location_id WHERE l.location_group_id = ?)`, id);
+  await db.runAsync(`DELETE FROM tasks WHERE crop_instance_id IN (SELECT ci.id FROM crop_instances ci JOIN sections s ON s.id = ci.section_id JOIN locations l ON l.id = s.location_id WHERE l.location_group_id = ?)`, id);
+  await db.runAsync(`DELETE FROM crop_stages WHERE crop_instance_id IN (SELECT ci.id FROM crop_instances ci JOIN sections s ON s.id = ci.section_id JOIN locations l ON l.id = s.location_id WHERE l.location_group_id = ?)`, id);
+  await db.runAsync(`DELETE FROM crop_instances WHERE section_id IN (SELECT s.id FROM sections s JOIN locations l ON l.id = s.location_id WHERE l.location_group_id = ?)`, id);
+  await db.runAsync(`DELETE FROM sections WHERE location_id IN (SELECT id FROM locations WHERE location_group_id = ?)`, id);
+  await db.runAsync(`DELETE FROM locations WHERE location_group_id = ?`, id);
+  await db.runAsync(`DELETE FROM location_groups WHERE id = ?`, id);
+}

@@ -2,19 +2,20 @@ import { create } from 'zustand';
 
 import {
   GridRowItem,
+  NewCropData,
+  NewTaskData,
   PrecomputedTaskLine,
   StageDefinition,
   TaskType,
 } from '@/src/types';
 import { ROW_HEIGHT } from '@/src/constants/layout';
 import { defaultCalendarStart, dateToWeekIndex, parseDateKey, toSunday } from '@/src/utils/dateUtils';
-import { getStageColorAtWeek } from '@/src/utils/stageUtils';
+import { getRowHeight } from '../utils/rowLayout';
 import { getTaskLineOccurrences } from '@/src/utils/taskUtils';
 
-import { getAllLocationGroups, getAllLocations, getAllSections } from '@/src/db/queries/locationQueries';
-import { getCropsForSection, getCropStages, getStageDefs, insertCropInstance, insertCropStage, deleteCropInstance } from '@/src/db/queries/cropQueries';
+import { getAllLocationGroups, getAllLocations, getAllSections, insertLocationGroup, insertLocation, insertSection, deleteLocationGroup, deleteLocation, deleteSection } from '@/src/db/queries/locationQueries';
+import { archiveCrop as archiveCropQuery, getCropsForSection, getCropStages, getStageDefs, insertCropInstance, insertCropStage, deleteCropInstance, replaceCropStages, updateCropInstance } from '@/src/db/queries/cropQueries';
 import { getTasksForCrop, getCompletionsForCrop, getTaskTypes, insertTask, insertCompletion, deleteCompletion, deleteTask as dbDeleteTask, updateTaskDay } from '@/src/db/queries/taskQueries';
-import { NewCropData, NewTaskData } from '@/src/types';
 
 interface PlannerState {
   rows: GridRowItem[];
@@ -28,12 +29,20 @@ interface PlannerState {
 
   loadData: () => Promise<void>;
   addCrop: (data: NewCropData) => Promise<void>;
+  editCrop: (cropId: number, data: NewCropData) => Promise<void>;
+  archiveCrop: (cropId: number) => Promise<void>;
   deleteCrop: (cropId: number) => Promise<void>;
   addTask: (data: NewTaskData) => Promise<void>;
   completeTask: (taskId: number, weekDate: string) => Promise<void>;
   uncompleteTask: (taskId: number, weekDate: string) => Promise<void>;
   deleteTask: (taskId: number) => Promise<void>;
   adjustTaskDay: (taskId: number, dayOfWeek: number) => Promise<void>;
+  addLocationGroup: (name: string) => Promise<void>;
+  addLocation: (groupId: number, name: string) => Promise<void>;
+  addSection: (locationId: number, name: string) => Promise<void>;
+  removeLocationGroup: (id: number) => Promise<void>;
+  removeLocation: (id: number) => Promise<void>;
+  removeSection: (id: number) => Promise<void>;
   setSelectedCrop: (id: number | null) => void;
   toggleArchivedRows: () => void;
 }
@@ -47,6 +56,36 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
   showArchivedRows: false,
   isLoaded: false,
   selectedCropId: null,
+
+  addLocationGroup: async (name) => {
+    await insertLocationGroup(name);
+    await get().loadData();
+  },
+
+  addLocation: async (groupId, name) => {
+    await insertLocation(groupId, name);
+    await get().loadData();
+  },
+
+  addSection: async (locationId, name) => {
+    await insertSection(locationId, name);
+    await get().loadData();
+  },
+
+  removeLocationGroup: async (id) => {
+    await deleteLocationGroup(id);
+    await get().loadData();
+  },
+
+  removeLocation: async (id) => {
+    await deleteLocation(id);
+    await get().loadData();
+  },
+
+  removeSection: async (id) => {
+    await deleteSection(id);
+    await get().loadData();
+  },
 
   setSelectedCrop: (id) => set({ selectedCropId: id }),
 
@@ -89,6 +128,23 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
     await get().loadData();
   },
 
+  editCrop: async (cropId, data) => {
+    await updateCropInstance(cropId, {
+      name: data.name,
+      plant_count: data.plant_count,
+      start_date: data.start_date,
+      section_id: data.section_id,
+    });
+    await replaceCropStages(cropId, data.stages);
+    await get().loadData();
+  },
+
+  archiveCrop: async (cropId) => {
+    await archiveCropQuery(cropId);
+    set({ selectedCropId: null });
+    await get().loadData();
+  },
+
   toggleArchivedRows: () => {
     set(s => ({ showArchivedRows: !s.showArchivedRows }));
     get().loadData();
@@ -108,22 +164,35 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
 
     const rows: GridRowItem[]           = [];
     const allTaskLines: PrecomputedTaskLine[] = [];
+    let currentTop = 0;
+
+    const pushRow = (row: GridRowItem) => {
+      rows.push(row);
+      currentTop += getRowHeight(row);
+    };
 
     for (const group of groups) {
-      rows.push({ type: 'group_header', group });
+      pushRow({ type: 'group_header', group });
 
       const groupLocations = locations.filter(l => l.location_group_id === group.id);
 
       for (const location of groupLocations) {
         const locationSections = sections.filter(s => s.location_id === location.id);
 
+        pushRow({ type: 'location_header', location });
+
         for (const section of locationSections) {
-          rows.push({ type: 'section_header', section, location });
+          pushRow({ type: 'section_header', section });
 
           const crops = await getCropsForSection(section.id, showArchived);
 
+          if (crops.length === 0) {
+            pushRow({ type: 'section_footer' });
+            pushRow({ type: 'section_spacer' });
+          }
+
           for (const crop of crops) {
-            const rowIndex = rows.length; // this row's position in the flat list
+            const y1 = currentTop;
 
             const [stages, tasks, completions] = await Promise.all([
               getCropStages(crop.id),
@@ -152,13 +221,12 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
             }
             const cropEndWeek = cursor - 1;
 
-            rows.push({ type: 'crop_row', crop, weekColorMap, tasks, completions });
+            pushRow({ type: 'crop_row', crop, weekColorMap, tasks, completions });
 
             // Precompute task lines for this row — zero work at render time
             const completionSet = new Set(
               completions.map(c => `${c.task_id}:${c.completed_date}`)
             );
-            const y1 = rowIndex * ROW_HEIGHT;
             const y2 = y1 + ROW_HEIGHT;
 
             for (const task of tasks) {
@@ -175,8 +243,16 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
               }
             }
           }
+
+          if (crops.length > 0) {
+            pushRow({ type: 'section_footer' });
+            pushRow({ type: 'section_spacer' });
+          }
         }
+
+        pushRow({ type: 'location_footer' });
       }
+      pushRow({ type: 'group_footer' });
     }
 
     set({ rows, allTaskLines, stageDefinitions: stageDefs, taskTypes: taskTypeList, isLoaded: true });

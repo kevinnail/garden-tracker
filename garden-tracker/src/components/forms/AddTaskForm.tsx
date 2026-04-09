@@ -15,29 +15,15 @@ export default function AddTaskForm() {
   const taskTypes      = usePlannerStore(s => s.taskTypes);
   const selectedCropId = usePlannerStore(s => s.selectedCropId);
   const addTask        = usePlannerStore(s => s.addTask);
-  const deleteCrop     = usePlannerStore(s => s.deleteCrop);
   const rows           = usePlannerStore(s => s.rows);
 
   const cropRow = rows.find(r => r.type === 'crop_row' && r.crop.id === selectedCropId);
-  const cropName = cropRow?.type === 'crop_row' ? cropRow.crop.name : null;
 
   const [taskTypeId, setTaskTypeId]       = useState<number>(taskTypes[0]?.id ?? 1);
   const [dayOfWeek, setDayOfWeek]         = useState<number>(1);
   const [frequencyWeeks, setFrequency]    = useState<number>(1);
   const [startOffsetWeeks, setOffset]     = useState<number>(0);
   const [submitting, setSubmitting]       = useState(false);
-
-  const handleDeleteCrop = () => {
-    if (selectedCropId == null || !cropName) return;
-    Alert.alert(
-      'Delete Crop',
-      `Permanently delete "${cropName}" and all its tasks and completions? This cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: async () => { await deleteCrop(selectedCropId); router.back(); } },
-      ]
-    );
-  };
 
   const handleSubmit = async () => {
     if (selectedCropId == null) return Alert.alert('Error', 'No crop selected.');
@@ -140,11 +126,6 @@ export default function AddTaskForm() {
             }
           </Pressable>
         </View>
-
-        <Pressable style={styles.deleteCropBtn} onPress={handleDeleteCrop}>
-          <Text style={styles.deleteCropBtnText}>Delete Crop</Text>
-        </Pressable>
-
       </ScrollView>
     </SafeAreaView>
   );
@@ -175,6 +156,4 @@ const styles = StyleSheet.create({
   cancelBtnText: { color: '#ddd', fontWeight: '600', fontSize: 15 },
   submitBtn: { flex: 1, backgroundColor: '#3498db', borderRadius: 8, paddingVertical: 14, alignItems: 'center' },
   submitBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
-  deleteCropBtn: { marginTop: 8, paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
-  deleteCropBtnText: { color: '#664444', fontSize: 13 },
 });

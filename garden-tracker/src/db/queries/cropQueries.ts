@@ -76,15 +76,44 @@ export async function insertCropStage(
 
 export async function updateCropInstance(
   id: number,
-  fields: Partial<Pick<CropInstance, 'name' | 'plant_count' | 'start_date' | 'notes'>>
+  fields: Partial<Pick<CropInstance, 'name' | 'plant_count' | 'start_date' | 'notes' | 'section_id'>>
 ): Promise<void> {
+  if (Object.keys(fields).length === 0) {
+    return;
+  }
+
   const db = await getDb();
-  const sets = Object.keys(fields).map(k => `${k} = ?`).join(', ');
-  const values = Object.values(fields);
+  const normalizedFields = {
+    ...fields,
+    ...(fields.start_date ? { start_date: normalizeStartDate(fields.start_date) } : {}),
+  };
+  const sets = Object.keys(normalizedFields).map(k => `${k} = ?`).join(', ');
+  const values = Object.values(normalizedFields);
   await db.runAsync(
     `UPDATE crop_instances SET ${sets}, updated_at = datetime('now') WHERE id = ?`,
     ...values, id
   );
+}
+
+export async function replaceCropStages(
+  cropInstanceId: number,
+  stages: { stage_definition_id: number; duration_weeks: number }[]
+): Promise<void> {
+  const db = await getDb();
+
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(`DELETE FROM crop_stages WHERE crop_instance_id = ?`, cropInstanceId);
+
+    for (let i = 0; i < stages.length; i++) {
+      await db.runAsync(
+        `INSERT INTO crop_stages (crop_instance_id, stage_definition_id, duration_weeks, order_index) VALUES (?, ?, ?, ?)`,
+        cropInstanceId,
+        stages[i].stage_definition_id,
+        stages[i].duration_weeks,
+        i
+      );
+    }
+  });
 }
 
 export async function archiveCrop(id: number): Promise<void> {

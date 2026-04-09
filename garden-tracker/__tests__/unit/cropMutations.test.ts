@@ -13,6 +13,7 @@
 import {
   insertCropInstance,
   insertCropStage,
+  replaceCropStages,
   updateCropInstance,
   archiveCrop,
 } from '@/src/db/queries/cropQueries';
@@ -26,12 +27,14 @@ const mockDb = {
   getAllAsync: jest.fn(),
   getFirstAsync: jest.fn(),
   runAsync: jest.fn(),
+  withTransactionAsync: jest.fn(),
 };
 
 beforeEach(() => {
   jest.clearAllMocks();
   (getDb as jest.Mock).mockResolvedValue(mockDb);
   mockDb.runAsync.mockResolvedValue({ lastInsertRowId: 1, changes: 1 });
+  mockDb.withTransactionAsync.mockImplementation(async (callback: () => Promise<void>) => callback());
 });
 
 // ── insertCropInstance ─────────────────────────────────────────────────────────
@@ -140,6 +143,27 @@ describe('updateCropInstance', () => {
     expect(args).toContain(4);
   });
 
+  it('normalizes start_date to the preceding Sunday before updating', async () => {
+    await updateCropInstance(2, { start_date: '2025-03-05' });
+
+    const args: unknown[] = mockDb.runAsync.mock.calls[0];
+    expect(args).toContain('2025-03-02');
+  });
+
+  it('updates section_id when moving a crop between sections', async () => {
+    await updateCropInstance(3, { section_id: 9 });
+
+    const sql: string = mockDb.runAsync.mock.calls[0][0];
+    expect(sql).toContain('section_id = ?');
+    expect(mockDb.runAsync.mock.calls[0]).toContain(9);
+  });
+
+  it('returns early without writing when no fields are provided', async () => {
+    await expect(updateCropInstance(1, {})).resolves.toBeUndefined();
+
+    expect(mockDb.runAsync).not.toHaveBeenCalled();
+  });
+
   it('resolves without a return value', async () => {
     await expect(updateCropInstance(1, { plant_count: 3 })).resolves.toBeUndefined();
   });
@@ -148,6 +172,49 @@ describe('updateCropInstance', () => {
     mockDb.runAsync.mockRejectedValueOnce(new Error('Database error'));
 
     await expect(updateCropInstance(1, { name: 'Kale' })).rejects.toThrow('Database error');
+  });
+});
+
+// ── replaceCropStages ─────────────────────────────────────────────────────────
+
+describe('replaceCropStages', () => {
+  it('replaces all stages for a crop inside a transaction', async () => {
+    await replaceCropStages(7, [
+      { stage_definition_id: 2, duration_weeks: 4 },
+      { stage_definition_id: 3, duration_weeks: 8 },
+    ]);
+
+    expect(mockDb.withTransactionAsync).toHaveBeenCalledTimes(1);
+    expect(mockDb.runAsync).toHaveBeenNthCalledWith(1, 'DELETE FROM crop_stages WHERE crop_instance_id = ?', 7);
+    expect(mockDb.runAsync).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('INSERT INTO crop_stages'),
+      7,
+      2,
+      4,
+      0
+    );
+    expect(mockDb.runAsync).toHaveBeenNthCalledWith(
+      3,
+      expect.stringContaining('INSERT INTO crop_stages'),
+      7,
+      3,
+      8,
+      1
+    );
+  });
+
+  it('supports replacing a crop with zero stages', async () => {
+    await replaceCropStages(7, []);
+
+    expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
+    expect(mockDb.runAsync).toHaveBeenCalledWith('DELETE FROM crop_stages WHERE crop_instance_id = ?', 7);
+  });
+
+  it('handles database errors', async () => {
+    mockDb.runAsync.mockRejectedValueOnce(new Error('Database error'));
+
+    await expect(replaceCropStages(7, [{ stage_definition_id: 2, duration_weeks: 4 }])).rejects.toThrow('Database error');
   });
 });
 
