@@ -13,7 +13,7 @@ import { getTaskLineOccurrences } from '@/src/utils/taskUtils';
 
 import { getAllLocationGroups, getAllLocations, getAllSections } from '@/src/db/queries/locationQueries';
 import { getCropsForSection, getCropStages, getStageDefs, insertCropInstance, insertCropStage } from '@/src/db/queries/cropQueries';
-import { getTasksForCrop, getCompletionsForCrop, getTaskTypes, insertTask } from '@/src/db/queries/taskQueries';
+import { getTasksForCrop, getCompletionsForCrop, getTaskTypes, insertTask, insertCompletion, deleteCompletion, deleteTask as dbDeleteTask, updateTaskDay } from '@/src/db/queries/taskQueries';
 import { NewCropData, NewTaskData } from '@/src/types';
 
 interface PlannerState {
@@ -29,6 +29,10 @@ interface PlannerState {
   loadData: () => Promise<void>;
   addCrop: (data: NewCropData) => Promise<void>;
   addTask: (data: NewTaskData) => Promise<void>;
+  completeTask: (taskId: number, weekDate: string) => Promise<void>;
+  uncompleteTask: (taskId: number, weekDate: string) => Promise<void>;
+  deleteTask: (taskId: number) => Promise<void>;
+  adjustTaskDay: (taskId: number, dayOfWeek: number) => Promise<void>;
   setSelectedCrop: (id: number | null) => void;
   toggleArchivedRows: () => void;
 }
@@ -47,6 +51,26 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
 
   addTask: async (data: NewTaskData) => {
     await insertTask(data.crop_instance_id, data.task_type_id, data.day_of_week, data.frequency_weeks, data.start_offset_weeks);
+    await get().loadData();
+  },
+
+  completeTask: async (taskId, weekDate) => {
+    await insertCompletion(taskId, weekDate);
+    await get().loadData();
+  },
+
+  uncompleteTask: async (taskId, weekDate) => {
+    await deleteCompletion(taskId, weekDate);
+    await get().loadData();
+  },
+
+  deleteTask: async (taskId) => {
+    await dbDeleteTask(taskId);
+    await get().loadData();
+  },
+
+  adjustTaskDay: async (taskId, dayOfWeek) => {
+    await updateTaskDay(taskId, dayOfWeek);
     await get().loadData();
   },
 
