@@ -14,7 +14,7 @@ import { getRowHeight } from '../utils/rowLayout';
 import { getTaskLineOccurrences } from '@/src/utils/taskUtils';
 
 import { getAllLocationGroups, getAllLocations, getAllSections, insertLocationGroup, insertLocation, insertSection, deleteLocationGroup, deleteLocation, deleteSection } from '@/src/db/queries/locationQueries';
-import { getCropsForSection, getCropStages, getStageDefs, insertCropInstance, insertCropStage, deleteCropInstance } from '@/src/db/queries/cropQueries';
+import { archiveCrop as archiveCropQuery, getCropsForSection, getCropStages, getStageDefs, insertCropInstance, insertCropStage, deleteCropInstance, replaceCropStages, updateCropInstance } from '@/src/db/queries/cropQueries';
 import { getTasksForCrop, getCompletionsForCrop, getTaskTypes, insertTask, insertCompletion, deleteCompletion, deleteTask as dbDeleteTask, updateTaskDay } from '@/src/db/queries/taskQueries';
 
 interface PlannerState {
@@ -29,6 +29,8 @@ interface PlannerState {
 
   loadData: () => Promise<void>;
   addCrop: (data: NewCropData) => Promise<void>;
+  editCrop: (cropId: number, data: NewCropData) => Promise<void>;
+  archiveCrop: (cropId: number) => Promise<void>;
   deleteCrop: (cropId: number) => Promise<void>;
   addTask: (data: NewTaskData) => Promise<void>;
   completeTask: (taskId: number, weekDate: string) => Promise<void>;
@@ -123,6 +125,23 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
     for (let i = 0; i < data.stages.length; i++) {
       await insertCropStage(cropId, data.stages[i].stage_definition_id, data.stages[i].duration_weeks, i);
     }
+    await get().loadData();
+  },
+
+  editCrop: async (cropId, data) => {
+    await updateCropInstance(cropId, {
+      name: data.name,
+      plant_count: data.plant_count,
+      start_date: data.start_date,
+      section_id: data.section_id,
+    });
+    await replaceCropStages(cropId, data.stages);
+    await get().loadData();
+  },
+
+  archiveCrop: async (cropId) => {
+    await archiveCropQuery(cropId);
+    set({ selectedCropId: null });
     await get().loadData();
   },
 
