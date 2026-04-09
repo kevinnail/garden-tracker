@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import {
   View, Text, TextInput, StyleSheet, ScrollView,
   Pressable, Alert, ActivityIndicator, Platform,
@@ -27,9 +27,16 @@ const DEFAULT_STAGES: StageRow[] = [
 
 interface AddCropFormProps {
   cropId?: number;
+  embedded?: boolean;
 }
 
-export default function AddCropForm({ cropId }: AddCropFormProps) {
+export interface AddCropFormHandle {
+  submit: () => Promise<void>;
+  archive: () => void;
+  remove: () => void;
+}
+
+const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function AddCropForm({ cropId, embedded = false }: AddCropFormProps, ref) {
   const stageDefs    = usePlannerStore(s => s.stageDefinitions);
   const rows         = usePlannerStore(s => s.rows);
   const addCrop      = usePlannerStore(s => s.addCrop);
@@ -131,7 +138,7 @@ export default function AddCropForm({ cropId }: AddCropFormProps) {
     setStages(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = async () => {
+  const submitCrop = async () => {
     if (!name.trim()) return Alert.alert('Validation', 'Crop name is required.');
     const count = parseInt(plantCount, 10);
     if (isNaN(count) || count < 1) return Alert.alert('Validation', 'Plant count must be at least 1.');
@@ -167,6 +174,10 @@ export default function AddCropForm({ cropId }: AddCropFormProps) {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleSubmit = async () => {
+    await submitCrop();
   };
 
   const handleArchive = () => {
@@ -209,22 +220,31 @@ export default function AddCropForm({ cropId }: AddCropFormProps) {
     );
   };
 
+  useImperativeHandle(ref, () => ({
+    submit: submitCrop,
+    archive: handleArchive,
+    remove: handleDelete,
+  }), [name, plantCount, startDate, sectionId, stages, submitting, cropId, isEditMode, cropRow, stageDefs]);
+
   if (loadingInitial) {
-    return (
-      <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
+    const loadingContent = (
         <View style={styles.loadingState}>
           <ActivityIndicator color="#7dcea0" />
           <Text style={styles.loadingText}>Loading crop details...</Text>
         </View>
+    );
+
+    return embedded ? loadingContent : (
+      <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
+        {loadingContent}
       </SafeAreaView>
     );
   }
 
-  return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
+  const formContent = (
       <ScrollView
         style={styles.container}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, embedded && styles.embeddedContent]}
         keyboardShouldPersistTaps="handled"
       >
 
@@ -332,37 +352,49 @@ export default function AddCropForm({ cropId }: AddCropFormProps) {
         <Text style={styles.addStageBtnText}>+ Add Stage</Text>
       </Pressable>
 
-      <View style={styles.actionRow}>
-        <Pressable style={styles.cancelBtn} onPress={() => router.back()} disabled={submitting}>
-          <Text style={styles.cancelBtnText}>Cancel</Text>
-        </Pressable>
-        <Pressable style={styles.submitBtn} onPress={handleSubmit} disabled={submitting}>
-          {submitting
-            ? <ActivityIndicator color="#fff" />
-            : <Text style={styles.submitBtnText}>{isEditMode ? 'Save Crop' : 'Add Crop'}</Text>
-          }
-        </Pressable>
-      </View>
-
-      {isEditMode && (
+      {!embedded && (
         <>
-          <Pressable style={styles.archiveBtn} onPress={handleArchive}>
-            <Text style={styles.archiveBtnText}>Archive Crop</Text>
-          </Pressable>
-          <Pressable style={styles.deleteBtn} onPress={handleDelete}>
-            <Text style={styles.deleteBtnText}>Delete Crop</Text>
-          </Pressable>
+          <View style={styles.actionRow}>
+            <Pressable style={styles.cancelBtn} onPress={() => router.back()} disabled={submitting}>
+              <Text style={styles.cancelBtnText}>Cancel</Text>
+            </Pressable>
+            <Pressable style={styles.submitBtn} onPress={handleSubmit} disabled={submitting}>
+              {submitting
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={styles.submitBtnText}>{isEditMode ? 'Save Crop' : 'Add Crop'}</Text>
+              }
+            </Pressable>
+          </View>
+
+          {isEditMode && (
+            <>
+              <Pressable style={styles.archiveBtn} onPress={handleArchive}>
+                <Text style={styles.archiveBtnText}>Archive Crop</Text>
+              </Pressable>
+              <Pressable style={styles.deleteBtn} onPress={handleDelete}>
+                <Text style={styles.deleteBtnText}>Delete Crop</Text>
+              </Pressable>
+            </>
+          )}
         </>
       )}
 
       </ScrollView>
+  );
+
+  return embedded ? formContent : (
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
+      {formContent}
     </SafeAreaView>
   );
-}
+});
+
+export default AddCropForm;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#1a1a1a' },
   content: { paddingTop: 16, paddingHorizontal: 16, paddingBottom: 40 },
+  embeddedContent: { paddingBottom: 16 },
   loadingState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 },
   loadingText: { color: '#999', fontSize: 13 },
   label: { color: '#888', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 16, marginBottom: 4 },
