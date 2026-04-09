@@ -194,7 +194,7 @@ export default function AddGardenForm() {
         {/* Success confirmation */}
         {lastAdded && (
           <View style={styles.successBox}>
-            <Text style={styles.successText}>✓ "{lastAdded}" added</Text>
+            <Text style={styles.successText}>✓ &quot;{lastAdded}&quot; added</Text>
           </View>
         )}
 
