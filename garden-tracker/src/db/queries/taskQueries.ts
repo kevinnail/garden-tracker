@@ -69,3 +69,8 @@ export async function deleteTask(id: number): Promise<void> {
   const db = await getDb();
   await db.runAsync(`DELETE FROM tasks WHERE id = ?`, id);
 }
+
+export async function updateTaskDay(id: number, dayOfWeek: number): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(`UPDATE tasks SET day_of_week = ? WHERE id = ?`, dayOfWeek, id);
+}

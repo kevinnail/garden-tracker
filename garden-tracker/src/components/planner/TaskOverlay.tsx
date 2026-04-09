@@ -38,7 +38,7 @@ export default function TaskOverlay({ calendarStart, totalHeight, taskLines, scr
       <Svg width={totalWidth} height={totalHeight} style={StyleSheet.absoluteFill}>
         {taskLines.map((line) => (
           <Line
-            key={line.key}
+            key={`${line.key}-${line.dashed ? 'dashed' : 'solid'}`}
             x1={line.x}
             y1={line.y1}
             x2={line.x}
