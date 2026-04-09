@@ -14,6 +14,9 @@ export default function PlannerToolbar() {
         <Pressable style={styles.btn} onPress={() => router.push('/(modals)/add-crop')}>
           <Text style={styles.btnText}>+ Crop</Text>
         </Pressable>
+        <Pressable style={styles.locationBtn} onPress={() => router.push('/(modals)/add-garden')}>
+          <Text style={styles.locationBtnText}>Gardens ⚙ </Text>
+        </Pressable>
         {selectedCropId != null && (
           <Pressable style={styles.taskBtn} onPress={() => router.push('/(modals)/add-task')}>
             <Text style={styles.taskBtnText}>+ Task</Text>
@@ -45,6 +48,17 @@ const styles = StyleSheet.create({
   },
   btnText: {
     color: '#111',
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+  locationBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    backgroundColor: '#555',
+    borderRadius: 6,
+  },
+  locationBtnText: {
+    color: '#ddd',
     fontWeight: 'bold',
     fontSize: 13,
   },
