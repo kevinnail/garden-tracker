@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 
 import {
   ROW_HEIGHT,
@@ -9,12 +9,16 @@ import {
   BACKGROUND_COLOR,
 } from '@/src/constants/layout';
 import { GridRowItem } from '@/src/types';
+import { usePlannerStore } from '@/src/store/plannerStore';
 
 interface Props {
   rows: GridRowItem[];
 }
 
 export default function RowHeader({ rows }: Props) {
+  const selectedCropId = usePlannerStore(s => s.selectedCropId);
+  const setSelectedCrop = usePlannerStore(s => s.setSelectedCrop);
+
   return (
     <View style={[styles.container, { height: rows.length * ROW_HEIGHT }]}>
       {rows.map((item, i) => {
@@ -39,17 +43,22 @@ export default function RowHeader({ rows }: Props) {
         }
 
         if (item.type === 'crop_row') {
+          const isSelected = selectedCropId === item.crop.id;
           return (
-            <View key={i} style={styles.row}>
+            <Pressable
+              key={i}
+              style={[styles.row, isSelected && styles.rowSelected]}
+              onLongPress={() => setSelectedCrop(isSelected ? null : item.crop.id)}
+            >
               <View style={styles.countCell}>
                 <Text style={styles.countText}>{item.crop.plant_count}</Text>
               </View>
               <View style={styles.nameCell}>
-                <Text style={styles.nameText} numberOfLines={1}>
+                <Text style={[styles.nameText, isSelected && styles.nameTextSelected]} numberOfLines={1}>
                   {item.crop.name}
                 </Text>
               </View>
-            </View>
+            </Pressable>
           );
         }
 
@@ -122,9 +131,15 @@ const styles = StyleSheet.create({
     borderRightWidth: 2,
     borderRightColor: '#444',
   },
+  rowSelected: {
+    backgroundColor: '#1a2a3a',
+  },
   nameText: {
     color: '#ddd',
     fontSize: 10,
+  },
+  nameTextSelected: {
+    color: '#74b9ff',
   },
   placeholderText: {
     color: '#444',
