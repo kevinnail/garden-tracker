@@ -12,7 +12,6 @@ import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 
 import {
   CELL_WIDTH,
-  ROW_HEIGHT,
   TOTAL_WEEKS,
   TOTAL_HEADER_HEIGHT,
   ROW_HEADER_WIDTH,
@@ -20,6 +19,7 @@ import {
 } from '@/src/constants/layout';
 import { todayWeekIndex } from '@/src/utils/dateUtils';
 import { usePlannerStore } from '@/src/store/plannerStore';
+import { getTotalRowsHeight } from '../../utils/rowLayout';
 
 import ColumnHeader from './ColumnHeader';
 import RowHeader from './RowHeader';
@@ -33,9 +33,8 @@ export default function PlannerGrid() {
   const allTaskLines = usePlannerStore(s => s.allTaskLines);
   const calendarStart = usePlannerStore(s => s.calendarStart);
 
-  const rowCount    = rows.length;
   const totalWidth  = TOTAL_WEEKS * CELL_WIDTH;
-  const totalHeight = Math.max(rowCount, 1) * ROW_HEIGHT;
+  const totalHeight = Math.max(getTotalRowsHeight(rows), 1);
 
   // ── Shared values (UI thread) ─────────────────────────────────────────────
   const scrollX      = useSharedValue(0);
