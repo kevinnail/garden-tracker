@@ -12,6 +12,7 @@ export default function RootLayout() {
         <Stack.Screen name="(modals)/add-crop" options={{ presentation: 'modal', title: 'Add Crop', headerStyle: { backgroundColor: '#1a1a1a' }, headerTintColor: '#ddd' }} />
         <Stack.Screen name="(modals)/add-task" options={{ presentation: 'modal', title: 'Add Task', headerStyle: { backgroundColor: '#1a1a1a' }, headerTintColor: '#ddd' }} />
         <Stack.Screen name="(modals)/manage-tasks" options={{ presentation: 'modal', title: 'Manage Tasks', headerStyle: { backgroundColor: '#1a1a1a' }, headerTintColor: '#ddd' }} />
+        <Stack.Screen name="(modals)/add-garden" options={{ presentation: 'modal', title: 'Add Garden', headerStyle: { backgroundColor: '#1a1a1a' }, headerTintColor: '#ddd' }} />
         </Stack>
         <StatusBar style="light" />
       </GestureHandlerRootView>
