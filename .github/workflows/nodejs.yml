@@ -1,0 +1,24 @@
+name: Jest Tests
+
+on:
+  push:
+    branches:
+      - main # Runs only when pushing to main
+  pull_request:
+    branches:
+      - main # Runs only when a PR is created or updated targeting main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: node:latest
+    defaults:
+      run:
+        working-directory: garden-tracker
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci
+      - run: npx eslint .
+      - run: npm test
+        env:
+          CI: true

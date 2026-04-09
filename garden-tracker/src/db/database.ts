@@ -1,7 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 import { PRESET_STAGES } from '@/src/constants/stages';
 import { PRESET_TASK_TYPES } from '@/src/constants/taskTypes';
-import { toSunday } from '@/src/utils/dateUtils';
+import { toSunday, formatDateKey } from '@/src/utils/dateUtils';
 
 let _db: SQLite.SQLiteDatabase | null = null;
 
@@ -142,8 +142,7 @@ async function seedIfNeeded(db: SQLite.SQLiteDatabase) {
     );
 
     // Demo crop — started 4 weeks ago
-    const startDate = toSunday(new Date(Date.now() - 4 * 7 * 24 * 60 * 60 * 1000))
-      .toISOString().slice(0, 10);
+    const startDate = formatDateKey(toSunday(new Date(Date.now() - 4 * 7 * 24 * 60 * 60 * 1000)));
 
     const crop = await db.runAsync(
       `INSERT INTO crop_instances (section_id, name, plant_count, start_date) VALUES (?, 'Tomato', 6, ?)`,

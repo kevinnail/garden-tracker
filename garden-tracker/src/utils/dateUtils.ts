@@ -1,5 +1,7 @@
 import { CELL_WIDTH } from '@/src/constants/layout';
 
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
 // ---------------------------------------------------------------------------
 // Sunday snapping
 // ---------------------------------------------------------------------------
@@ -13,6 +15,50 @@ export function toSunday(date: Date): Date {
   d.setDate(d.getDate() - d.getDay()); // getDay() returns 0 for Sunday
   d.setHours(0, 0, 0, 0);
   return d;
+}
+
+/**
+ * Format a Date as local YYYY-MM-DD without UTC conversion.
+ */
+export function formatDateKey(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * Parse YYYY-MM-DD into a local Date at midnight.
+ * Returns null for invalid input.
+ */
+export function parseDateKey(value: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const monthIndex = Number(match[2]) - 1;
+  const day = Number(match[3]);
+
+  const parsed = new Date(year, monthIndex, day);
+  if (
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== monthIndex ||
+    parsed.getDate() !== day
+  ) {
+    return null;
+  }
+
+  parsed.setHours(0, 0, 0, 0);
+  return parsed;
+}
+
+function utcMidnightMs(date: Date): number {
+  return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function weekDiff(startSunday: Date, endSunday: Date): number {
+  const diffDays = (utcMidnightMs(endSunday) - utcMidnightMs(startSunday)) / MS_PER_DAY;
+  return Math.round(diffDays / 7);
 }
 
 // ---------------------------------------------------------------------------
@@ -35,8 +81,7 @@ export function weekIndexToDate(calendarStart: Date, index: number): Date {
  */
 export function todayWeekIndex(calendarStart: Date): number {
   const todaySunday = toSunday(new Date());
-  const diffMs = todaySunday.getTime() - calendarStart.getTime();
-  return Math.round(diffMs / (7 * 24 * 60 * 60 * 1000));
+  return weekDiff(calendarStart, todaySunday);
 }
 
 /**
@@ -45,8 +90,7 @@ export function todayWeekIndex(calendarStart: Date): number {
  */
 export function dateToWeekIndex(calendarStart: Date, date: Date): number {
   const sunday = toSunday(date);
-  const diffMs = sunday.getTime() - calendarStart.getTime();
-  return Math.round(diffMs / (7 * 24 * 60 * 60 * 1000));
+  return weekDiff(calendarStart, sunday);
 }
 
 // ---------------------------------------------------------------------------
