@@ -7,6 +7,15 @@ import { SCHEMA_SQL } from '@/src/db/schema';
 let _db: SQLite.SQLiteDatabase | null = null;
 let _dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
+export async function resetDatabase(): Promise<void> {
+  if (_db) {
+    await _db.closeAsync();
+    _db = null;
+  }
+  _dbPromise = null;
+  await SQLite.deleteDatabaseAsync('garden_tracker.db');
+}
+
 export async function getDb(): Promise<SQLite.SQLiteDatabase> {
   if (_db) return _db;
   if (_dbPromise) return _dbPromise;
