@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Pressable, Text, StyleSheet } from 'react-native';
+import { View, Pressable, Text, StyleSheet, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -12,66 +12,90 @@ export default function PlannerToolbar() {
   const overdueCount = usePlannerStore(s => s.todayOverdueTasks.length);
   const todayCount = dueTodayCount + overdueCount;
 
+  const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
+
   const todayLabel = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'long',
     day: 'numeric',
   });
 
+  const todayBanner = (
+    <Pressable
+      style={[
+        styles.todayBanner,
+        isLandscape && styles.todayBannerCompact,
+        overdueCount > 0
+          ? styles.todayBannerOverdue
+          : todayCount > 0
+            ? styles.todayBannerActive
+            : styles.todayBannerIdle,
+      ]}
+      onPress={() => router.navigate('/(tabs)/today')}
+    >
+      <View style={styles.todayBannerMain}>
+        <Text style={styles.todayBannerTitle}>Today</Text>
+        {!isLandscape && (
+          <Text style={styles.todayBannerText} numberOfLines={1}>
+            {todayCount > 0
+              ? `${dueTodayCount} due today · ${overdueCount} overdue`
+              : `All clear · ${todayLabel}`}
+          </Text>
+        )}
+        {isLandscape && todayCount > 0 && (
+          <Text style={styles.todayBannerText} numberOfLines={1}>
+            {dueTodayCount} due · {overdueCount} overdue
+          </Text>
+        )}
+      </View>
+
+      <View style={styles.todayBannerRight}>
+        {todayCount > 0 ? (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{todayCount}</Text>
+          </View>
+        ) : (
+          <View style={styles.badgeIdle}>
+            <Text style={styles.badgeIdleText}>0</Text>
+          </View>
+        )}
+      </View>
+    </Pressable>
+  );
+
+  const actionButtons = (
+    <View style={[styles.actionRow, isLandscape && styles.actionRowLandscape]}>
+      <Pressable style={styles.btn} onPress={() => router.push('/(modals)/add-crop')}>
+        <Text style={styles.btnText}>+ Crop</Text>
+      </Pressable>
+      <Pressable style={styles.locationBtn} onPress={() => router.push('/(modals)/add-garden')}>
+        <Text style={styles.locationBtnText}>Gardens</Text>
+      </Pressable>
+      <Pressable
+        style={[styles.archiveBtn, showArchivedRows && styles.archiveBtnActive]}
+        onPress={toggleArchivedRows}
+      >
+        <Text style={[styles.archiveBtnText, showArchivedRows && styles.archiveBtnTextActive]}>
+          {showArchivedRows ? 'Archived On' : 'Archived'}
+        </Text>
+      </Pressable>
+    </View>
+  );
+
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
-      <View style={styles.container}>
-        <Pressable
-          style={[
-            styles.todayBanner,
-            overdueCount > 0
-              ? styles.todayBannerOverdue
-              : todayCount > 0
-                ? styles.todayBannerActive
-                : styles.todayBannerIdle,
-          ]}
-          onPress={() => router.navigate('/(tabs)/today')}
-        >
-          <View style={styles.todayBannerMain}>
-            <Text style={styles.todayBannerTitle}>Today</Text>
-            <Text style={styles.todayBannerText} numberOfLines={1}>
-              {todayCount > 0
-                ? `${dueTodayCount} due today · ${overdueCount} overdue`
-                : `All clear · ${todayLabel}`}
-            </Text>
-          </View>
-
-          <View style={styles.todayBannerRight}>
-            {todayCount > 0 ? (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{todayCount}</Text>
-              </View>
-            ) : (
-              <View style={styles.badgeIdle}>
-                <Text style={styles.badgeIdleText}>0</Text>
-              </View>
-            )}
-            <Text style={styles.todayBannerHint}>Open</Text>
-          </View>
-        </Pressable>
-
-        <View style={styles.actionRow}>
-          <Pressable style={styles.btn} onPress={() => router.push('/(modals)/add-crop')}>
-            <Text style={styles.btnText}>+ Crop</Text>
-          </Pressable>
-          <Pressable style={styles.locationBtn} onPress={() => router.push('/(modals)/add-garden')}>
-            <Text style={styles.locationBtnText}>Gardens</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.archiveBtn, showArchivedRows && styles.archiveBtnActive]}
-            onPress={toggleArchivedRows}
-          >
-            <Text style={[styles.archiveBtnText, showArchivedRows && styles.archiveBtnTextActive]}>
-              {showArchivedRows ? 'Archived On' : 'Archived'}
-            </Text>
-          </Pressable>
+      {isLandscape ? (
+        <View style={styles.containerLandscape}>
+          {todayBanner}
+          {actionButtons}
         </View>
-      </View>
+      ) : (
+        <View style={styles.container}>
+          {todayBanner}
+          {actionButtons}
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -88,6 +112,16 @@ const styles = StyleSheet.create({
     borderBottomColor: '#333',
     gap: 8,
   },
+  containerLandscape: {
+    backgroundColor: '#111',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   todayBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -98,6 +132,11 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 10,
     borderWidth: 1,
+  },
+  todayBannerCompact: {
+    flex: 1,
+    minHeight: 0,
+    paddingVertical: 5,
   },
   todayBannerIdle: {
     backgroundColor: '#14181d',
@@ -137,6 +176,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+  },
+  actionRowLandscape: {
+    flexWrap: 'nowrap',
+    flexShrink: 0,
   },
   btn: {
     paddingHorizontal: 14,
