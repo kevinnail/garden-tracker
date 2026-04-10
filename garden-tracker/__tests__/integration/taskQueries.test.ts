@@ -16,8 +16,7 @@ import {
   insertCompletion,
   deleteCompletion,
   deleteTask,
-  getDueToday,
-  getOverdue,
+  getTodayAndOverdue,
 } from '@/src/db/queries/taskQueries';
 import { getDb } from '@/src/db/database';
 import { setupTestDb, SEED } from '../setup';
@@ -229,42 +228,40 @@ describe('deleteTask', () => {
 
 // ── dashboard queries ────────────────────────────────────────────────────────
 
-describe('getDueToday', () => {
-  it('returns a seeded task whose day matches the reference date', async () => {
-    const tasks = await getDueToday(new Date('2025-03-05T12:00:00'));
+describe('getTodayAndOverdue', () => {
+  it('returns a seeded task in due when the day matches the reference date', async () => {
+    const { due } = await getTodayAndOverdue(new Date('2025-03-05T12:00:00'));
 
-    expect(tasks).toHaveLength(1);
-    expect(tasks[0].task_id).toBe(SEED.TASK_ID);
-    expect(tasks[0].crop_instance_id).toBe(SEED.CROP_ID);
-    expect(tasks[0].crop_name).toBe(SEED.CROP_NAME);
-    expect(tasks[0].section_name).toBe('Section A');
-    expect(tasks[0].due_date).toBe('2025-03-05');
-    expect(tasks[0].week_date).toBe(SEED.START_DATE);
+    expect(due).toHaveLength(1);
+    expect(due[0].task_id).toBe(SEED.TASK_ID);
+    expect(due[0].crop_instance_id).toBe(SEED.CROP_ID);
+    expect(due[0].crop_name).toBe(SEED.CROP_NAME);
+    expect(due[0].section_name).toBe('Section A');
+    expect(due[0].due_date).toBe('2025-03-05');
+    expect(due[0].week_date).toBe(SEED.START_DATE);
   });
 
-  it('does not return the task after completion is recorded for that week', async () => {
+  it('does not return the task in due after completion is recorded for that week', async () => {
     await insertCompletion(SEED.TASK_ID, SEED.START_DATE);
 
-    const tasks = await getDueToday(new Date('2025-03-05T12:00:00'));
+    const { due } = await getTodayAndOverdue(new Date('2025-03-05T12:00:00'));
 
-    expect(tasks).toHaveLength(0);
-  });
-});
-
-describe('getOverdue', () => {
-  it('returns a task due earlier this week when incomplete', async () => {
-    const tasks = await getOverdue(new Date('2025-03-06T12:00:00'));
-
-    expect(tasks).toHaveLength(1);
-    expect(tasks[0].task_id).toBe(SEED.TASK_ID);
-    expect(tasks[0].due_date).toBe('2025-03-05');
+    expect(due).toHaveLength(0);
   });
 
-  it('does not return the task when that week is completed', async () => {
+  it('returns a task in overdue when due earlier this week and incomplete', async () => {
+    const { overdue } = await getTodayAndOverdue(new Date('2025-03-06T12:00:00'));
+
+    expect(overdue).toHaveLength(1);
+    expect(overdue[0].task_id).toBe(SEED.TASK_ID);
+    expect(overdue[0].due_date).toBe('2025-03-05');
+  });
+
+  it('does not return the task in overdue when that week is completed', async () => {
     await insertCompletion(SEED.TASK_ID, SEED.START_DATE);
 
-    const tasks = await getOverdue(new Date('2025-03-06T12:00:00'));
+    const { overdue } = await getTodayAndOverdue(new Date('2025-03-06T12:00:00'));
 
-    expect(tasks).toHaveLength(0);
+    expect(overdue).toHaveLength(0);
   });
 });
