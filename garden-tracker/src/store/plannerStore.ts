@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import Toast from 'react-native-toast-message';
 
 import {
   GridRowItem,
@@ -62,6 +63,11 @@ interface PlannerState {
   toggleArchivedRows: () => void;
 }
 
+function showError(action: string, e: unknown) {
+  const detail = e instanceof Error ? e.message : String(e);
+  Toast.show({ type: 'error', text1: action, text2: detail, visibilityTime: 4000 });
+}
+
 export const usePlannerStore = create<PlannerState>((set, get) => ({
   rows: [],
   allTaskLines: [],
@@ -78,53 +84,69 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
   plannerFocusDate: null,
 
   addLocationGroup: async (name) => {
-    await insertLocationGroup(name);
-    await get().loadData();
+    try {
+      await insertLocationGroup(name);
+      await get().loadData();
+    } catch (e) { showError('Failed to add group', e); throw e; }
   },
 
   addLocation: async (groupId, name) => {
-    await insertLocation(groupId, name);
-    await get().loadData();
+    try {
+      await insertLocation(groupId, name);
+      await get().loadData();
+    } catch (e) { showError('Failed to add location', e); throw e; }
   },
 
   addSection: async (locationId, name) => {
-    await insertSection(locationId, name);
-    await get().loadData();
+    try {
+      await insertSection(locationId, name);
+      await get().loadData();
+    } catch (e) { showError('Failed to add section', e); throw e; }
   },
 
   ensureDefaultGarden: async () => {
-    const sections = await getAllSections();
-    if (sections.length > 0) return;
-    await insertLocationGroup('Home');
-    const groups = await getAllLocationGroups();
-    const group = groups[0];
-    if (!group) return;
-    await insertLocation(group.id, 'My Garden');
-    const locations = await getAllLocations();
-    const loc = locations.find(l => l.location_group_id === group.id);
-    if (!loc) return;
-    await insertSection(loc.id, 'My Section');
-    await get().loadData();
+    try {
+      const sections = await getAllSections();
+      if (sections.length > 0) return;
+      await insertLocationGroup('Home');
+      const groups = await getAllLocationGroups();
+      const group = groups[0];
+      if (!group) return;
+      await insertLocation(group.id, 'My Garden');
+      const locations = await getAllLocations();
+      const loc = locations.find(l => l.location_group_id === group.id);
+      if (!loc) return;
+      await insertSection(loc.id, 'My Section');
+      await get().loadData();
+    } catch (e) { showError('Failed to set up default garden', e); throw e; }
   },
 
   resetAllData: async () => {
-    await resetDatabase();
-    await get().loadData();
+    try {
+      await resetDatabase();
+      await get().loadData();
+    } catch (e) { showError('Failed to reset data', e); throw e; }
   },
 
   removeLocationGroup: async (id) => {
-    await deleteLocationGroup(id);
-    await get().loadData();
+    try {
+      await deleteLocationGroup(id);
+      await get().loadData();
+    } catch (e) { showError('Failed to remove group', e); throw e; }
   },
 
   removeLocation: async (id) => {
-    await deleteLocation(id);
-    await get().loadData();
+    try {
+      await deleteLocation(id);
+      await get().loadData();
+    } catch (e) { showError('Failed to remove location', e); throw e; }
   },
 
   removeSection: async (id) => {
-    await deleteSection(id);
-    await get().loadData();
+    try {
+      await deleteSection(id);
+      await get().loadData();
+    } catch (e) { showError('Failed to remove section', e); throw e; }
   },
 
   setSelectedCrop: (id) => set({ selectedCropId: id }),
@@ -138,66 +160,88 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
   clearPlannerFocus: () => set({ plannerFocusCropId: null, plannerFocusDate: null }),
 
   addTask: async (data: NewTaskData) => {
-    await insertTask(data.crop_instance_id, data.task_type_id, data.day_of_week, data.frequency_weeks, data.start_offset_weeks);
-    await get().loadData();
+    try {
+      await insertTask(data.crop_instance_id, data.task_type_id, data.day_of_week, data.frequency_weeks, data.start_offset_weeks);
+      await get().loadData();
+    } catch (e) { showError('Failed to add task', e); throw e; }
   },
 
   completeTask: async (taskId, weekDate) => {
-    await insertCompletion(taskId, weekDate);
-    await get().loadData();
+    try {
+      await insertCompletion(taskId, weekDate);
+      await get().loadData();
+    } catch (e) { showError('Failed to complete task', e); throw e; }
   },
 
   uncompleteTask: async (taskId, weekDate) => {
-    await deleteCompletion(taskId, weekDate);
-    await get().loadData();
+    try {
+      await deleteCompletion(taskId, weekDate);
+      await get().loadData();
+    } catch (e) { showError('Failed to uncomplete task', e); throw e; }
   },
 
   deleteTask: async (taskId) => {
-    await dbDeleteTask(taskId);
-    await get().loadData();
+    try {
+      await dbDeleteTask(taskId);
+      await get().loadData();
+    } catch (e) { showError('Failed to delete task', e); throw e; }
   },
 
   adjustTaskDay: async (taskId, dayOfWeek) => {
-    await updateTaskDay(taskId, dayOfWeek);
-    await get().loadData();
+    try {
+      await updateTaskDay(taskId, dayOfWeek);
+      await get().loadData();
+    } catch (e) { showError('Failed to adjust task day', e); throw e; }
   },
 
   saveCellNote: async (cropInstanceId, weekDate, content) => {
-    await upsertNote(cropInstanceId, weekDate, content);
-    await get().loadData();
+    try {
+      await upsertNote(cropInstanceId, weekDate, content);
+      await get().loadData();
+    } catch (e) { showError('Failed to save note', e); throw e; }
   },
 
   deleteNote: async (noteId) => {
-    await deleteNoteQuery(noteId);
-    await get().loadData();
+    try {
+      await deleteNoteQuery(noteId);
+      await get().loadData();
+    } catch (e) { showError('Failed to delete note', e); throw e; }
   },
 
   deleteCrop: async (cropId) => {
-    await deleteCropInstance(cropId);
-    set({ selectedCropId: null });
-    await get().loadData();
+    try {
+      await deleteCropInstance(cropId);
+      set({ selectedCropId: null });
+      await get().loadData();
+    } catch (e) { showError('Failed to delete crop', e); throw e; }
   },
 
   addCrop: async (data: NewCropData) => {
-    await insertCropWithStages(data.section_id, data.name, data.plant_count, data.start_date, data.stages);
-    await get().loadData();
+    try {
+      await insertCropWithStages(data.section_id, data.name, data.plant_count, data.start_date, data.stages);
+      await get().loadData();
+    } catch (e) { showError('Failed to add crop', e); throw e; }
   },
 
   editCrop: async (cropId, data) => {
-    await updateCropInstance(cropId, {
-      name: data.name,
-      plant_count: data.plant_count,
-      start_date: data.start_date,
-      section_id: data.section_id,
-    });
-    await replaceCropStages(cropId, data.stages);
-    await get().loadData();
+    try {
+      await updateCropInstance(cropId, {
+        name: data.name,
+        plant_count: data.plant_count,
+        start_date: data.start_date,
+        section_id: data.section_id,
+      });
+      await replaceCropStages(cropId, data.stages);
+      await get().loadData();
+    } catch (e) { showError('Failed to save crop', e); throw e; }
   },
 
   archiveCrop: async (cropId) => {
-    await archiveCropQuery(cropId);
-    set({ selectedCropId: null });
-    await get().loadData();
+    try {
+      await archiveCropQuery(cropId);
+      set({ selectedCropId: null });
+      await get().loadData();
+    } catch (e) { showError('Failed to archive crop', e); throw e; }
   },
 
   toggleArchivedRows: () => {
@@ -206,6 +250,7 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
   },
 
   loadData: async () => {
+    try {
     const calendarStart = get().calendarStart;
     const showArchived  = get().showArchivedRows;
 
@@ -332,5 +377,6 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
       taskTypes: taskTypeList,
       isLoaded: true,
     });
+    } catch (e) { showError('Failed to load data', e); throw e; }
   },
 }));
