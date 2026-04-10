@@ -150,6 +150,22 @@ export default function PlannerGrid() {
     month: 'numeric', day: 'numeric', year: '2-digit',
   });
 
+  if (rows.length === 0) {
+    return (
+      <View style={[styles.root, styles.emptyRoot, { paddingLeft: leftInset }]}>
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyTitle}>Welcome to Garden Tracker</Text>
+          <Text style={styles.emptyBody}>
+            Tap <Text style={styles.emptyHighlight}>+ Crop</Text> to add your first crop and it will appear here on the planner timeline.
+          </Text>
+          <Text style={styles.emptyHint}>
+            Each row shows a crop&apos;s growing stages across the calendar.
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.root, { paddingLeft: leftInset }]}>
 
@@ -167,19 +183,6 @@ export default function PlannerGrid() {
 
       {/* ── Main row: row header + grid body ── */}
       <View style={styles.mainRow}>
-
-        {rows.length === 0 && (
-          <View style={styles.emptyState} pointerEvents="none">
-            <Text style={styles.emptyTitle}>Welcome to Garden Tracker</Text>
-            <Text style={styles.emptyBody}>
-              Tap <Text style={styles.emptyHighlight}>+ Crop</Text> to add your first crop and it will appear here on the planner timeline.
-            </Text>
-            <Text style={styles.emptyHint}>
-              Each row shows a crop&apos;s growing stages across the calendar. Swipe left and right to navigate weeks.
-            </Text>
-          </View>
-        )}
-
         <View style={styles.rowHeaderClip}>
           <Animated.View
             style={[{ position: 'absolute', width: ROW_HEADER_WIDTH, height: totalHeight }, rowHeaderStyle]}
@@ -222,6 +225,7 @@ export default function PlannerGrid() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: BACKGROUND_COLOR },
+  emptyRoot: { justifyContent: 'center' },
   headerRow: { flexDirection: 'row', height: TOTAL_HEADER_HEIGHT },
   corner: {
     width: ROW_HEADER_WIDTH,
@@ -239,9 +243,6 @@ const styles = StyleSheet.create({
   rowHeaderClip: { width: ROW_HEADER_WIDTH, overflow: 'hidden' },
   bodyClip: { flex: 1, overflow: 'hidden' },
   emptyState: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    zIndex: 10,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 40,
