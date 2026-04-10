@@ -193,8 +193,10 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
           text: 'Archive',
           style: 'destructive',
           onPress: async () => {
-            await archiveCrop(cropId);
-            router.back();
+            try {
+              await archiveCrop(cropId);
+              router.back();
+            } catch { /* toast shown by store */ }
           },
         },
       ]
@@ -213,8 +215,10 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            await deleteCrop(cropId);
-            router.back();
+            try {
+              await deleteCrop(cropId);
+              router.back();
+            } catch { /* toast shown by store */ }
           },
         },
       ]
