@@ -62,7 +62,7 @@ function TaskSwipeRow({ item, overdue }: { item: TodayTaskItem; overdue: boolean
       friction={2}
       leftThreshold={60}
       renderLeftActions={() => <DoneAction />}
-      onSwipeableOpen={() => completeTask(item.task_id, item.week_date)}
+      onSwipeableOpen={() => { completeTask(item.task_id, item.week_date).catch(() => {}); }}
     >
       <View style={styles.taskRow}>
         <View style={styles.taskBody}>
