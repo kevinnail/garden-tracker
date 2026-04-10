@@ -8,6 +8,7 @@ import { usePlannerStore } from '@/src/store/plannerStore';
 export default function PlannerToolbar() {
   const showArchivedRows = usePlannerStore(s => s.showArchivedRows);
   const toggleArchivedRows = usePlannerStore(s => s.toggleArchivedRows);
+  const ensureDefaultGarden = usePlannerStore(s => s.ensureDefaultGarden);
   const dueTodayCount = usePlannerStore(s => s.todayDueTasks.length);
   const overdueCount = usePlannerStore(s => s.todayOverdueTasks.length);
   const todayCount = dueTodayCount + overdueCount;
@@ -66,7 +67,7 @@ export default function PlannerToolbar() {
 
   const actionButtons = (
     <View style={[styles.actionRow, isLandscape && styles.actionRowLandscape]}>
-      <Pressable style={styles.btn} onPress={() => router.push('/(modals)/add-crop')}>
+      <Pressable style={styles.btn} onPress={async () => { await ensureDefaultGarden(); router.push('/(modals)/add-crop'); }}>
         <Text style={styles.btnText}>+ Crop</Text>
       </Pressable>
       <Pressable style={styles.locationBtn} onPress={() => router.push('/(modals)/add-garden')}>
