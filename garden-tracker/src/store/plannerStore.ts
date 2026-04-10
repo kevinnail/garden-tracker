@@ -16,7 +16,7 @@ import { getRowHeight } from '../utils/rowLayout';
 import { getTaskLineOccurrences } from '@/src/utils/taskUtils';
 
 import { getAllLocationGroups, getAllLocations, getAllSections, insertLocationGroup, insertLocation, insertSection, deleteLocationGroup, deleteLocation, deleteSection } from '@/src/db/queries/locationQueries';
-import { archiveCrop as archiveCropQuery, getCropsForSection, getCropStages, getStageDefs, insertCropInstance, insertCropStage, deleteCropInstance, replaceCropStages, updateCropInstance } from '@/src/db/queries/cropQueries';
+import { archiveCrop as archiveCropQuery, getCropsForSection, getCropStages, getStageDefs, insertCropWithStages, deleteCropInstance, replaceCropStages, updateCropInstance } from '@/src/db/queries/cropQueries';
 import { getTasksForCrop, getCompletionsForCrop, getTaskTypes, insertTask, insertCompletion, deleteCompletion, deleteTask as dbDeleteTask, updateTaskDay, getDueToday, getOverdue } from '@/src/db/queries/taskQueries';
 import { deleteNote as deleteNoteQuery, getAllNotesForCrop, upsertNote } from '@/src/db/queries/noteQueries';
 
@@ -156,10 +156,7 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
   },
 
   addCrop: async (data: NewCropData) => {
-    const cropId = await insertCropInstance(data.section_id, data.name, data.plant_count, data.start_date);
-    for (let i = 0; i < data.stages.length; i++) {
-      await insertCropStage(cropId, data.stages[i].stage_definition_id, data.stages[i].duration_weeks, i);
-    }
+    await insertCropWithStages(data.section_id, data.name, data.plant_count, data.start_date, data.stages);
     await get().loadData();
   },
 
