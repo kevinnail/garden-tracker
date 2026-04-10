@@ -247,29 +247,22 @@ export async function updateTaskDay(id: number, dayOfWeek: number): Promise<void
   await db.runAsync(`UPDATE tasks SET day_of_week = ? WHERE id = ?`, dayOfWeek, id);
 }
 
-export async function getDueToday(referenceDate: Date = new Date()): Promise<TodayTaskItem[]> {
+export async function getTodayAndOverdue(referenceDate: Date = new Date()): Promise<{ due: TodayTaskItem[]; overdue: TodayTaskItem[] }> {
   const today = new Date(referenceDate);
   today.setHours(0, 0, 0, 0);
 
   const [tasks, completions] = await Promise.all([getDashboardTasks(), getCompletionSet()]);
-  const todayWeekDate = formatDateKey(toSunday(today));
 
-  return tasks
+  const todayWeekDate = formatDateKey(toSunday(today));
+  const due = tasks
     .filter(task => task.day_of_week === today.getDay())
     .filter(task => isTaskScheduledOnDate(task, today))
     .filter(task => !completions.has(`${task.task_id}:${todayWeekDate}`))
     .map(task => buildDashboardItem(task, today))
     .sort(compareDashboardItems);
-}
 
-export async function getOverdue(referenceDate: Date = new Date()): Promise<TodayTaskItem[]> {
-  const today = new Date(referenceDate);
-  today.setHours(0, 0, 0, 0);
-
-  const [tasks, completions] = await Promise.all([getDashboardTasks(), getCompletionSet()]);
   const overdueFloor = addDays(today, -7);
-
-  return tasks
+  const overdue = tasks
     .map(task => {
       const dayDelta = (7 + today.getDay() - task.day_of_week) % 7;
       const daysBack = dayDelta === 0 ? 7 : dayDelta;
@@ -280,4 +273,6 @@ export async function getOverdue(referenceDate: Date = new Date()): Promise<Toda
     .filter(({ task, dueDate }) => !completions.has(`${task.task_id}:${formatDateKey(toSunday(dueDate))}`))
     .map(({ task, dueDate }) => buildDashboardItem(task, dueDate, countMissedOccurrences(task, dueDate, completions)))
     .sort(compareDashboardItems);
+
+  return { due, overdue };
 }
