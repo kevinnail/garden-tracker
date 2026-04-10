@@ -128,9 +128,11 @@ export default function AddGardenForm() {
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Delete', style: 'destructive', onPress: async () => {
-          await removeLocationGroup(g.id);
-          if (groupId === g.id) setGroupId(null);
-          await reload();
+          try {
+            await removeLocationGroup(g.id);
+            if (groupId === g.id) setGroupId(null);
+            await reload();
+          } catch { /* toast shown by store */ }
         }},
       ]
     );
@@ -145,9 +147,11 @@ export default function AddGardenForm() {
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Delete', style: 'destructive', onPress: async () => {
-          await removeLocation(l.id);
-          if (locationId === l.id) setLocationId(null);
-          await reload();
+          try {
+            await removeLocation(l.id);
+            if (locationId === l.id) setLocationId(null);
+            await reload();
+          } catch { /* toast shown by store */ }
         }},
       ]
     );
@@ -160,8 +164,10 @@ export default function AddGardenForm() {
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Delete', style: 'destructive', onPress: async () => {
-          await removeSection(s.id);
-          await reload();
+          try {
+            await removeSection(s.id);
+            await reload();
+          } catch { /* toast shown by store */ }
         }},
       ]
     );
@@ -330,8 +336,10 @@ export default function AddGardenForm() {
             Alert.alert('Reset All Data', 'Delete everything and start fresh? This cannot be undone.', [
               { text: 'Cancel', style: 'cancel' },
               { text: 'Reset', style: 'destructive', onPress: async () => {
-                await resetAllData();
-                await reload();
+                try {
+                  await resetAllData();
+                  await reload();
+                } catch { /* toast shown by store */ }
               }},
             ])
           }
