@@ -125,9 +125,10 @@ export async function archiveCrop(id: number): Promise<void> {
 
 export async function deleteCropInstance(id: number): Promise<void> {
   const db = await getDb();
-  // Delete dependent rows first, then the crop itself
-  await db.runAsync(`DELETE FROM task_completions WHERE task_id IN (SELECT id FROM tasks WHERE crop_instance_id = ?)`, id);
-  await db.runAsync(`DELETE FROM tasks WHERE crop_instance_id = ?`, id);
-  await db.runAsync(`DELETE FROM crop_stages WHERE crop_instance_id = ?`, id);
-  await db.runAsync(`DELETE FROM crop_instances WHERE id = ?`, id);
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(`DELETE FROM task_completions WHERE task_id IN (SELECT id FROM tasks WHERE crop_instance_id = ?)`, id);
+    await db.runAsync(`DELETE FROM tasks WHERE crop_instance_id = ?`, id);
+    await db.runAsync(`DELETE FROM crop_stages WHERE crop_instance_id = ?`, id);
+    await db.runAsync(`DELETE FROM crop_instances WHERE id = ?`, id);
+  });
 }
