@@ -67,11 +67,11 @@ export default function TaskAssessForm({ embedded = false }: TaskAssessFormProps
   const completionSet = new Set(completions.map(c => `${c.task_id}:${c.completed_date}`));
 
   const colorKeys = Object.keys(weekColorMap).map(Number);
-  const cropStartWeek = colorKeys.length > 0 ? Math.min(...colorKeys) : dateToWeekIndex(calendarStart, (() => {
+  const cropStartWeek = colorKeys.length > 0 ? colorKeys.reduce((a, b) => a < b ? a : b) : dateToWeekIndex(calendarStart, (() => {
     const d = parseDateKey(crop.start_date);
     return d ?? toSunday(new Date());
   })());
-  const cropEndWeek = colorKeys.length > 0 ? Math.max(...colorKeys) : cropStartWeek;
+  const cropEndWeek = colorKeys.length > 0 ? colorKeys.reduce((a, b) => a > b ? a : b) : cropStartWeek;
 
   const todayWeek = dateToWeekIndex(calendarStart, toSunday(new Date()));
   const windowStart = Math.max(cropStartWeek, todayWeek - WINDOW_PAST);
