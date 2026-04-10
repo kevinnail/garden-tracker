@@ -15,8 +15,7 @@ import {
   insertCompletion,
   deleteCompletion,
   deleteTask,
-  getDueToday,
-  getOverdue,
+  getTodayAndOverdue,
 } from '@/src/db/queries/taskQueries';
 import { getDb } from '@/src/db/database';
 
@@ -244,131 +243,73 @@ describe('deleteTask', () => {
   });
 });
 
-// ── getDueToday ───────────────────────────────────────────────────────────────
+// ── getTodayAndOverdue ────────────────────────────────────────────────────────
 
-describe('getDueToday', () => {
-  it('returns tasks due on the reference date when incomplete', async () => {
+const TASK_ROW = {
+  task_id: 1,
+  crop_instance_id: 1,
+  task_type_id: 1,
+  task_type_name: 'Watering',
+  color: '#00CCFF',
+  crop_name: 'Tomato',
+  section_name: 'Section A',
+  location_name: 'Test Beds',
+  start_date: '2025-03-02',
+  day_of_week: 3,
+  frequency_weeks: 1,
+  start_offset_weeks: 0,
+  total_duration_weeks: 9,
+};
+
+describe('getTodayAndOverdue', () => {
+  it('returns due tasks for the reference date when incomplete', async () => {
     mockDb.getAllAsync
-      .mockResolvedValueOnce([
-        {
-          task_id: 1,
-          crop_instance_id: 1,
-          task_type_id: 1,
-          task_type_name: 'Watering',
-          color: '#00CCFF',
-          crop_name: 'Tomato',
-          section_name: 'Section A',
-          location_name: 'Test Beds',
-          start_date: '2025-03-02',
-          day_of_week: 3,
-          frequency_weeks: 1,
-          start_offset_weeks: 0,
-          total_duration_weeks: 9,
-        },
-      ])
+      .mockResolvedValueOnce([TASK_ROW])
       .mockResolvedValueOnce([]);
 
-    const results = await getDueToday(new Date('2025-03-05T12:00:00'));
+    const { due } = await getTodayAndOverdue(new Date('2025-03-05T12:00:00'));
 
-    expect(results).toHaveLength(1);
-    expect(results[0].crop_name).toBe('Tomato');
-    expect(results[0].due_date).toBe('2025-03-05');
-    expect(results[0].week_date).toBe('2025-03-02');
+    expect(due).toHaveLength(1);
+    expect(due[0].crop_name).toBe('Tomato');
+    expect(due[0].due_date).toBe('2025-03-05');
+    expect(due[0].week_date).toBe('2025-03-02');
   });
 
-  it('excludes tasks already completed for that week', async () => {
+  it('excludes due tasks already completed for that week', async () => {
     mockDb.getAllAsync
-      .mockResolvedValueOnce([
-        {
-          task_id: 1,
-          crop_instance_id: 1,
-          task_type_id: 1,
-          task_type_name: 'Watering',
-          color: '#00CCFF',
-          crop_name: 'Tomato',
-          section_name: 'Section A',
-          location_name: 'Test Beds',
-          start_date: '2025-03-02',
-          day_of_week: 3,
-          frequency_weeks: 1,
-          start_offset_weeks: 0,
-          total_duration_weeks: 9,
-        },
-      ])
+      .mockResolvedValueOnce([TASK_ROW])
       .mockResolvedValueOnce([{ task_id: 1, completed_date: '2025-03-02' }]);
 
-    const results = await getDueToday(new Date('2025-03-05T12:00:00'));
+    const { due } = await getTodayAndOverdue(new Date('2025-03-05T12:00:00'));
 
-    expect(results).toHaveLength(0);
+    expect(due).toHaveLength(0);
+  });
+
+  it('returns overdue tasks due in the last 7 days when incomplete', async () => {
+    mockDb.getAllAsync
+      .mockResolvedValueOnce([TASK_ROW])
+      .mockResolvedValueOnce([]);
+
+    const { overdue } = await getTodayAndOverdue(new Date('2025-03-06T12:00:00'));
+
+    expect(overdue).toHaveLength(1);
+    expect(overdue[0].due_date).toBe('2025-03-05');
+    expect(overdue[0].week_date).toBe('2025-03-02');
+  });
+
+  it('does not return overdue tasks completed for that week', async () => {
+    mockDb.getAllAsync
+      .mockResolvedValueOnce([TASK_ROW])
+      .mockResolvedValueOnce([{ task_id: 1, completed_date: '2025-03-02' }]);
+
+    const { overdue } = await getTodayAndOverdue(new Date('2025-03-06T12:00:00'));
+
+    expect(overdue).toHaveLength(0);
   });
 
   it('handles database errors', async () => {
     mockDb.getAllAsync.mockRejectedValueOnce(new Error('Database error'));
 
-    await expect(getDueToday(new Date('2025-03-05T12:00:00'))).rejects.toThrow('Database error');
-  });
-});
-
-// ── getOverdue ────────────────────────────────────────────────────────────────
-
-describe('getOverdue', () => {
-  it('returns tasks due in the last 7 days when incomplete', async () => {
-    mockDb.getAllAsync
-      .mockResolvedValueOnce([
-        {
-          task_id: 1,
-          crop_instance_id: 1,
-          task_type_id: 1,
-          task_type_name: 'Watering',
-          color: '#00CCFF',
-          crop_name: 'Tomato',
-          section_name: 'Section A',
-          location_name: 'Test Beds',
-          start_date: '2025-03-02',
-          day_of_week: 3,
-          frequency_weeks: 1,
-          start_offset_weeks: 0,
-          total_duration_weeks: 9,
-        },
-      ])
-      .mockResolvedValueOnce([]);
-
-    const results = await getOverdue(new Date('2025-03-06T12:00:00'));
-
-    expect(results).toHaveLength(1);
-    expect(results[0].due_date).toBe('2025-03-05');
-    expect(results[0].week_date).toBe('2025-03-02');
-  });
-
-  it('does not return tasks completed for the overdue week', async () => {
-    mockDb.getAllAsync
-      .mockResolvedValueOnce([
-        {
-          task_id: 1,
-          crop_instance_id: 1,
-          task_type_id: 1,
-          task_type_name: 'Watering',
-          color: '#00CCFF',
-          crop_name: 'Tomato',
-          section_name: 'Section A',
-          location_name: 'Test Beds',
-          start_date: '2025-03-02',
-          day_of_week: 3,
-          frequency_weeks: 1,
-          start_offset_weeks: 0,
-          total_duration_weeks: 9,
-        },
-      ])
-      .mockResolvedValueOnce([{ task_id: 1, completed_date: '2025-03-02' }]);
-
-    const results = await getOverdue(new Date('2025-03-06T12:00:00'));
-
-    expect(results).toHaveLength(0);
-  });
-
-  it('handles database errors', async () => {
-    mockDb.getAllAsync.mockRejectedValueOnce(new Error('Database error'));
-
-    await expect(getOverdue(new Date('2025-03-06T12:00:00'))).rejects.toThrow('Database error');
+    await expect(getTodayAndOverdue(new Date('2025-03-05T12:00:00'))).rejects.toThrow('Database error');
   });
 });

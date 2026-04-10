@@ -21,6 +21,15 @@ export async function getCropsForSection(sectionId: number, includeArchived = fa
   return rows.map(r => ({ ...r, archived: r.archived === 1 }));
 }
 
+export async function getAllCrops(includeArchived = false): Promise<CropInstance[]> {
+  const db = await getDb();
+  const sql = includeArchived
+    ? `SELECT * FROM crop_instances ORDER BY section_id, start_date`
+    : `SELECT * FROM crop_instances WHERE archived = 0 ORDER BY section_id, start_date`;
+  const rows = await db.getAllAsync<any>(sql);
+  return rows.map(r => ({ ...r, archived: r.archived === 1 }));
+}
+
 export async function getCropStages(cropInstanceId: number): Promise<CropStage[]> {
   const db = await getDb();
   return db.getAllAsync<CropStage>(`
@@ -74,21 +83,49 @@ export async function insertCropStage(
   );
 }
 
+export async function insertCropWithStages(
+  sectionId: number,
+  name: string,
+  plantCount: number,
+  startDate: string,
+  stages: { stage_definition_id: number; duration_weeks: number }[]
+): Promise<number> {
+  const db = await getDb();
+  const normalizedStartDate = normalizeStartDate(startDate);
+  let cropId = 0;
+  await db.withTransactionAsync(async () => {
+    const result = await db.runAsync(
+      `INSERT INTO crop_instances (section_id, name, plant_count, start_date) VALUES (?, ?, ?, ?)`,
+      sectionId, name, plantCount, normalizedStartDate
+    );
+    cropId = result.lastInsertRowId;
+    for (let i = 0; i < stages.length; i++) {
+      await db.runAsync(
+        `INSERT INTO crop_stages (crop_instance_id, stage_definition_id, duration_weeks, order_index) VALUES (?, ?, ?, ?)`,
+        cropId, stages[i].stage_definition_id, stages[i].duration_weeks, i
+      );
+    }
+  });
+  return cropId;
+}
+
+const CROP_INSTANCE_COLUMNS = new Set(['name', 'plant_count', 'start_date', 'notes', 'section_id']);
+
 export async function updateCropInstance(
   id: number,
   fields: Partial<Pick<CropInstance, 'name' | 'plant_count' | 'start_date' | 'notes' | 'section_id'>>
 ): Promise<void> {
-  if (Object.keys(fields).length === 0) {
-    return;
-  }
-
-  const db = await getDb();
   const normalizedFields = {
     ...fields,
     ...(fields.start_date ? { start_date: normalizeStartDate(fields.start_date) } : {}),
   };
-  const sets = Object.keys(normalizedFields).map(k => `${k} = ?`).join(', ');
-  const values = Object.values(normalizedFields);
+
+  const entries = Object.entries(normalizedFields).filter(([k]) => CROP_INSTANCE_COLUMNS.has(k));
+  if (entries.length === 0) return;
+
+  const db = await getDb();
+  const sets = entries.map(([k]) => `${k} = ?`).join(', ');
+  const values = entries.map(([, v]) => v);
   await db.runAsync(
     `UPDATE crop_instances SET ${sets}, updated_at = datetime('now') WHERE id = ?`,
     ...values, id
@@ -125,9 +162,10 @@ export async function archiveCrop(id: number): Promise<void> {
 
 export async function deleteCropInstance(id: number): Promise<void> {
   const db = await getDb();
-  // Delete dependent rows first, then the crop itself
-  await db.runAsync(`DELETE FROM task_completions WHERE task_id IN (SELECT id FROM tasks WHERE crop_instance_id = ?)`, id);
-  await db.runAsync(`DELETE FROM tasks WHERE crop_instance_id = ?`, id);
-  await db.runAsync(`DELETE FROM crop_stages WHERE crop_instance_id = ?`, id);
-  await db.runAsync(`DELETE FROM crop_instances WHERE id = ?`, id);
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(`DELETE FROM task_completions WHERE task_id IN (SELECT id FROM tasks WHERE crop_instance_id = ?)`, id);
+    await db.runAsync(`DELETE FROM tasks WHERE crop_instance_id = ?`, id);
+    await db.runAsync(`DELETE FROM crop_stages WHERE crop_instance_id = ?`, id);
+    await db.runAsync(`DELETE FROM crop_instances WHERE id = ?`, id);
+  });
 }
