@@ -21,6 +21,15 @@ export async function getCropsForSection(sectionId: number, includeArchived = fa
   return rows.map(r => ({ ...r, archived: r.archived === 1 }));
 }
 
+export async function getAllCrops(includeArchived = false): Promise<CropInstance[]> {
+  const db = await getDb();
+  const sql = includeArchived
+    ? `SELECT * FROM crop_instances ORDER BY section_id, start_date`
+    : `SELECT * FROM crop_instances WHERE archived = 0 ORDER BY section_id, start_date`;
+  const rows = await db.getAllAsync<any>(sql);
+  return rows.map(r => ({ ...r, archived: r.archived === 1 }));
+}
+
 export async function getCropStages(cropInstanceId: number): Promise<CropStage[]> {
   const db = await getDb();
   return db.getAllAsync<CropStage>(`

@@ -16,7 +16,7 @@ import { getRowHeight } from '../utils/rowLayout';
 import { getTaskLineOccurrences } from '@/src/utils/taskUtils';
 
 import { getAllLocationGroups, getAllLocations, getAllSections, insertLocationGroup, insertLocation, insertSection, deleteLocationGroup, deleteLocation, deleteSection } from '@/src/db/queries/locationQueries';
-import { archiveCrop as archiveCropQuery, getCropsForSection, getCropStages, getStageDefs, insertCropWithStages, deleteCropInstance, replaceCropStages, updateCropInstance } from '@/src/db/queries/cropQueries';
+import { archiveCrop as archiveCropQuery,  getAllCrops, getCropStages, getStageDefs, insertCropWithStages, deleteCropInstance, replaceCropStages, updateCropInstance } from '@/src/db/queries/cropQueries';
 import { getTasksForCrop, getCompletionsForCrop, getTaskTypes, insertTask, insertCompletion, deleteCompletion, deleteTask as dbDeleteTask, updateTaskDay, getTodayAndOverdue } from '@/src/db/queries/taskQueries';
 import { deleteNote as deleteNoteQuery, getAllNotesForCrop, upsertNote } from '@/src/db/queries/noteQueries';
 
@@ -186,10 +186,11 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
     const calendarStart = get().calendarStart;
     const showArchived  = get().showArchivedRows;
 
-    const [groups, locations, sections, stageDefs, taskTypeList, { due: todayDueTasks, overdue: todayOverdueTasks }] = await Promise.all([
+    const [groups, locations, sections, allCrops, stageDefs, taskTypeList, { due: todayDueTasks, overdue: todayOverdueTasks }] = await Promise.all([
       getAllLocationGroups(),
       getAllLocations(),
       getAllSections(),
+      getAllCrops(showArchived),
       getStageDefs(),
       getTaskTypes(),
       getTodayAndOverdue(),
@@ -218,7 +219,7 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
         for (const section of locationSections) {
           pushRow({ type: 'section_header', section });
 
-          const crops = await getCropsForSection(section.id, showArchived);
+          const crops = allCrops.filter(c => c.section_id === section.id);
 
           if (crops.length === 0) {
             pushRow({ type: 'section_footer' });
