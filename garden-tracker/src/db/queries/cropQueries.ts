@@ -109,21 +109,23 @@ export async function insertCropWithStages(
   return cropId;
 }
 
+const CROP_INSTANCE_COLUMNS = new Set(['name', 'plant_count', 'start_date', 'notes', 'section_id']);
+
 export async function updateCropInstance(
   id: number,
   fields: Partial<Pick<CropInstance, 'name' | 'plant_count' | 'start_date' | 'notes' | 'section_id'>>
 ): Promise<void> {
-  if (Object.keys(fields).length === 0) {
-    return;
-  }
-
-  const db = await getDb();
   const normalizedFields = {
     ...fields,
     ...(fields.start_date ? { start_date: normalizeStartDate(fields.start_date) } : {}),
   };
-  const sets = Object.keys(normalizedFields).map(k => `${k} = ?`).join(', ');
-  const values = Object.values(normalizedFields);
+
+  const entries = Object.entries(normalizedFields).filter(([k]) => CROP_INSTANCE_COLUMNS.has(k));
+  if (entries.length === 0) return;
+
+  const db = await getDb();
+  const sets = entries.map(([k]) => `${k} = ?`).join(', ');
+  const values = entries.map(([, v]) => v);
   await db.runAsync(
     `UPDATE crop_instances SET ${sets}, updated_at = datetime('now') WHERE id = ?`,
     ...values, id
