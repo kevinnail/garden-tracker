@@ -78,12 +78,14 @@ export default function TaskAssessForm({ embedded = false }: TaskAssessFormProps
   const windowEnd = Math.min(cropEndWeek, todayWeek + WINDOW_AHEAD);
 
   const handleToggle = async (task: Task, weekSunday: string) => {
-    const key = `${task.id}:${weekSunday}`;
-    if (completionSet.has(key)) {
-      await uncompleteTask(task.id, weekSunday);
-    } else {
-      await completeTask(task.id, weekSunday);
-    }
+    try {
+      const key = `${task.id}:${weekSunday}`;
+      if (completionSet.has(key)) {
+        await uncompleteTask(task.id, weekSunday);
+      } else {
+        await completeTask(task.id, weekSunday);
+      }
+    } catch { /* toast shown by store */ }
   };
 
   const handleDelete = (task: Task) => {
@@ -92,13 +94,15 @@ export default function TaskAssessForm({ embedded = false }: TaskAssessFormProps
       `Delete "${task.task_type_name}" (${DAYS_SHORT[task.day_of_week]}, every ${task.frequency_weeks}w)? This removes all completion history.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => deleteTask(task.id) },
+        { text: 'Delete', style: 'destructive', onPress: async () => { try { await deleteTask(task.id); } catch { /* toast shown by store */ } } },
       ]
     );
   };
 
   const handleAdjustDay = async (task: Task, delta: number) => {
-    await adjustTaskDay(task.id, (task.day_of_week + delta + 7) % 7);
+    try {
+      await adjustTaskDay(task.id, (task.day_of_week + delta + 7) % 7);
+    } catch { /* toast shown by store */ }
   };
 
   const handleAddTask = () => {
