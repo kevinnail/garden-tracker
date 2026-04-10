@@ -2,6 +2,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
 
 export default function RootLayout() {
   return (
@@ -17,6 +18,7 @@ export default function RootLayout() {
         <Stack.Screen name="(modals)/cell-note" options={{ presentation: 'modal', title: 'Weekly Note', headerStyle: { backgroundColor: '#111111' }, headerTintColor: '#ddd' }} />
         </Stack>
         <StatusBar style="light" />
+        <Toast />
       </GestureHandlerRootView>
     </SafeAreaProvider>
   );
