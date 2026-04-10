@@ -74,6 +74,32 @@ export async function insertCropStage(
   );
 }
 
+export async function insertCropWithStages(
+  sectionId: number,
+  name: string,
+  plantCount: number,
+  startDate: string,
+  stages: { stage_definition_id: number; duration_weeks: number }[]
+): Promise<number> {
+  const db = await getDb();
+  const normalizedStartDate = normalizeStartDate(startDate);
+  let cropId = 0;
+  await db.withTransactionAsync(async () => {
+    const result = await db.runAsync(
+      `INSERT INTO crop_instances (section_id, name, plant_count, start_date) VALUES (?, ?, ?, ?)`,
+      sectionId, name, plantCount, normalizedStartDate
+    );
+    cropId = result.lastInsertRowId;
+    for (let i = 0; i < stages.length; i++) {
+      await db.runAsync(
+        `INSERT INTO crop_stages (crop_instance_id, stage_definition_id, duration_weeks, order_index) VALUES (?, ?, ?, ?)`,
+        cropId, stages[i].stage_definition_id, stages[i].duration_weeks, i
+      );
+    }
+  });
+  return cropId;
+}
+
 export async function updateCropInstance(
   id: number,
   fields: Partial<Pick<CropInstance, 'name' | 'plant_count' | 'start_date' | 'notes' | 'section_id'>>
