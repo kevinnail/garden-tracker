@@ -80,7 +80,7 @@ function countMissedOccurrences(
   let count = 0;
   let date = mostRecentDueDate;
 
-  for (let i = 0; i < 52; i++) {
+  for (let i = 0; i < 12; i++) {
     if (!isTaskScheduledOnDate(task, date)) break;
     if (completions.has(`${task.task_id}:${formatDateKey(toSunday(date))}`)) break;
     count++;
