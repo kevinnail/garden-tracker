@@ -168,6 +168,18 @@ export default function PlannerGrid() {
       {/* ── Main row: row header + grid body ── */}
       <View style={styles.mainRow}>
 
+        {rows.length === 0 && (
+          <View style={styles.emptyState} pointerEvents="none">
+            <Text style={styles.emptyTitle}>Welcome to Garden Tracker</Text>
+            <Text style={styles.emptyBody}>
+              Tap <Text style={styles.emptyHighlight}>+ Crop</Text> to add your first crop and it will appear here on the planner timeline.
+            </Text>
+            <Text style={styles.emptyHint}>
+              Each row shows a crop&apos;s growing stages across the calendar. Swipe left and right to navigate weeks.
+            </Text>
+          </View>
+        )}
+
         <View style={styles.rowHeaderClip}>
           <Animated.View
             style={[{ position: 'absolute', width: ROW_HEADER_WIDTH, height: totalHeight }, rowHeaderStyle]}
@@ -226,4 +238,35 @@ const styles = StyleSheet.create({
   mainRow: { flex: 1, flexDirection: 'row' },
   rowHeaderClip: { width: ROW_HEADER_WIDTH, overflow: 'hidden' },
   bodyClip: { flex: 1, overflow: 'hidden' },
+  emptyState: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    zIndex: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 40,
+    gap: 16,
+  },
+  emptyTitle: {
+    color: '#ccc',
+    fontSize: 20,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  emptyBody: {
+    color: '#888',
+    fontSize: 15,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  emptyHighlight: {
+    color: '#4CAF50',
+    fontWeight: '700',
+  },
+  emptyHint: {
+    color: '#555',
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
 });

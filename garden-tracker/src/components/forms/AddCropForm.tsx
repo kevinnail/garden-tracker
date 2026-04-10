@@ -19,11 +19,6 @@ interface StageRow {
   duration_weeks: string; // string for TextInput, parsed on submit
 }
 
-const DEFAULT_STAGES: StageRow[] = [
-  { stage_definition_id: 1, duration_weeks: '2' }, // Seedling
-  { stage_definition_id: 2, duration_weeks: '4' }, // Vegetative
-  { stage_definition_id: 3, duration_weeks: '8' }, // Flowering
-];
 
 interface AddCropFormProps {
   cropId?: number;
@@ -53,7 +48,7 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
   const [startDate, setStartDate]   = useState<Date>(() => toSunday(new Date()));
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [sectionId, setSectionId]   = useState<number | null>(null);
-  const [stages, setStages]         = useState<StageRow[]>(DEFAULT_STAGES);
+  const [stages, setStages]         = useState<StageRow[]>([]);
   const [sections, setSections]     = useState<Section[]>([]);
   const [locations, setLocations]   = useState<Location[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -97,6 +92,12 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
       if (secs.length > 0) {
         setSectionId(secs[0].id);
       }
+      setStages(
+        stageDefs.slice(0, 3).map((def, i) => ({
+          stage_definition_id: def.id,
+          duration_weeks: ['2', '4', '8'][i] ?? '4',
+        }))
+      );
       setLoadingInitial(false);
     };
 
@@ -192,8 +193,10 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
           text: 'Archive',
           style: 'destructive',
           onPress: async () => {
-            await archiveCrop(cropId);
-            router.back();
+            try {
+              await archiveCrop(cropId);
+              router.back();
+            } catch { /* toast shown by store */ }
           },
         },
       ]
@@ -212,8 +215,10 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            await deleteCrop(cropId);
-            router.back();
+            try {
+              await deleteCrop(cropId);
+              router.back();
+            } catch { /* toast shown by store */ }
           },
         },
       ]

@@ -1,4 +1,5 @@
 import { useLocalSearchParams } from 'expo-router';
+import Toast from 'react-native-toast-message';
 
 import CellNoteForm from '@/src/components/forms/CellNoteForm';
 
@@ -11,5 +12,10 @@ export default function CellNoteModal() {
     return null;
   }
 
-  return <CellNoteForm cropId={cropId} weekDate={weekDate} />;
+  return (
+    <>
+      <CellNoteForm cropId={cropId} weekDate={weekDate} />
+      <Toast />
+    </>
+  );
 }
