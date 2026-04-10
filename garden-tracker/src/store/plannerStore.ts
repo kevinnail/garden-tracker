@@ -19,6 +19,7 @@ import { getAllLocationGroups, getAllLocations, getAllSections, insertLocationGr
 import { archiveCrop as archiveCropQuery,  getAllCrops, getCropStages, getStageDefs, insertCropWithStages, deleteCropInstance, replaceCropStages, updateCropInstance } from '@/src/db/queries/cropQueries';
 import { getTasksForCrop, getCompletionsForCrop, getTaskTypes, insertTask, insertCompletion, deleteCompletion, deleteTask as dbDeleteTask, updateTaskDay, getTodayAndOverdue } from '@/src/db/queries/taskQueries';
 import { deleteNote as deleteNoteQuery, getAllNotesForCrop, upsertNote } from '@/src/db/queries/noteQueries';
+import { resetDatabase } from '@/src/db/database';
 
 interface PlannerState {
   rows: GridRowItem[];
@@ -53,6 +54,8 @@ interface PlannerState {
   removeLocationGroup: (id: number) => Promise<void>;
   removeLocation: (id: number) => Promise<void>;
   removeSection: (id: number) => Promise<void>;
+  ensureDefaultGarden: () => Promise<void>;
+  resetAllData: () => Promise<void>;
   setSelectedCrop: (id: number | null) => void;
   focusPlannerCrop: (id: number | null, focusDate?: string | null) => void;
   clearPlannerFocus: () => void;
@@ -86,6 +89,26 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
 
   addSection: async (locationId, name) => {
     await insertSection(locationId, name);
+    await get().loadData();
+  },
+
+  ensureDefaultGarden: async () => {
+    const sections = await getAllSections();
+    if (sections.length > 0) return;
+    await insertLocationGroup('Home');
+    const groups = await getAllLocationGroups();
+    const group = groups[0];
+    if (!group) return;
+    await insertLocation(group.id, 'My Garden');
+    const locations = await getAllLocations();
+    const loc = locations.find(l => l.location_group_id === group.id);
+    if (!loc) return;
+    await insertSection(loc.id, 'My Section');
+    await get().loadData();
+  },
+
+  resetAllData: async () => {
+    await resetDatabase();
     await get().loadData();
   },
 
