@@ -43,6 +43,7 @@ export default function AddGardenForm() {
   const removeLocationGroup = usePlannerStore(s => s.removeLocationGroup);
   const removeLocation    = usePlannerStore(s => s.removeLocation);
   const removeSection     = usePlannerStore(s => s.removeSection);
+  const resetAllData      = usePlannerStore(s => s.resetAllData);
 
   const [mode, setMode]             = useState<Mode>('garden');
   const [name, setName]             = useState('');
@@ -310,8 +311,32 @@ export default function AddGardenForm() {
           </>
         )}
 
+        {groups.some(g => gardenStatus(g, locations, sections) === 'ready') && (
+          <Pressable
+            style={styles.addCropBtn}
+            onPress={() => { router.back(); router.push('/(modals)/add-crop'); }}
+          >
+            <Text style={styles.addCropBtnText}>+ Add a Crop</Text>
+          </Pressable>
+        )}
+
         <Pressable style={styles.doneBtn} onPress={() => router.back()}>
           <Text style={styles.doneBtnText}>Done</Text>
+        </Pressable>
+
+        <Pressable
+          style={styles.resetBtn}
+          onPress={() =>
+            Alert.alert('Reset All Data', 'Delete everything and start fresh? This cannot be undone.', [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Reset', style: 'destructive', onPress: async () => {
+                await resetAllData();
+                await reload();
+              }},
+            ])
+          }
+        >
+          <Text style={styles.resetBtnText}>⚠ Reset Database</Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>
@@ -348,6 +373,10 @@ const styles = StyleSheet.create({
   existingStatus: { fontSize: 11, marginTop: 2 },
   deleteBtn: { padding: 6 },
   deleteBtnText: { color: '#664444', fontSize: 14 },
-  doneBtn: { marginTop: 24, paddingVertical: 14, borderRadius: 8, borderWidth: 1, borderColor: '#4a4a4a', backgroundColor: '#262626', alignItems: 'center' },
+  addCropBtn: { marginTop: 24, paddingVertical: 14, borderRadius: 8, backgroundColor: '#2ecc71', alignItems: 'center' },
+  addCropBtnText: { color: '#111', fontWeight: '700', fontSize: 15 },
+  doneBtn: { marginTop: 10, paddingVertical: 14, borderRadius: 8, borderWidth: 1, borderColor: '#4a4a4a', backgroundColor: '#262626', alignItems: 'center' },
   doneBtnText: { color: '#ddd', fontWeight: '600', fontSize: 15 },
+  resetBtn: { marginTop: 32, paddingVertical: 10, alignItems: 'center' },
+  resetBtnText: { color: '#5a2020', fontSize: 12, fontWeight: '600' },
 });
