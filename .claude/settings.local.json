@@ -10,7 +10,8 @@
       "Bash(npm install:*)",
       "Bash(npm test:*)",
       "Bash(npx tsc:*)",
-      "Bash(echo \"exit=$?\")"
+      "Bash(echo \"exit=$?\")",
+      "Bash(node -e ':*)"
     ]
   }
 }

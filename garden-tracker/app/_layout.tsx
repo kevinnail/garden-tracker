@@ -14,6 +14,7 @@ export default function RootLayout() {
         <Stack.Screen name="(modals)/edit-crop" options={{ presentation: 'modal', headerShown: false }} />
         <Stack.Screen name="(modals)/add-task" options={{ presentation: 'modal', title: 'Add Task', headerStyle: { backgroundColor: '#1a1a1a' }, headerTintColor: '#ddd' }} />
         <Stack.Screen name="(modals)/manage-tasks" options={{ presentation: 'modal', title: 'Manage Tasks', headerStyle: { backgroundColor: '#1a1a1a' }, headerTintColor: '#ddd' }} />
+        <Stack.Screen name="(modals)/add-location" options={{ presentation: 'modal', title: 'Setup Locations', headerStyle: { backgroundColor: '#1a1a1a' }, headerTintColor: '#ddd' }} />
         <Stack.Screen name="(modals)/add-garden" options={{ presentation: 'modal', title: 'Setup Locations', headerStyle: { backgroundColor: '#1a1a1a' }, headerTintColor: '#ddd' }} />
         <Stack.Screen name="(modals)/cell-note" options={{ presentation: 'modal', title: 'Weekly Note', headerStyle: { backgroundColor: '#111111' }, headerTintColor: '#ddd' }} />
         </Stack>

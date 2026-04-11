@@ -61,20 +61,20 @@ export function setupTestDb() {
       name  TEXT NOT NULL,
       color TEXT NOT NULL
     );
-    CREATE TABLE location_groups (
+    CREATE TABLE locations (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       name        TEXT NOT NULL,
       order_index INTEGER NOT NULL DEFAULT 0
     );
-    CREATE TABLE locations (
-      id                INTEGER PRIMARY KEY AUTOINCREMENT,
-      location_group_id INTEGER NOT NULL,
+    CREATE TABLE gardens (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      location_id INTEGER NOT NULL,
       name              TEXT NOT NULL,
       order_index       INTEGER NOT NULL DEFAULT 0
     );
     CREATE TABLE sections (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      location_id INTEGER NOT NULL,
+      garden_id   INTEGER NOT NULL,
       name        TEXT NOT NULL,
       order_index INTEGER NOT NULL DEFAULT 0
     );
@@ -134,9 +134,9 @@ export function setupTestDb() {
   }
 
   // Location hierarchy
-  const group = db.prepare('INSERT INTO location_groups (name, order_index) VALUES (?, ?)').run('Test Garden', 0);
-  const loc   = db.prepare('INSERT INTO locations (location_group_id, name, order_index) VALUES (?, ?, ?)').run(group.lastInsertRowid, 'Test Beds', 0);
-  db.prepare('INSERT INTO sections (location_id, name, order_index) VALUES (?, ?, ?)').run(loc.lastInsertRowid, 'Section A', 0);
+  const location = db.prepare('INSERT INTO locations (name, order_index) VALUES (?, ?)').run('Home', 0);
+  const garden = db.prepare('INSERT INTO gardens (location_id, name, order_index) VALUES (?, ?, ?)').run(location.lastInsertRowid, 'Test Beds', 0);
+  db.prepare('INSERT INTO sections (garden_id, name, order_index) VALUES (?, ?, ?)').run(garden.lastInsertRowid, 'Section A', 0);
   // → section_id = 1 = SEED.SECTION_ID
 
   // One known crop

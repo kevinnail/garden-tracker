@@ -46,7 +46,56 @@ async function initSchema(db: SQLite.SQLiteDatabase) {
     // Expo SQLite web support is still alpha; continue if WAL is unavailable.
   }
 
+  await migrateLegacyHierarchy(db);
   await db.execAsync(SCHEMA_SQL);
+}
+
+async function tableExists(db: SQLite.SQLiteDatabase, tableName: string): Promise<boolean> {
+  const row = await db.getFirstAsync<{ name: string }>(
+    `SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?`,
+    tableName
+  );
+  return Boolean(row?.name);
+}
+
+async function columnExists(db: SQLite.SQLiteDatabase, tableName: string, columnName: string): Promise<boolean> {
+  const rows = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(${tableName})`);
+  return rows.some(row => row.name === columnName);
+}
+
+async function migrateLegacyHierarchy(db: SQLite.SQLiteDatabase) {
+  const hasLegacyLocationGroups = await tableExists(db, 'location_groups');
+  if (!hasLegacyLocationGroups) {
+    return;
+  }
+
+  await db.withTransactionAsync(async () => {
+    await db.runAsync('PRAGMA foreign_keys = OFF');
+
+    const hasLegacyLocations = await tableExists(db, 'locations');
+    const hasGardens = await tableExists(db, 'gardens');
+
+    if (hasLegacyLocations && !hasGardens) {
+      await db.runAsync(`ALTER TABLE locations RENAME TO gardens`);
+    }
+
+    const hasLocations = await tableExists(db, 'locations');
+    if (!hasLocations) {
+      await db.runAsync(`ALTER TABLE location_groups RENAME TO locations`);
+    }
+
+    const hasGardenLocationGroupId = await columnExists(db, 'gardens', 'location_group_id');
+    if (hasGardenLocationGroupId) {
+      await db.runAsync(`ALTER TABLE gardens RENAME COLUMN location_group_id TO location_id`);
+    }
+
+    const hasSectionLocationId = await columnExists(db, 'sections', 'location_id');
+    if (hasSectionLocationId) {
+      await db.runAsync(`ALTER TABLE sections RENAME COLUMN location_id TO garden_id`);
+    }
+
+    await db.runAsync('PRAGMA foreign_keys = ON');
+  });
 }
 
 async function removeDemoData(db: SQLite.SQLiteDatabase) {
@@ -55,11 +104,11 @@ async function removeDemoData(db: SQLite.SQLiteDatabase) {
   );
   if (done) return;
 
-  // Remove the seeded demo location hierarchy (My Garden → Raised Beds → Bed 1)
+  // Remove the seeded demo hierarchy (Home -> My Garden -> Bed 1)
   // Safe to run even if already gone — DELETE WHERE matches nothing is a no-op
-  await db.runAsync(`DELETE FROM sections WHERE name = 'Bed 1' AND location_id IN (SELECT id FROM locations WHERE name = 'Raised Beds')`);
-  await db.runAsync(`DELETE FROM locations WHERE name = 'Raised Beds'`);
-  await db.runAsync(`DELETE FROM location_groups WHERE name = 'My Garden'`);
+  await db.runAsync(`DELETE FROM sections WHERE name = 'Bed 1' AND garden_id IN (SELECT id FROM gardens WHERE name = 'My Garden')`);
+  await db.runAsync(`DELETE FROM gardens WHERE name = 'My Garden'`);
+  await db.runAsync(`DELETE FROM locations WHERE name = 'Home'`);
 
   await db.runAsync(`INSERT INTO settings (key, value) VALUES ('demo_removed', '1')`);
 }
@@ -87,17 +136,17 @@ async function seedIfNeeded(db: SQLite.SQLiteDatabase) {
       );
     }
 
-    // Demo location hierarchy
-    const group = await db.runAsync(
-      `INSERT INTO location_groups (name, order_index) VALUES ('My Garden', 0)`
+    // Demo hierarchy
+    const location = await db.runAsync(
+      `INSERT INTO locations (name, order_index) VALUES ('Home', 0)`
     );
-    const loc = await db.runAsync(
-      `INSERT INTO locations (location_group_id, name, order_index) VALUES (?, 'Raised Beds', 0)`,
-      group.lastInsertRowId
+    const garden = await db.runAsync(
+      `INSERT INTO gardens (location_id, name, order_index) VALUES (?, 'My Garden', 0)`,
+      location.lastInsertRowId
     );
     const section = await db.runAsync(
-      `INSERT INTO sections (location_id, name, order_index) VALUES (?, 'Bed 1', 0)`,
-      loc.lastInsertRowId
+      `INSERT INTO sections (garden_id, name, order_index) VALUES (?, 'Bed 1', 0)`,
+      garden.lastInsertRowId
     );
 
     // Demo crop — started 4 weeks ago

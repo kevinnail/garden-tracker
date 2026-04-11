@@ -72,7 +72,7 @@ export default function PlannerToolbar() {
     <View style={[styles.actionRow, isLandscape && styles.actionRowLandscape]}>
       <Pressable
         style={styles.btn}
-        onPress={() => router.push(hasSections ? '/(modals)/add-crop' : '/(modals)/add-garden')}
+        onPress={() => router.push(hasSections ? '/(modals)/add-crop' : '/(modals)/add-location')}
         accessibilityRole="button"
         accessibilityLabel="Add crop"
         accessibilityHint={hasSections ? 'Opens the add crop form' : 'Opens hierarchy setup first'}
@@ -81,7 +81,7 @@ export default function PlannerToolbar() {
       </Pressable>
       <Pressable
         style={styles.locationBtn}
-        onPress={() => router.push('/(modals)/add-garden')}
+        onPress={() => router.push('/(modals)/add-location')}
         accessibilityRole="button"
         accessibilityLabel="Manage locations"
         accessibilityHint="Opens the locations, gardens, and sections editor"

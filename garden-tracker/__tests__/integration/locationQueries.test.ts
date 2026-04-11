@@ -9,12 +9,15 @@
 // * ==================================================
 
 import {
-  getAllLocationGroups,
   getAllLocations,
+  getAllGardens,
   getAllSections,
-  insertLocationGroup,
   insertLocation,
+  insertGarden,
   insertSection,
+  deleteSection,
+  deleteGarden,
+  deleteLocation,
 } from '@/src/db/queries/locationQueries';
 import { getDb } from '@/src/db/database';
 import { setupTestDb, SEED } from '../setup';
@@ -31,29 +34,6 @@ beforeEach(() => {
   (getDb as jest.Mock).mockResolvedValue(adapter);
 });
 
-// ── getAllLocationGroups ────────────────────────────────────────────────────────
-
-describe('getAllLocationGroups', () => {
-  it('returns the seeded location group', async () => {
-    const groups = await getAllLocationGroups();
-
-    expect(groups.length).toBeGreaterThan(0);
-    expect(groups[0].id).toBeDefined();
-    expect(typeof groups[0].name).toBe('string');
-  });
-
-  it('returns groups in order_index order', async () => {
-    await insertLocationGroup('ZZZ Last');
-    await insertLocationGroup('AAA Also Last');
-
-    const groups = await getAllLocationGroups();
-
-    for (let i = 1; i < groups.length; i++) {
-      expect(groups[i].order_index).toBeGreaterThanOrEqual(groups[i - 1].order_index);
-    }
-  });
-});
-
 // ── getAllLocations ─────────────────────────────────────────────────────────────
 
 describe('getAllLocations', () => {
@@ -61,7 +41,30 @@ describe('getAllLocations', () => {
     const locations = await getAllLocations();
 
     expect(locations.length).toBeGreaterThan(0);
-    expect(typeof locations[0].location_group_id).toBe('number');
+    expect(locations[0].id).toBeDefined();
+    expect(typeof locations[0].name).toBe('string');
+  });
+
+  it('returns locations in order_index order', async () => {
+    await insertLocation('ZZZ Last');
+    await insertLocation('AAA Also Last');
+
+    const locations = await getAllLocations();
+
+    for (let i = 1; i < locations.length; i++) {
+      expect(locations[i].order_index).toBeGreaterThanOrEqual(locations[i - 1].order_index);
+    }
+  });
+});
+
+// ── getAllGardens ──────────────────────────────────────────────────────────────
+
+describe('getAllGardens', () => {
+  it('returns the seeded garden', async () => {
+    const gardens = await getAllGardens();
+
+    expect(gardens.length).toBeGreaterThan(0);
+    expect(typeof gardens[0].location_id).toBe('number');
   });
 });
 
@@ -76,12 +79,12 @@ describe('getAllSections', () => {
   });
 
   it('returns sections in order_index order', async () => {
-    const groups = await getAllLocationGroups();
     const locations = await getAllLocations();
-    const locId = locations.find(l => l.location_group_id === groups[0].id)!.id;
+    const gardens = await getAllGardens();
+    const gardenId = gardens.find(g => g.location_id === locations[0].id)!.id;
 
-    await insertSection(locId, 'Section B');
-    await insertSection(locId, 'Section C');
+    await insertSection(gardenId, 'Section B');
+    await insertSection(gardenId, 'Section C');
 
     const sections = await getAllSections();
 
@@ -91,80 +94,158 @@ describe('getAllSections', () => {
   });
 });
 
-// ── insertLocationGroup ────────────────────────────────────────────────────────
+// ── insertLocation ─────────────────────────────────────────────────────────────
 
-describe('insertLocationGroup', () => {
+describe('insertLocation', () => {
   it('returns a numeric id greater than zero', async () => {
-    const id = await insertLocationGroup('New Group');
+    const id = await insertLocation('New Location');
 
     expect(typeof id).toBe('number');
     expect(id).toBeGreaterThan(0);
   });
 
-  it('new group appears in getAllLocationGroups', async () => {
-    await insertLocationGroup('Rooftop');
+  it('new location appears in getAllLocations', async () => {
+    await insertLocation('Rooftop');
 
-    const groups = await getAllLocationGroups();
-    const found = groups.find(g => g.name === 'Rooftop');
+    const locations = await getAllLocations();
+    const found = locations.find(l => l.name === 'Rooftop');
 
     expect(found).toBeDefined();
   });
 
   it('assigns sequential order_index values', async () => {
-    const id1 = await insertLocationGroup('First');
-    const id2 = await insertLocationGroup('Second');
+    const id1 = await insertLocation('First');
+    const id2 = await insertLocation('Second');
 
-    const groups = await getAllLocationGroups();
-    const g1 = groups.find(g => g.id === id1)!;
-    const g2 = groups.find(g => g.id === id2)!;
+    const locations = await getAllLocations();
+    const l1 = locations.find(l => l.id === id1)!;
+    const l2 = locations.find(l => l.id === id2)!;
 
-    expect(g2.order_index).toBeGreaterThan(g1.order_index);
+    expect(l2.order_index).toBeGreaterThan(l1.order_index);
   });
 });
 
-// ── insertLocation ─────────────────────────────────────────────────────────────
+// ── insertGarden ──────────────────────────────────────────────────────────────
 
-describe('insertLocation', () => {
-  it('inserts a location under the correct group', async () => {
-    const groupId = await insertLocationGroup('Test Group');
-    const locId = await insertLocation(groupId, 'Test Location');
+describe('insertGarden', () => {
+  it('inserts a garden under the correct location', async () => {
+    const locationId = await insertLocation('Home');
+    const gardenId = await insertGarden(locationId, 'Test Garden');
 
-    const locations = await getAllLocations();
-    const found = locations.find(l => l.id === locId);
+    const gardens = await getAllGardens();
+    const found = gardens.find(g => g.id === gardenId);
 
     expect(found).toBeDefined();
-    expect(found!.location_group_id).toBe(groupId);
-    expect(found!.name).toBe('Test Location');
+    expect(found!.location_id).toBe(locationId);
+    expect(found!.name).toBe('Test Garden');
   });
 });
 
 // ── insertSection ──────────────────────────────────────────────────────────────
 
 describe('insertSection', () => {
-  it('inserts a section under the correct location', async () => {
-    const groupId  = await insertLocationGroup('G');
-    const locId    = await insertLocation(groupId, 'L');
-    const secId    = await insertSection(locId, 'Bed 1');
+  it('inserts a section under the correct garden', async () => {
+    const locationId = await insertLocation('G');
+    const gardenId = await insertGarden(locationId, 'L');
+    const secId = await insertSection(gardenId, 'Bed 1');
 
     const sections = await getAllSections();
     const found = sections.find(s => s.id === secId);
 
     expect(found).toBeDefined();
-    expect(found!.location_id).toBe(locId);
+    expect(found!.garden_id).toBe(gardenId);
     expect(found!.name).toBe('Bed 1');
   });
 
-  it('full hierarchy round-trip: group → location → section', async () => {
-    const groupId  = await insertLocationGroup('Greenhouse');
-    const locId    = await insertLocation(groupId, 'North Wing');
-    await insertSection(locId, 'Row A');
+  it('full hierarchy round-trip: location -> garden -> section', async () => {
+    const locationId = await insertLocation('Greenhouse');
+    const gardenId = await insertGarden(locationId, 'North Wing');
+    await insertSection(gardenId, 'Row A');
 
-    const groups   = await getAllLocationGroups();
-    const locs     = await getAllLocations();
+    const locations = await getAllLocations();
+    const gardens = await getAllGardens();
     const sections = await getAllSections();
 
-    expect(groups.find(g => g.name === 'Greenhouse')).toBeDefined();
-    expect(locs.find(l => l.name === 'North Wing')).toBeDefined();
+    expect(locations.find(l => l.name === 'Greenhouse')).toBeDefined();
+    expect(gardens.find(g => g.name === 'North Wing')).toBeDefined();
     expect(sections.find(s => s.name === 'Row A')).toBeDefined();
+  });
+});
+
+// ── deleteSection ──────────────────────────────────────────────────────────────
+
+describe('deleteSection', () => {
+  it('removes the section so it no longer appears in getAllSections', async () => {
+    await deleteSection(SEED.SECTION_ID);
+
+    const sections = await getAllSections();
+
+    expect(sections.find(s => s.id === SEED.SECTION_ID)).toBeUndefined();
+  });
+
+  it('does nothing when section does not exist', async () => {
+    await expect(deleteSection(999)).resolves.toBeUndefined();
+  });
+
+  it('removing a section leaves the parent garden intact', async () => {
+    await deleteSection(SEED.SECTION_ID);
+
+    const gardens = await getAllGardens();
+
+    expect(gardens.length).toBeGreaterThan(0);
+  });
+});
+
+// ── deleteGarden ───────────────────────────────────────────────────────────────
+
+describe('deleteGarden', () => {
+  it('removes the garden and its sections', async () => {
+    const gardens = await getAllGardens();
+    const gardenId = gardens[0].id;
+
+    await deleteGarden(gardenId);
+
+    const remaining = await getAllGardens();
+    expect(remaining.find(g => g.id === gardenId)).toBeUndefined();
+
+    const sections = await getAllSections();
+    expect(sections.find(s => s.id === SEED.SECTION_ID)).toBeUndefined();
+  });
+
+  it('does nothing when garden does not exist', async () => {
+    await expect(deleteGarden(999)).resolves.toBeUndefined();
+  });
+
+  it('removing a garden leaves the parent location intact', async () => {
+    const gardens = await getAllGardens();
+    await deleteGarden(gardens[0].id);
+
+    const locations = await getAllLocations();
+
+    expect(locations.length).toBeGreaterThan(0);
+  });
+});
+
+// ── deleteLocation ─────────────────────────────────────────────────────────────
+
+describe('deleteLocation', () => {
+  it('removes the location and its full hierarchy', async () => {
+    const locations = await getAllLocations();
+    const locationId = locations[0].id;
+
+    await deleteLocation(locationId);
+
+    const remaining = await getAllLocations();
+    expect(remaining.find(l => l.id === locationId)).toBeUndefined();
+
+    const gardens = await getAllGardens();
+    expect(gardens).toHaveLength(0);
+
+    const sections = await getAllSections();
+    expect(sections).toHaveLength(0);
+  });
+
+  it('does nothing when location does not exist', async () => {
+    await expect(deleteLocation(999)).resolves.toBeUndefined();
   });
 });

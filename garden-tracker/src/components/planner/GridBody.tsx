@@ -14,8 +14,8 @@ import CropCell from './CropCell';
 
 // Must match RowHeader band colors so the full-width strips feel continuous
 import {
-  GARDEN_BAND,
   LOCATION_BAND,
+  GARDEN_BAND,
   SECTION_BAND,
 } from './RowHeader';
 
@@ -84,14 +84,14 @@ export default function GridBody({
       // All band rows render as a single seamless full-width strip (no cell-gap grid pattern)
       let bandColor: string;
       switch (rowItem?.type) {
-        case 'group_header':
-        case 'group_footer':
-          bandColor = GARDEN_BAND;
-          break;
         case 'location_header':
         case 'location_footer':
-        case 'section_spacer':
           bandColor = LOCATION_BAND;
+          break;
+        case 'garden_header':
+        case 'garden_footer':
+        case 'section_spacer':
+          bandColor = GARDEN_BAND;
           break;
         case 'section_header':
         case 'section_footer':

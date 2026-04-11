@@ -6,22 +6,22 @@
 // Database entity types (populated from SQLite in Slice 5+)
 // ---------------------------------------------------------------------------
 
-export interface LocationGroup {
+export interface Location {
   id: number;
   name: string;
   order_index: number;
 }
 
-export interface Location {
+export interface Garden {
   id: number;
-  location_group_id: number;
+  location_id: number;
   name: string;
   order_index: number;
 }
 
 export interface Section {
   id: number;
-  location_id: number;
+  garden_id: number;
   name: string;
   order_index: number;
 }
@@ -85,6 +85,7 @@ export interface TodayTaskItem {
   task_type_name: string;
   color: string;
   crop_name: string;
+  garden_name: string;
   section_name: string;
   location_name: string;
   day_of_week: number;
@@ -119,10 +120,10 @@ export interface WeeklyNoteEntry {
 // ---------------------------------------------------------------------------
 
 export type GridRowItem =
-  | { type: 'group_header';    group: LocationGroup }
-  | { type: 'group_footer' }
   | { type: 'location_header'; location: Location }
   | { type: 'location_footer' }
+  | { type: 'garden_header';   garden: Garden }
+  | { type: 'garden_footer' }
   | { type: 'section_header';  section: Section }
   | { type: 'section_footer' }
   | { type: 'section_spacer' }

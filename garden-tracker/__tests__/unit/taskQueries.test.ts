@@ -15,6 +15,9 @@ import {
   insertCompletion,
   deleteCompletion,
   deleteTask,
+  updateTaskDay,
+  getTasksForCrops,
+  getCompletionsForCrops,
   getTodayAndOverdue,
 } from '@/src/db/queries/taskQueries';
 import { getDb } from '@/src/db/database';
@@ -253,6 +256,7 @@ const TASK_ROW = {
   color: '#00CCFF',
   crop_name: 'Tomato',
   section_name: 'Section A',
+  garden_name: 'Raised Beds',
   location_name: 'Test Beds',
   start_date: '2025-03-02',
   day_of_week: 3,
@@ -311,5 +315,162 @@ describe('getTodayAndOverdue', () => {
     mockDb.getAllAsync.mockRejectedValueOnce(new Error('Database error'));
 
     await expect(getTodayAndOverdue(new Date('2025-03-05T12:00:00'))).rejects.toThrow('Database error');
+  });
+
+  it('excludes a task with total_duration_weeks of 0', async () => {
+    const zeroRow = { ...TASK_ROW, total_duration_weeks: 0 };
+    mockDb.getAllAsync
+      .mockResolvedValueOnce([zeroRow])
+      .mockResolvedValueOnce([]);
+
+    const { due } = await getTodayAndOverdue(new Date('2025-03-05T12:00:00'));
+
+    expect(due).toHaveLength(0);
+  });
+
+  it('excludes a task where weekOffset is before start_offset_weeks', async () => {
+    // Crop started this same week (offset=0), but task needs offset >= 2 weeks
+    const offsetRow = { ...TASK_ROW, start_offset_weeks: 2 };
+    mockDb.getAllAsync
+      .mockResolvedValueOnce([offsetRow])
+      .mockResolvedValueOnce([]);
+
+    // Reference is the crop start week's Wednesday — weekOffset = 0 < start_offset_weeks = 2
+    const { due } = await getTodayAndOverdue(new Date('2025-03-05T12:00:00'));
+
+    expect(due).toHaveLength(0);
+  });
+
+  it('excludes a task where the due date falls past total_duration_weeks', async () => {
+    // Crop started early enough that today's week exceeds total_duration_weeks
+    const shortRow = { ...TASK_ROW, start_date: '2025-01-05', total_duration_weeks: 4 };
+    mockDb.getAllAsync
+      .mockResolvedValueOnce([shortRow])
+      .mockResolvedValueOnce([]);
+
+    // 2025-03-05 is ~8 weeks after 2025-01-05 — beyond 4 week duration
+    const { due } = await getTodayAndOverdue(new Date('2025-03-05T12:00:00'));
+
+    expect(due).toHaveLength(0);
+  });
+
+  it('counts multiple missed occurrences for a task missed across consecutive weeks', async () => {
+    // Crop starts 2025-02-23 (Sunday), 9 weeks duration, task every Wednesday
+    const multiMissRow = { ...TASK_ROW, start_date: '2025-02-23', total_duration_weeks: 9 };
+    mockDb.getAllAsync
+      .mockResolvedValueOnce([multiMissRow])
+      .mockResolvedValueOnce([]);
+
+    // Today = Thursday 2025-03-13 → most recent Wednesday = 2025-03-12
+    // countMissedOccurrences walks back: Mar 12 ✓, Mar 5 ✓, Feb 26 ✓, Feb 19 ✗ → missed_count = 3
+    const { overdue } = await getTodayAndOverdue(new Date('2025-03-13T12:00:00'));
+
+    expect(overdue).toHaveLength(1);
+    expect(overdue[0].missed_count).toBeGreaterThan(1);
+  });
+
+  it('sorts due items by due_date then location, garden, section, crop, task type', async () => {
+    const rowA = { ...TASK_ROW, task_id: 1, location_name: 'A', garden_name: 'A', section_name: 'A', crop_name: 'A', task_type_name: 'A' };
+    const rowB = { ...TASK_ROW, task_id: 2, location_name: 'B', garden_name: 'B', section_name: 'B', crop_name: 'B', task_type_name: 'B' };
+    mockDb.getAllAsync
+      .mockResolvedValueOnce([rowB, rowA])  // intentionally reversed
+      .mockResolvedValueOnce([]);
+
+    const { due } = await getTodayAndOverdue(new Date('2025-03-05T12:00:00'));
+
+    expect(due[0].task_id).toBe(1);
+    expect(due[1].task_id).toBe(2);
+  });
+});
+
+// ── updateTaskDay ──────────────────────────────────────────────────────────────
+
+describe('updateTaskDay', () => {
+  it('calls UPDATE tasks SET day_of_week with the correct args', async () => {
+    mockDb.runAsync.mockResolvedValueOnce({});
+
+    await updateTaskDay(5, 1);
+
+    expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
+    expect(mockDb.runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE tasks SET day_of_week'),
+      1, 5
+    );
+  });
+
+  it('resolves without a return value', async () => {
+    mockDb.runAsync.mockResolvedValueOnce({});
+
+    await expect(updateTaskDay(1, 3)).resolves.toBeUndefined();
+  });
+
+  it('handles database errors', async () => {
+    mockDb.runAsync.mockRejectedValueOnce(new Error('Database error'));
+
+    await expect(updateTaskDay(1, 3)).rejects.toThrow('Database error');
+  });
+});
+
+// ── getTasksForCrops ───────────────────────────────────────────────────────────
+
+describe('getTasksForCrops', () => {
+  it('returns empty array without hitting the db when given empty ids', async () => {
+    const results = await getTasksForCrops([]);
+
+    expect(results).toHaveLength(0);
+    expect(mockDb.getAllAsync).not.toHaveBeenCalled();
+  });
+
+  it('queries with the correct placeholders and returns tasks', async () => {
+    mockDb.getAllAsync.mockResolvedValueOnce([
+      { id: 1, crop_instance_id: 1, task_type_id: 1, day_of_week: 3, frequency_weeks: 1, start_offset_weeks: 0, color: '#00CCFF', task_type_name: 'Watering' },
+      { id: 2, crop_instance_id: 2, task_type_id: 1, day_of_week: 1, frequency_weeks: 2, start_offset_weeks: 1, color: '#00CCFF', task_type_name: 'Watering' },
+    ]);
+
+    const results = await getTasksForCrops([1, 2]);
+
+    expect(results).toHaveLength(2);
+    expect(mockDb.getAllAsync).toHaveBeenCalledWith(
+      expect.stringContaining('IN (?,?)'),
+      1, 2
+    );
+  });
+
+  it('handles database errors', async () => {
+    mockDb.getAllAsync.mockRejectedValueOnce(new Error('Database error'));
+
+    await expect(getTasksForCrops([1])).rejects.toThrow('Database error');
+  });
+});
+
+// ── getCompletionsForCrops ─────────────────────────────────────────────────────
+
+describe('getCompletionsForCrops', () => {
+  it('returns empty array without hitting the db when given empty ids', async () => {
+    const results = await getCompletionsForCrops([]);
+
+    expect(results).toHaveLength(0);
+    expect(mockDb.getAllAsync).not.toHaveBeenCalled();
+  });
+
+  it('queries with the correct placeholders and returns completions with crop_instance_id', async () => {
+    mockDb.getAllAsync.mockResolvedValueOnce([
+      { id: 1, task_id: 1, completed_date: '2025-03-02', crop_instance_id: 1 },
+    ]);
+
+    const results = await getCompletionsForCrops([1, 2]);
+
+    expect(results).toHaveLength(1);
+    expect(results[0].crop_instance_id).toBe(1);
+    expect(mockDb.getAllAsync).toHaveBeenCalledWith(
+      expect.stringContaining('IN (?,?)'),
+      1, 2
+    );
+  });
+
+  it('handles database errors', async () => {
+    mockDb.getAllAsync.mockRejectedValueOnce(new Error('Database error'));
+
+    await expect(getCompletionsForCrops([1])).rejects.toThrow('Database error');
   });
 });

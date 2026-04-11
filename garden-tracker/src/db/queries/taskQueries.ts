@@ -9,6 +9,7 @@ interface DashboardTaskRow {
   task_type_name: string;
   color: string;
   crop_name: string;
+  garden_name: string;
   section_name: string;
   location_name: string;
   start_date: string;
@@ -98,6 +99,7 @@ function buildDashboardItem(task: DashboardTaskRow, dueDate: Date, missed_count 
     task_type_name: task.task_type_name,
     color: task.color,
     crop_name: task.crop_name,
+    garden_name: task.garden_name,
     section_name: task.section_name,
     location_name: task.location_name,
     day_of_week: task.day_of_week,
@@ -116,6 +118,10 @@ function compareDashboardItems(a: TodayTaskItem, b: TodayTaskItem): number {
 
   if (a.location_name !== b.location_name) {
     return a.location_name.localeCompare(b.location_name);
+  }
+
+  if (a.garden_name !== b.garden_name) {
+    return a.garden_name.localeCompare(b.garden_name);
   }
 
   if (a.section_name !== b.section_name) {
@@ -140,6 +146,7 @@ async function getDashboardTasks(): Promise<DashboardTaskRow[]> {
       tt.color,
       ci.name AS crop_name,
       ci.start_date,
+      g.name AS garden_name,
       s.name AS section_name,
       l.name AS location_name,
       t.day_of_week,
@@ -154,9 +161,10 @@ async function getDashboardTasks(): Promise<DashboardTaskRow[]> {
     JOIN task_types tt ON tt.id = t.task_type_id
     JOIN crop_instances ci ON ci.id = t.crop_instance_id
     JOIN sections s ON s.id = ci.section_id
-    JOIN locations l ON l.id = s.location_id
+    JOIN gardens g ON g.id = s.garden_id
+    JOIN locations l ON l.id = g.location_id
     WHERE ci.archived = 0
-    ORDER BY l.order_index, s.order_index, ci.start_date, ci.id, t.id
+    ORDER BY l.order_index, g.order_index, s.order_index, ci.start_date, ci.id, t.id
   `);
 }
 
