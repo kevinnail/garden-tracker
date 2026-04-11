@@ -163,7 +163,7 @@ export default function RowHeader({ rows, rowOffsets }: Props) {
   );
 }
 
-const CROP_NAME_WIDTH = ROW_HEADER_WIDTH - PLANT_COUNT_WIDTH - 10 - 8 - 6; // 200 - 30 - 24 = 146
+const CROP_NAME_WIDTH = ROW_HEADER_WIDTH - PLANT_COUNT_WIDTH - 10 - 8 - 6; // 170 - 30 - 24 = 116
 
 const styles = StyleSheet.create({
   container: {
