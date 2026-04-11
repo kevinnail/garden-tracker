@@ -24,11 +24,11 @@ interface Props {
 
 // Bar colors MATCH their band colors — the left bar IS the same color as the
 // header/footer it connects, making each level read as one continuous frame.
-export const GARDEN_BAND   = '#0d0d0d';
-export const GARDEN_BAR    = '#0d0d0d';  // 10 px — same as garden band
+export const LOCATION_BAND = '#0d0d0d';
+export const LOCATION_BAR  = '#0d0d0d';  // 10 px — same as location band
 
-export const LOCATION_BAND = '#003e14';
-export const LOCATION_BAR  = '#003e14';  // 8 px — same as location band
+export const GARDEN_BAND   = '#003e14';
+export const GARDEN_BAR    = '#003e14';  // 8 px — same as garden band
 
 export const SECTION_BAND  = '#cdcdcd';
 export const SECTION_BAR   = '#cdcdcd';  // 6 px — same as section band
@@ -51,38 +51,38 @@ export default function RowHeader({ rows, rowOffsets }: Props) {
           { top: rowOffsets[i], height: rowHeight },
         ] as const;
 
-        // ── Garden top band ────────────────────────────────────────────────
-        if (item.type === 'group_header') return (
-          <View key={i} style={[rowStyle, { backgroundColor: GARDEN_BAND }]}>
-            <Text style={styles.gardenText} numberOfLines={1}>{item.group.name}</Text>
-          </View>
-        );
-
-        // ── Garden bottom band ─────────────────────────────────────────────
-        if (item.type === 'group_footer') return (
-          <View key={i} style={[rowStyle, { backgroundColor: GARDEN_BAND }]} />
-        );
-
-        // ── Location top band (garden bar on left connects to garden bands) ─
+        // ── Location top band ──────────────────────────────────────────────
         if (item.type === 'location_header') return (
           <View key={i} style={[rowStyle, { backgroundColor: LOCATION_BAND }]}>
-            <View style={[styles.bar, { width: 10, backgroundColor: GARDEN_BAR }]} />
             <Text style={styles.locationText} numberOfLines={1}>{item.location.name}</Text>
           </View>
         );
 
         // ── Location bottom band ───────────────────────────────────────────
         if (item.type === 'location_footer') return (
-          <View key={i} style={[rowStyle, { backgroundColor: LOCATION_BAND }]}>
-            <View style={[styles.bar, { width: 10, backgroundColor: GARDEN_BAR }]} />
+          <View key={i} style={[rowStyle, { backgroundColor: LOCATION_BAND }]} />
+        );
+
+        // ── Garden top band (location bar on left connects to location bands) ─
+        if (item.type === 'garden_header') return (
+          <View key={i} style={[rowStyle, { backgroundColor: GARDEN_BAND }]}> 
+            <View style={[styles.bar, { width: 10, backgroundColor: LOCATION_BAR }]} />
+            <Text style={styles.gardenText} numberOfLines={1}>{item.garden.name}</Text>
+          </View>
+        );
+
+        // ── Garden bottom band ─────────────────────────────────────────────
+        if (item.type === 'garden_footer') return (
+          <View key={i} style={[rowStyle, { backgroundColor: GARDEN_BAND }]}> 
+            <View style={[styles.bar, { width: 10, backgroundColor: LOCATION_BAR }]} />
           </View>
         );
 
         // ── Section top band ───────────────────────────────────────────────
         if (item.type === 'section_header') return (
           <View key={i} style={[rowStyle, { backgroundColor: SECTION_BAND }]}>
-            <View style={[styles.bar, { width: 10, backgroundColor: GARDEN_BAR }]} />
-            <View style={[styles.bar, { width: 8, backgroundColor: LOCATION_BAR }]} />
+            <View style={[styles.bar, { width: 10, backgroundColor: LOCATION_BAR }]} />
+            <View style={[styles.bar, { width: 8, backgroundColor: GARDEN_BAR }]} />
             <Text style={styles.sectionText} numberOfLines={1}>{item.section.name}</Text>
           </View>
         );
@@ -90,15 +90,15 @@ export default function RowHeader({ rows, rowOffsets }: Props) {
         // ── Section bottom band ────────────────────────────────────────────
         if (item.type === 'section_footer') return (
           <View key={i} style={[rowStyle, { backgroundColor: SECTION_BAND }]}>
-            <View style={[styles.bar, { width: 10, backgroundColor: GARDEN_BAR }]} />
-            <View style={[styles.bar, { width: 8, backgroundColor: LOCATION_BAR }]} />
+            <View style={[styles.bar, { width: 10, backgroundColor: LOCATION_BAR }]} />
+            <View style={[styles.bar, { width: 8, backgroundColor: GARDEN_BAR }]} />
           </View>
         );
 
         // ── Section spacer between framed sections ────────────────────────
         if (item.type === 'section_spacer') return (
-          <View key={i} style={[rowStyle, { backgroundColor: LOCATION_BAND }] }>
-            <View style={[styles.bar, { width: 10, backgroundColor: GARDEN_BAR }]} />
+          <View key={i} style={[rowStyle, { backgroundColor: GARDEN_BAND }] }> 
+            <View style={[styles.bar, { width: 10, backgroundColor: LOCATION_BAR }]} />
           </View>
         );
 
@@ -118,8 +118,8 @@ export default function RowHeader({ rows, rowOffsets }: Props) {
                 router.push('/(modals)/edit-crop');
               }}
             >
-              <View style={[styles.bar, { width: 10, backgroundColor: GARDEN_BAR }]} />
-              <View style={[styles.bar, { width: 8, backgroundColor: LOCATION_BAR }]} />
+              <View style={[styles.bar, { width: 10, backgroundColor: LOCATION_BAR }]} />
+              <View style={[styles.bar, { width: 8, backgroundColor: GARDEN_BAR }]} />
               <View style={[styles.bar, { width: 6, backgroundColor: SECTION_BAR }]} />
               <View style={styles.countCell}>
                 <Text style={styles.countText}>{item.crop.plant_count}</Text>
@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
   },
 
   // ── Text styles ────────────────────────────────────────────────────────────
-  gardenText: {
+  locationText: {
     flex: 1,
     color: '#aaa',
     fontSize: 11,
@@ -168,7 +168,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     paddingHorizontal: 8,
   },
-  locationText: {
+  gardenText: {
     flex: 1,
     color: '#aaa',
     fontSize: 10,
