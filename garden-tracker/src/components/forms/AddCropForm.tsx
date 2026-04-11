@@ -294,7 +294,7 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
         {sections.length === 0 && (
           <View style={styles.emptyStateBox}>
             <Text style={styles.emptyStateText}>No sections available yet.</Text>
-            <Text style={styles.emptyStateSubtext}>Create Garden, then Location, then Section first.</Text>
+            <Text style={styles.emptyStateSubtext}>Create Location, then Garden, then Section first.</Text>
             <Pressable style={styles.emptyStateBtn} onPress={() => router.push('/(modals)/add-garden')}>
               <Text style={styles.emptyStateBtnText}>Set up hierarchy</Text>
             </Pressable>
