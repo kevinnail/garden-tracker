@@ -201,6 +201,40 @@ export async function getCompletionsForCrop(cropInstanceId: number): Promise<Tas
   `, cropInstanceId);
 }
 
+export async function getTasksForCrops(cropInstanceIds: number[]): Promise<Task[]> {
+  if (cropInstanceIds.length === 0) return [];
+  const db = await getDb();
+  const placeholders = cropInstanceIds.map(() => '?').join(',');
+  return db.getAllAsync<Task>(`
+    SELECT
+      t.id,
+      t.crop_instance_id,
+      t.task_type_id,
+      t.day_of_week,
+      t.frequency_weeks,
+      t.start_offset_weeks,
+      tt.color,
+      tt.name AS task_type_name
+    FROM tasks t
+    JOIN task_types tt ON tt.id = t.task_type_id
+    WHERE t.crop_instance_id IN (${placeholders})
+  `, ...cropInstanceIds);
+}
+
+export async function getCompletionsForCrops(
+  cropInstanceIds: number[]
+): Promise<(TaskCompletion & { crop_instance_id: number })[]> {
+  if (cropInstanceIds.length === 0) return [];
+  const db = await getDb();
+  const placeholders = cropInstanceIds.map(() => '?').join(',');
+  return db.getAllAsync<TaskCompletion & { crop_instance_id: number }>(`
+    SELECT tc.id, tc.task_id, tc.completed_date, t.crop_instance_id
+    FROM task_completions tc
+    JOIN tasks t ON t.id = tc.task_id
+    WHERE t.crop_instance_id IN (${placeholders})
+  `, ...cropInstanceIds);
+}
+
 export async function getTaskTypes(): Promise<TaskType[]> {
   const db = await getDb();
   return db.getAllAsync<TaskType>(`SELECT * FROM task_types ORDER BY id`);
