@@ -61,38 +61,22 @@ export async function insertSection(gardenId: number, name: string): Promise<num
   return result.lastInsertRowId;
 }
 
+// Children at every level below (gardens → sections → crop_instances →
+// crop_stages/tasks/notes → task_completions) use ON DELETE CASCADE, so a
+// single DELETE at any level propagates all the way down via FK enforcement.
+// `PRAGMA foreign_keys = ON` is set in initSchema and applies to this connection.
+
 export async function deleteSection(id: number): Promise<void> {
   const db = await getDb();
-  await db.withTransactionAsync(async () => {
-    await db.runAsync(`DELETE FROM task_completions WHERE task_id IN (SELECT id FROM tasks WHERE crop_instance_id IN (SELECT id FROM crop_instances WHERE section_id = ?))`, id);
-    await db.runAsync(`DELETE FROM tasks WHERE crop_instance_id IN (SELECT id FROM crop_instances WHERE section_id = ?)`, id);
-    await db.runAsync(`DELETE FROM crop_stages WHERE crop_instance_id IN (SELECT id FROM crop_instances WHERE section_id = ?)`, id);
-    await db.runAsync(`DELETE FROM crop_instances WHERE section_id = ?`, id);
-    await db.runAsync(`DELETE FROM sections WHERE id = ?`, id);
-  });
+  await db.runAsync(`DELETE FROM sections WHERE id = ?`, id);
 }
 
 export async function deleteGarden(id: number): Promise<void> {
   const db = await getDb();
-  await db.withTransactionAsync(async () => {
-    await db.runAsync(`DELETE FROM task_completions WHERE task_id IN (SELECT t.id FROM tasks t JOIN crop_instances ci ON ci.id = t.crop_instance_id JOIN sections s ON s.id = ci.section_id WHERE s.garden_id = ?)`, id);
-    await db.runAsync(`DELETE FROM tasks WHERE crop_instance_id IN (SELECT ci.id FROM crop_instances ci JOIN sections s ON s.id = ci.section_id WHERE s.garden_id = ?)`, id);
-    await db.runAsync(`DELETE FROM crop_stages WHERE crop_instance_id IN (SELECT ci.id FROM crop_instances ci JOIN sections s ON s.id = ci.section_id WHERE s.garden_id = ?)`, id);
-    await db.runAsync(`DELETE FROM crop_instances WHERE section_id IN (SELECT id FROM sections WHERE garden_id = ?)`, id);
-    await db.runAsync(`DELETE FROM sections WHERE garden_id = ?`, id);
-    await db.runAsync(`DELETE FROM gardens WHERE id = ?`, id);
-  });
+  await db.runAsync(`DELETE FROM gardens WHERE id = ?`, id);
 }
 
 export async function deleteLocation(id: number): Promise<void> {
   const db = await getDb();
-  await db.withTransactionAsync(async () => {
-    await db.runAsync(`DELETE FROM task_completions WHERE task_id IN (SELECT t.id FROM tasks t JOIN crop_instances ci ON ci.id = t.crop_instance_id JOIN sections s ON s.id = ci.section_id JOIN gardens g ON g.id = s.garden_id WHERE g.location_id = ?)`, id);
-    await db.runAsync(`DELETE FROM tasks WHERE crop_instance_id IN (SELECT ci.id FROM crop_instances ci JOIN sections s ON s.id = ci.section_id JOIN gardens g ON g.id = s.garden_id WHERE g.location_id = ?)`, id);
-    await db.runAsync(`DELETE FROM crop_stages WHERE crop_instance_id IN (SELECT ci.id FROM crop_instances ci JOIN sections s ON s.id = ci.section_id JOIN gardens g ON g.id = s.garden_id WHERE g.location_id = ?)`, id);
-    await db.runAsync(`DELETE FROM crop_instances WHERE section_id IN (SELECT s.id FROM sections s JOIN gardens g ON g.id = s.garden_id WHERE g.location_id = ?)`, id);
-    await db.runAsync(`DELETE FROM sections WHERE garden_id IN (SELECT id FROM gardens WHERE location_id = ?)`, id);
-    await db.runAsync(`DELETE FROM gardens WHERE location_id = ?`, id);
-    await db.runAsync(`DELETE FROM locations WHERE id = ?`, id);
-  });
+  await db.runAsync(`DELETE FROM locations WHERE id = ?`, id);
 }
