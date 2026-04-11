@@ -74,7 +74,7 @@ Zustand store (`plannerStore.ts`) holds all grid rows and UI toggle state. SQLit
 |---|---|
 | `CELL_WIDTH` | 52px |
 | `ROW_HEIGHT` | 28px |
-| `ROW_HEADER_WIDTH` | 200px (30 plant count + 170 name) |
+| `ROW_HEADER_WIDTH` | 170px (30 plant count + 140 name) |
 | `TOTAL_WEEKS` | 156 (3 years) |
 | `BACKGROUND_COLOR` | `#1a1a1a` |
 | `EMPTY_CELL_COLOR` | `#333333` |
