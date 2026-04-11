@@ -280,6 +280,7 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
         onChangeText={setName}
         placeholder="e.g. Tomato"
         placeholderTextColor="#555"
+        maxLength={100}
         autoFocus={!isEditMode}
       />
 
@@ -291,6 +292,7 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
         keyboardType="numeric"
         placeholder="1"
         placeholderTextColor="#555"
+        maxLength={4}
       />
 
       <Text style={styles.label}>Start Date (snaps to Sunday on save)</Text>
@@ -343,6 +345,7 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
               value={stage.duration_weeks}
               onChangeText={v => updateStageDuration(i, v)}
               keyboardType="numeric"
+              maxLength={3}
             />
             <Text style={styles.weekLabel}>wk</Text>
             {stages.length > 1 && (
