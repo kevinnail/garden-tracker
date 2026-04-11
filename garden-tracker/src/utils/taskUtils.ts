@@ -29,6 +29,9 @@ export function getTaskLineOccurrences(
   calendarStart: Date,
 ): TaskLineOccurrence[] {
   const results: TaskLineOccurrence[] = [];
+  // DB schema enforces frequency_weeks > 0, but clamp defensively so a bad
+  // synthesized Task (tests, future schema changes) can never spin forever.
+  const step = Math.max(1, task.frequency_weeks);
   const xOffset = dayXOffset(task.day_of_week);
   let col = cropStartWeek + task.start_offset_weeks;
 
@@ -39,7 +42,7 @@ export function getTaskLineOccurrences(
       weekIndex: col,
       weekSunday,
     });
-    col += task.frequency_weeks;
+    col += step;
   }
 
   return results;
