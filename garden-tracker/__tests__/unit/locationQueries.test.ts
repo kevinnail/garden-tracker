@@ -8,11 +8,11 @@
 // * ==================================================
 
 import {
-  getAllLocationGroups,
   getAllLocations,
+  getAllGardens,
   getAllSections,
-  insertLocationGroup,
   insertLocation,
+  insertGarden,
   insertSection,
 } from '@/src/db/queries/locationQueries';
 import { getDb } from '@/src/db/database';
@@ -32,49 +32,19 @@ beforeEach(() => {
   (getDb as jest.Mock).mockResolvedValue(mockDb);
 });
 
-// ── getAllLocationGroups ────────────────────────────────────────────────────────
-
-describe('getAllLocationGroups', () => {
-  it('returns all location groups ordered by order_index', async () => {
-    mockDb.getAllAsync.mockResolvedValueOnce([
-      { id: 1, name: 'Main Garden', order_index: 0 },
-    ]);
-
-    const groups = await getAllLocationGroups();
-
-    expect(groups).toHaveLength(1);
-    expect(groups[0].name).toBe('Main Garden');
-    expect(mockDb.getAllAsync).toHaveBeenCalledTimes(1);
-    expect(mockDb.getAllAsync).toHaveBeenCalledWith(expect.stringContaining('ORDER BY order_index'));
-  });
-
-  it('returns empty array when no groups exist', async () => {
-    mockDb.getAllAsync.mockResolvedValueOnce([]);
-
-    const groups = await getAllLocationGroups();
-
-    expect(groups).toHaveLength(0);
-  });
-
-  it('handles database errors', async () => {
-    mockDb.getAllAsync.mockRejectedValueOnce(new Error('Database error'));
-
-    await expect(getAllLocationGroups()).rejects.toThrow('Database error');
-  });
-});
-
 // ── getAllLocations ─────────────────────────────────────────────────────────────
 
 describe('getAllLocations', () => {
   it('returns all locations ordered by order_index', async () => {
     mockDb.getAllAsync.mockResolvedValueOnce([
-      { id: 1, location_group_id: 1, name: 'Raised Beds', order_index: 0 },
+      { id: 1, name: 'Home', order_index: 0 },
     ]);
 
     const locations = await getAllLocations();
 
     expect(locations).toHaveLength(1);
-    expect(locations[0].name).toBe('Raised Beds');
+    expect(locations[0].name).toBe('Home');
+    expect(mockDb.getAllAsync).toHaveBeenCalledTimes(1);
     expect(mockDb.getAllAsync).toHaveBeenCalledWith(expect.stringContaining('ORDER BY order_index'));
   });
 
@@ -93,12 +63,42 @@ describe('getAllLocations', () => {
   });
 });
 
+// ── getAllGardens ──────────────────────────────────────────────────────────────
+
+describe('getAllGardens', () => {
+  it('returns all gardens ordered by order_index', async () => {
+    mockDb.getAllAsync.mockResolvedValueOnce([
+      { id: 1, location_id: 1, name: 'Raised Beds', order_index: 0 },
+    ]);
+
+    const gardens = await getAllGardens();
+
+    expect(gardens).toHaveLength(1);
+    expect(gardens[0].name).toBe('Raised Beds');
+    expect(mockDb.getAllAsync).toHaveBeenCalledWith(expect.stringContaining('ORDER BY order_index'));
+  });
+
+  it('returns empty array when no gardens exist', async () => {
+    mockDb.getAllAsync.mockResolvedValueOnce([]);
+
+    const gardens = await getAllGardens();
+
+    expect(gardens).toHaveLength(0);
+  });
+
+  it('handles database errors', async () => {
+    mockDb.getAllAsync.mockRejectedValueOnce(new Error('Database error'));
+
+    await expect(getAllGardens()).rejects.toThrow('Database error');
+  });
+});
+
 // ── getAllSections ─────────────────────────────────────────────────────────────
 
 describe('getAllSections', () => {
   it('returns all sections ordered by order_index', async () => {
     mockDb.getAllAsync.mockResolvedValueOnce([
-      { id: 1, location_id: 1, name: 'Bed A', order_index: 0 },
+      { id: 1, garden_id: 1, name: 'Bed A', order_index: 0 },
     ]);
 
     const sections = await getAllSections();
@@ -123,19 +123,19 @@ describe('getAllSections', () => {
   });
 });
 
-// ── insertLocationGroup ────────────────────────────────────────────────────────
+// ── insertLocation ─────────────────────────────────────────────────────────────
 
-describe('insertLocationGroup', () => {
-  it('inserts a group after computing order_index and returns new id', async () => {
+describe('insertLocation', () => {
+  it('inserts a location after computing order_index and returns new id', async () => {
     mockDb.getFirstAsync.mockResolvedValueOnce({ max: 0 });
     mockDb.runAsync.mockResolvedValueOnce({ lastInsertRowId: 2, changes: 1 });
 
-    const id = await insertLocationGroup('Back Yard');
+    const id = await insertLocation('Home');
 
     expect(id).toBe(2);
     expect(mockDb.runAsync).toHaveBeenCalledWith(
-      expect.stringContaining('INSERT INTO location_groups'),
-      'Back Yard', 1
+      expect.stringContaining('INSERT INTO locations'),
+      'Home', 1
     );
   });
 
@@ -143,31 +143,31 @@ describe('insertLocationGroup', () => {
     mockDb.getFirstAsync.mockResolvedValueOnce({ max: null });
     mockDb.runAsync.mockResolvedValueOnce({ lastInsertRowId: 1, changes: 1 });
 
-    await insertLocationGroup('First Group');
+    await insertLocation('First Location');
 
-    expect(mockDb.runAsync).toHaveBeenCalledWith(expect.any(String), 'First Group', 0);
+    expect(mockDb.runAsync).toHaveBeenCalledWith(expect.any(String), 'First Location', 0);
   });
 
   it('handles database errors', async () => {
     mockDb.getFirstAsync.mockResolvedValueOnce({ max: null });
     mockDb.runAsync.mockRejectedValueOnce(new Error('Database error'));
 
-    await expect(insertLocationGroup('Fail')).rejects.toThrow('Database error');
+    await expect(insertLocation('Fail')).rejects.toThrow('Database error');
   });
 });
 
-// ── insertLocation ─────────────────────────────────────────────────────────────
+// ── insertGarden ──────────────────────────────────────────────────────────────
 
-describe('insertLocation', () => {
-  it('inserts a location with the correct groupId and returns new id', async () => {
+describe('insertGarden', () => {
+  it('inserts a garden with the correct locationId and returns new id', async () => {
     mockDb.getFirstAsync.mockResolvedValueOnce({ max: null });
     mockDb.runAsync.mockResolvedValueOnce({ lastInsertRowId: 3, changes: 1 });
 
-    const id = await insertLocation(1, 'Greenhouse');
+    const id = await insertGarden(1, 'Greenhouse');
 
     expect(id).toBe(3);
     expect(mockDb.runAsync).toHaveBeenCalledWith(
-      expect.stringContaining('INSERT INTO locations'),
+      expect.stringContaining('INSERT INTO gardens'),
       1, 'Greenhouse', 0
     );
   });
@@ -176,14 +176,14 @@ describe('insertLocation', () => {
     mockDb.getFirstAsync.mockResolvedValueOnce({ max: null });
     mockDb.runAsync.mockRejectedValueOnce(new Error('Database error'));
 
-    await expect(insertLocation(1, 'Fail')).rejects.toThrow('Database error');
+    await expect(insertGarden(1, 'Fail')).rejects.toThrow('Database error');
   });
 });
 
 // ── insertSection ──────────────────────────────────────────────────────────────
 
 describe('insertSection', () => {
-  it('inserts a section with the correct locationId and returns new id', async () => {
+  it('inserts a section with the correct gardenId and returns new id', async () => {
     mockDb.getFirstAsync.mockResolvedValueOnce({ max: null });
     mockDb.runAsync.mockResolvedValueOnce({ lastInsertRowId: 4, changes: 1 });
 
