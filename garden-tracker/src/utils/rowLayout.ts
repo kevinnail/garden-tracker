@@ -1,12 +1,20 @@
 import { ROW_HEIGHT } from '@/src/constants/layout';
 import { GridRowItem } from '@/src/types';
 
-export const SECTION_FOOTER_HEIGHT = 8;
-export const SECTION_SPACER_HEIGHT = 6;
+export const SECTION_FOOTER_HEIGHT  = 8;
+export const SECTION_SPACER_HEIGHT  = 6;
+export const GARDEN_FOOTER_HEIGHT   = 10;
+export const GARDEN_SPACER_HEIGHT   = 8;
+export const LOCATION_FOOTER_HEIGHT = 12;
+export const LOCATION_SPACER_HEIGHT = 10;
 
 export function getRowHeight(row: GridRowItem | undefined): number {
-  if (row?.type === 'section_footer') return SECTION_FOOTER_HEIGHT;
-  if (row?.type === 'section_spacer') return SECTION_SPACER_HEIGHT;
+  if (row?.type === 'section_footer')  return SECTION_FOOTER_HEIGHT;
+  if (row?.type === 'section_spacer')  return SECTION_SPACER_HEIGHT;
+  if (row?.type === 'garden_footer')   return GARDEN_FOOTER_HEIGHT;
+  if (row?.type === 'garden_spacer')   return GARDEN_SPACER_HEIGHT;
+  if (row?.type === 'location_footer') return LOCATION_FOOTER_HEIGHT;
+  if (row?.type === 'location_spacer') return LOCATION_SPACER_HEIGHT;
   return ROW_HEIGHT;
 }
 

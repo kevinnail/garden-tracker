@@ -35,6 +35,8 @@ export const SECTION_BAR   = '#cdcdcd';  // 6 px — same as section band
 
 const CROP_BG = '#191928';
 
+const CONTAINER_RADIUS = 5;
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function RowHeader({ rows, rowOffsets }: Props) {
@@ -53,45 +55,67 @@ export default function RowHeader({ rows, rowOffsets }: Props) {
 
         // ── Location top band ──────────────────────────────────────────────
         if (item.type === 'location_header') return (
-          <View key={i} style={[rowStyle, { backgroundColor: LOCATION_BAND }]}>
-            <Text style={styles.locationText} numberOfLines={1}>{item.location.name}</Text>
+          <View key={i} style={[rowStyle, { backgroundColor: BACKGROUND_COLOR }]}>
+            <View style={[styles.bandContent, { backgroundColor: LOCATION_BAND,  }]}>
+              <Text style={styles.locationText} numberOfLines={1}>{item.location.name}</Text>
+            </View>
           </View>
         );
 
         // ── Location bottom band ───────────────────────────────────────────
         if (item.type === 'location_footer') return (
-          <View key={i} style={[rowStyle, { backgroundColor: LOCATION_BAND }]} />
+          <View key={i} style={[rowStyle, { backgroundColor: BACKGROUND_COLOR }]}>
+            <View style={[styles.bandContent, { backgroundColor: LOCATION_BAND,  }]} />
+          </View>
+        );
+
+        // ── Location spacer (between locations, in background color) ───────
+        if (item.type === 'location_spacer') return (
+          <View key={i} style={[rowStyle, { backgroundColor: BACKGROUND_COLOR }]} />
         );
 
         // ── Garden top band (location bar on left connects to location bands) ─
         if (item.type === 'garden_header') return (
-          <View key={i} style={[rowStyle, { backgroundColor: GARDEN_BAND }]}> 
+          <View key={i} style={[rowStyle, { backgroundColor: LOCATION_BAND }]}>
             <View style={[styles.bar, { width: 10, backgroundColor: LOCATION_BAR }]} />
-            <Text style={styles.gardenText} numberOfLines={1}>{item.garden.name}</Text>
+            <View style={[styles.bandContent, { backgroundColor: GARDEN_BAND, borderTopLeftRadius: CONTAINER_RADIUS }]}>
+              <Text style={styles.gardenText} numberOfLines={1}>{item.garden.name}</Text>
+            </View>
           </View>
         );
 
         // ── Garden bottom band ─────────────────────────────────────────────
         if (item.type === 'garden_footer') return (
-          <View key={i} style={[rowStyle, { backgroundColor: GARDEN_BAND }]}> 
+          <View key={i} style={[rowStyle, { backgroundColor: LOCATION_BAND }]}>
+            <View style={[styles.bar, { width: 10, backgroundColor: LOCATION_BAR }]} />
+            <View style={[styles.bandContent, { backgroundColor: GARDEN_BAND, borderBottomLeftRadius: CONTAINER_RADIUS }]} />
+          </View>
+        );
+
+        // ── Garden spacer (between gardens, in location band color) ────────
+        if (item.type === 'garden_spacer') return (
+          <View key={i} style={[rowStyle, { backgroundColor: LOCATION_BAND }]}>
             <View style={[styles.bar, { width: 10, backgroundColor: LOCATION_BAR }]} />
           </View>
         );
 
         // ── Section top band ───────────────────────────────────────────────
         if (item.type === 'section_header') return (
-          <View key={i} style={[rowStyle, { backgroundColor: SECTION_BAND }]}>
+          <View key={i} style={[rowStyle, { backgroundColor: GARDEN_BAND }]}>
             <View style={[styles.bar, { width: 10, backgroundColor: LOCATION_BAR }]} />
             <View style={[styles.bar, { width: 8, backgroundColor: GARDEN_BAR }]} />
-            <Text style={styles.sectionText} numberOfLines={1}>{item.section.name}</Text>
+            <View style={[styles.bandContent, { backgroundColor: SECTION_BAND, borderTopLeftRadius: CONTAINER_RADIUS }]}>
+              <Text style={styles.sectionText} numberOfLines={1}>{item.section.name}</Text>
+            </View>
           </View>
         );
 
         // ── Section bottom band ────────────────────────────────────────────
         if (item.type === 'section_footer') return (
-          <View key={i} style={[rowStyle, { backgroundColor: SECTION_BAND }]}>
+          <View key={i} style={[rowStyle, { backgroundColor: GARDEN_BAND }]}>
             <View style={[styles.bar, { width: 10, backgroundColor: LOCATION_BAR }]} />
             <View style={[styles.bar, { width: 8, backgroundColor: GARDEN_BAR }]} />
+            <View style={[styles.bandContent, { backgroundColor: SECTION_BAND, borderBottomLeftRadius: CONTAINER_RADIUS }]} />
           </View>
         );
 
@@ -157,6 +181,12 @@ const styles = StyleSheet.create({
     height: '100%',
     flexShrink: 0,
   },
+  bandContent: {
+    flex: 1,
+    height: '100%',
+    justifyContent: 'center' as const,
+    overflow: 'hidden',
+  },
 
   // ── Text styles ────────────────────────────────────────────────────────────
   locationText: {
@@ -167,6 +197,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     paddingHorizontal: 8,
+    paddingTop:4
   },
   gardenText: {
     flex: 1,
@@ -174,12 +205,14 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
     paddingHorizontal: 6,
+    paddingTop:4
   },
   sectionText: {
     flex: 1,
     color: '#000000',
     fontSize: 10,
     paddingHorizontal: 5,
+    paddingTop:4
   },
 
   // ── Crop cell internals ────────────────────────────────────────────────────

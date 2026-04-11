@@ -419,8 +419,10 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
         }
 
         pushRow({ type: 'garden_footer' });
+        pushRow({ type: 'garden_spacer' });
       }
       pushRow({ type: 'location_footer' });
+      pushRow({ type: 'location_spacer' });
     }
 
     set({
