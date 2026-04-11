@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Keyboard,
@@ -70,6 +70,9 @@ export default function CellNoteForm({ cropId, weekDate }: CellNoteFormProps) {
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
+  // Ref guard stops a double-tap from queuing two persistEntries calls before
+  // React flushes the `saving` state that would disable the button.
+  const saveInFlight = useRef(false);
 
   useEffect(() => {
     const parsed = parseWeeklyNoteEntries(note);
@@ -99,6 +102,9 @@ export default function CellNoteForm({ cropId, weekDate }: CellNoteFormProps) {
   );
 
   const persistEntries = async (nextEntries: WeeklyNoteEntry[]) => {
+    if (saveInFlight.current) return false;
+    saveInFlight.current = true;
+
     const filtered = nextEntries.filter(entry => entry.text.trim().length > 0);
     setSaving(true);
 
@@ -116,6 +122,7 @@ export default function CellNoteForm({ cropId, weekDate }: CellNoteFormProps) {
       return false;
     } finally {
       setSaving(false);
+      saveInFlight.current = false;
     }
   };
 
