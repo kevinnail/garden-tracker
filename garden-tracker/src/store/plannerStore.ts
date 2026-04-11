@@ -2,12 +2,17 @@ import { create } from 'zustand';
 import Toast from 'react-native-toast-message';
 
 import {
+  CropStage,
   GridRowItem,
+  Location,
   NewCropData,
   NewTaskData,
   Note,
   PrecomputedTaskLine,
+  Section,
   StageDefinition,
+  Task,
+  TaskCompletion,
   TodayTaskItem,
   TaskType,
 } from '@/src/types';
@@ -17,9 +22,9 @@ import { getRowHeight } from '../utils/rowLayout';
 import { getTaskLineOccurrences } from '@/src/utils/taskUtils';
 
 import { getAllLocationGroups, getAllLocations, getAllSections, insertLocationGroup, insertLocation, insertSection, deleteLocationGroup, deleteLocation, deleteSection } from '@/src/db/queries/locationQueries';
-import { archiveCrop as archiveCropQuery,  getAllCrops, getCropStages, getStageDefs, insertCropWithStages, deleteCropInstance, replaceCropStages, updateCropInstance } from '@/src/db/queries/cropQueries';
-import { getTasksForCrop, getCompletionsForCrop, getTaskTypes, insertTask, insertCompletion, deleteCompletion, deleteTask as dbDeleteTask, updateTaskDay, getTodayAndOverdue } from '@/src/db/queries/taskQueries';
-import { deleteNote as deleteNoteQuery, getAllNotesForCrop, upsertNote } from '@/src/db/queries/noteQueries';
+import { archiveCrop as archiveCropQuery,  getAllCrops, getCropStagesForCrops, getStageDefs, insertCropWithStages, deleteCropInstance, replaceCropStages, updateCropInstance } from '@/src/db/queries/cropQueries';
+import { getTasksForCrops, getCompletionsForCrops, getTaskTypes, insertTask, insertCompletion, deleteCompletion, deleteTask as dbDeleteTask, updateTaskDay, getTodayAndOverdue } from '@/src/db/queries/taskQueries';
+import { deleteNote as deleteNoteQuery, getNotesForCrops, upsertNote } from '@/src/db/queries/noteQueries';
 import { resetDatabase } from '@/src/db/database';
 
 interface PlannerState {
@@ -266,6 +271,59 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
       getTodayAndOverdue(),
     ]);
 
+    // Batch-fetch all per-crop data in parallel (fixes N+1 query pattern)
+    const cropIds = allCrops.map(c => c.id);
+    const [allStages, allTasks, allCompletions, allCellNotes] = await Promise.all([
+      getCropStagesForCrops(cropIds),
+      getTasksForCrops(cropIds),
+      getCompletionsForCrops(cropIds),
+      getNotesForCrops(cropIds),
+    ]);
+
+    // Pre-index everything by parent key for O(1) lookup in the render loop
+    const locationsByGroup = new Map<number, Location[]>();
+    for (const loc of locations) {
+      const arr = locationsByGroup.get(loc.location_group_id);
+      if (arr) arr.push(loc); else locationsByGroup.set(loc.location_group_id, [loc]);
+    }
+
+    const sectionsByLocation = new Map<number, Section[]>();
+    for (const sec of sections) {
+      const arr = sectionsByLocation.get(sec.location_id);
+      if (arr) arr.push(sec); else sectionsByLocation.set(sec.location_id, [sec]);
+    }
+
+    const cropsBySection = new Map<number, typeof allCrops>();
+    for (const crop of allCrops) {
+      const arr = cropsBySection.get(crop.section_id);
+      if (arr) arr.push(crop); else cropsBySection.set(crop.section_id, [crop]);
+    }
+
+    const stagesByCrop = new Map<number, CropStage[]>();
+    for (const stage of allStages) {
+      const arr = stagesByCrop.get(stage.crop_instance_id);
+      if (arr) arr.push(stage); else stagesByCrop.set(stage.crop_instance_id, [stage]);
+    }
+
+    const tasksByCrop = new Map<number, Task[]>();
+    for (const task of allTasks) {
+      const arr = tasksByCrop.get(task.crop_instance_id);
+      if (arr) arr.push(task); else tasksByCrop.set(task.crop_instance_id, [task]);
+    }
+
+    const completionsByCrop = new Map<number, TaskCompletion[]>();
+    for (const comp of allCompletions) {
+      const arr = completionsByCrop.get(comp.crop_instance_id);
+      if (arr) arr.push(comp); else completionsByCrop.set(comp.crop_instance_id, [comp]);
+    }
+
+    const notesByCrop = new Map<number, Note[]>();
+    for (const note of allCellNotes) {
+      if (note.crop_instance_id == null) continue;
+      const arr = notesByCrop.get(note.crop_instance_id);
+      if (arr) arr.push(note); else notesByCrop.set(note.crop_instance_id, [note]);
+    }
+
     const rows: GridRowItem[]           = [];
     const allTaskLines: PrecomputedTaskLine[] = [];
     const notes: Note[] = [];
@@ -279,17 +337,17 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
     for (const group of groups) {
       pushRow({ type: 'group_header', group });
 
-      const groupLocations = locations.filter(l => l.location_group_id === group.id);
+      const groupLocations = locationsByGroup.get(group.id) ?? [];
 
       for (const location of groupLocations) {
-        const locationSections = sections.filter(s => s.location_id === location.id);
+        const locationSections = sectionsByLocation.get(location.id) ?? [];
 
         pushRow({ type: 'location_header', location });
 
         for (const section of locationSections) {
           pushRow({ type: 'section_header', section });
 
-          const crops = allCrops.filter(c => c.section_id === section.id);
+          const crops = cropsBySection.get(section.id) ?? [];
 
           if (crops.length === 0) {
             pushRow({ type: 'section_footer' });
@@ -299,12 +357,10 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
           for (const crop of crops) {
             const y1 = currentTop;
 
-            const [stages, tasks, completions, cellNotes] = await Promise.all([
-              getCropStages(crop.id),
-              getTasksForCrop(crop.id),
-              getCompletionsForCrop(crop.id),
-              getAllNotesForCrop(crop.id),
-            ]);
+            const stages      = stagesByCrop.get(crop.id) ?? [];
+            const tasks       = tasksByCrop.get(crop.id) ?? [];
+            const completions = completionsByCrop.get(crop.id) ?? [];
+            const cellNotes   = notesByCrop.get(crop.id) ?? [];
 
             const notesByWeek: Record<string, Note> = {};
             for (const note of cellNotes) {
