@@ -64,7 +64,7 @@ export default function AddGardenForm() {
     return { g, l, s };
   }, []);
 
-  useEffect(() => { reload(); }, []);
+  useEffect(() => { void reload().catch(() => {/* toast shown by store */}); }, [reload]);
 
   // Keep locationId in sync when groupId changes
   useEffect(() => {
