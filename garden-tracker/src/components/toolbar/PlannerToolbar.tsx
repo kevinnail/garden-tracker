@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Pressable, Text, StyleSheet, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,15 +13,16 @@ export default function PlannerToolbar() {
   const overdueCount = usePlannerStore(s => s.todayOverdueTasks.length);
   const todayCount = dueTodayCount + overdueCount;
 
+  
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
-
+  
   const todayLabel = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'long',
     day: 'numeric',
   });
-
+  
   const todayBanner = (
     <Pressable
       style={[
@@ -34,7 +35,7 @@ export default function PlannerToolbar() {
             : styles.todayBannerIdle,
       ]}
       onPress={() => router.navigate('/(tabs)/today')}
-    >
+      >
       <View style={styles.todayBannerMain}>
         <Text style={styles.todayBannerTitle}>Today</Text>
         {!isLandscape && (
@@ -50,24 +51,19 @@ export default function PlannerToolbar() {
           </Text>
         )}
       </View>
-
       <View style={styles.todayBannerRight}>
-        {todayCount > 0 ? (
+        {todayCount > 0 && (
           <View style={styles.badge}>
             <Text style={styles.badgeText}>{todayCount}</Text>
           </View>
-        ) : (
-          <View style={styles.badgeIdle}>
-            <Text style={styles.badgeIdleText}>0</Text>
-          </View>
-        )}
+        ) }
       </View>
     </Pressable>
   );
 
   const actionButtons = (
     <View style={[styles.actionRow, isLandscape && styles.actionRowLandscape]}>
-      <Pressable style={styles.btn} onPress={async () => { try { await ensureDefaultGarden(); } catch { /* toast shown by store */ } router.push('/(modals)/add-crop'); }}>
+      <Pressable style={styles.btn} onPress={async () => { try { await ensureDefaultGarden(); router.push('/(modals)/add-crop'); } catch { /* toast shown by store */ } }}>
         <Text style={styles.btnText}>+ Crop</Text>
       </Pressable>
       <Pressable style={styles.locationBtn} onPress={() => router.push('/(modals)/add-garden')}>

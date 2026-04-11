@@ -60,7 +60,7 @@ interface PlannerState {
   setSelectedCrop: (id: number | null) => void;
   focusPlannerCrop: (id: number | null, focusDate?: string | null) => void;
   clearPlannerFocus: () => void;
-  toggleArchivedRows: () => void;
+  toggleArchivedRows: () => Promise<void>;
 }
 
 function showError(action: string, e: unknown) {
@@ -244,9 +244,11 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
     } catch (e) { showError('Failed to archive crop', e); throw e; }
   },
 
-  toggleArchivedRows: () => {
+  toggleArchivedRows: async () => {
     set(s => ({ showArchivedRows: !s.showArchivedRows }));
-    get().loadData();
+    try {
+      await get().loadData();
+    } catch (e) { showError('Failed to reload after archive toggle', e); }
   },
 
   loadData: async () => {
