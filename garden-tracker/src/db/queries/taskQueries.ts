@@ -37,15 +37,9 @@ function wholeWeekDiff(startSunday: Date, endSunday: Date): number {
 }
 
 function getCropStartDate(startDate: string): Date | null {
-  const strict = parseDateKey(startDate);
-  if (strict) return strict;
-
-  const loose = new Date(startDate);
-  if (isNaN(loose.getTime())) {
-    return null;
-  }
-
-  return toSunday(loose);
+  // Strict parse only. `new Date("YYYY-MM-DD")` parses as UTC and can land a
+  // day off in local time; treat anything parseDateKey rejects as corrupted.
+  return parseDateKey(startDate);
 }
 
 function isTaskScheduledOnDate(task: DashboardTaskRow, dueDate: Date): boolean {
