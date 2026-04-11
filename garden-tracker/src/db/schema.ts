@@ -17,22 +17,22 @@ export const SCHEMA_SQL = `
     color TEXT NOT NULL
   );
 
-  CREATE TABLE IF NOT EXISTS location_groups (
+  CREATE TABLE IF NOT EXISTS locations (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     name        TEXT NOT NULL,
     order_index INTEGER NOT NULL DEFAULT 0
   );
 
-  CREATE TABLE IF NOT EXISTS locations (
+  CREATE TABLE IF NOT EXISTS gardens (
     id                INTEGER PRIMARY KEY AUTOINCREMENT,
-    location_group_id INTEGER NOT NULL REFERENCES location_groups(id) ON DELETE CASCADE,
+    location_id       INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
     name              TEXT NOT NULL,
     order_index       INTEGER NOT NULL DEFAULT 0
   );
 
   CREATE TABLE IF NOT EXISTS sections (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+    garden_id   INTEGER NOT NULL REFERENCES gardens(id) ON DELETE CASCADE,
     name        TEXT NOT NULL,
     order_index INTEGER NOT NULL DEFAULT 0
   );

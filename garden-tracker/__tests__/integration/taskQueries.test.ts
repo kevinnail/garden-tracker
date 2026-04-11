@@ -16,6 +16,9 @@ import {
   insertCompletion,
   deleteCompletion,
   deleteTask,
+  updateTaskDay,
+  getTasksForCrops,
+  getCompletionsForCrops,
   getTodayAndOverdue,
 } from '@/src/db/queries/taskQueries';
 import { getDb } from '@/src/db/database';
@@ -263,5 +266,89 @@ describe('getTodayAndOverdue', () => {
     const { overdue } = await getTodayAndOverdue(new Date('2025-03-06T12:00:00'));
 
     expect(overdue).toHaveLength(0);
+  });
+});
+
+// ── updateTaskDay ──────────────────────────────────────────────────────────────
+
+describe('updateTaskDay', () => {
+  it('updates the day_of_week field and the change is visible in getTasksForCrop', async () => {
+    await updateTaskDay(SEED.TASK_ID, 5);
+
+    const tasks = await getTasksForCrop(SEED.CROP_ID);
+
+    expect(tasks[0].day_of_week).toBe(5);
+  });
+
+  it('does nothing when the task does not exist', async () => {
+    await expect(updateTaskDay(999, 1)).resolves.toBeUndefined();
+  });
+});
+
+// ── getTasksForCrops ───────────────────────────────────────────────────────────
+
+describe('getTasksForCrops', () => {
+  it('returns empty array for empty input without hitting the db', async () => {
+    const tasks = await getTasksForCrops([]);
+
+    expect(tasks).toHaveLength(0);
+  });
+
+  it('returns the seeded task when queried by crop id', async () => {
+    const tasks = await getTasksForCrops([SEED.CROP_ID]);
+
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].id).toBe(SEED.TASK_ID);
+    expect(tasks[0].crop_instance_id).toBe(SEED.CROP_ID);
+  });
+
+  it('returns tasks for multiple crop ids', async () => {
+    const id2 = await insertTask(SEED.CROP_ID, SEED.TASK_TYPE_ID, 1, 1, 0);
+
+    const tasks = await getTasksForCrops([SEED.CROP_ID]);
+
+    expect(tasks.map(t => t.id)).toContain(SEED.TASK_ID);
+    expect(tasks.map(t => t.id)).toContain(id2);
+  });
+
+  it('returns empty array for a crop with no tasks', async () => {
+    const tasks = await getTasksForCrops([999]);
+
+    expect(tasks).toHaveLength(0);
+  });
+});
+
+// ── getCompletionsForCrops ─────────────────────────────────────────────────────
+
+describe('getCompletionsForCrops', () => {
+  it('returns empty array for empty input', async () => {
+    const completions = await getCompletionsForCrops([]);
+
+    expect(completions).toHaveLength(0);
+  });
+
+  it('returns empty array when no completions exist', async () => {
+    const completions = await getCompletionsForCrops([SEED.CROP_ID]);
+
+    expect(completions).toHaveLength(0);
+  });
+
+  it('returns completions with crop_instance_id after inserting one', async () => {
+    await insertCompletion(SEED.TASK_ID, '2025-03-05');
+
+    const completions = await getCompletionsForCrops([SEED.CROP_ID]);
+
+    expect(completions).toHaveLength(1);
+    expect(completions[0].task_id).toBe(SEED.TASK_ID);
+    expect(completions[0].crop_instance_id).toBe(SEED.CROP_ID);
+    expect(completions[0].completed_date).toBe('2025-03-05');
+  });
+
+  it('returns empty array for a crop with no matching completions', async () => {
+    await insertCompletion(SEED.TASK_ID, '2025-03-05');
+
+    const completions = await getCompletionsForCrops([999]);
+
+    expect(completions).toHaveLength(0);
   });
 });

@@ -15,6 +15,7 @@ const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 interface CropTaskGroup {
   cropId: number;
   cropName: string;
+  gardenName: string;
   sectionName: string;
   locationName: string;
   tasks: TodayTaskItem[];
@@ -27,6 +28,7 @@ function groupByCrop(items: TodayTaskItem[]): CropTaskGroup[] {
       map.set(item.crop_instance_id, {
         cropId: item.crop_instance_id,
         cropName: item.crop_name,
+        gardenName: item.garden_name,
         sectionName: item.section_name,
         locationName: item.location_name,
         tasks: [],
@@ -98,7 +100,7 @@ function CropGroup({ group, overdue }: { group: CropTaskGroup; overdue: boolean 
       <Pressable style={styles.cropHeader} onPress={handleHeaderPress}>
         <View style={styles.cropHeaderLeft}>
           <Text style={styles.cropName}>{group.cropName}</Text>
-          <Text style={styles.cropMeta}>{group.locationName} · {group.sectionName}</Text>
+          <Text style={styles.cropMeta}>{group.locationName} · {group.gardenName} · {group.sectionName}</Text>
         </View>
         <Text style={styles.cropArrow}>
           {group.tasks.length} task{group.tasks.length !== 1 ? 's' : ''} ›

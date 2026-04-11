@@ -3,6 +3,7 @@ import Toast from 'react-native-toast-message';
 
 import {
   CropStage,
+  Garden,
   GridRowItem,
   Location,
   NewCropData,
@@ -21,7 +22,7 @@ import { defaultCalendarStart, dateToWeekIndex, parseDateKey, toSunday } from '@
 import { getRowHeight } from '../utils/rowLayout';
 import { getTaskLineOccurrences } from '@/src/utils/taskUtils';
 
-import { getAllLocationGroups, getAllLocations, getAllSections, insertLocationGroup, insertLocation, insertSection, deleteLocationGroup, deleteLocation, deleteSection } from '@/src/db/queries/locationQueries';
+import { getAllLocations, getAllGardens, getAllSections, insertLocation, insertGarden, insertSection, deleteLocation, deleteGarden, deleteSection } from '@/src/db/queries/locationQueries';
 import { archiveCrop as archiveCropQuery,  getAllCrops, getCropStagesForCrops, getStageDefs, insertCropWithStages, deleteCropInstance, replaceCropStages, updateCropInstance } from '@/src/db/queries/cropQueries';
 import { getTasksForCrops, getCompletionsForCrops, getTaskTypes, insertTask, insertCompletion, deleteCompletion, deleteTask as dbDeleteTask, updateTaskDay, getTodayAndOverdue } from '@/src/db/queries/taskQueries';
 import { deleteNote as deleteNoteQuery, getNotesForCrops, upsertNote } from '@/src/db/queries/noteQueries';
@@ -54,13 +55,13 @@ interface PlannerState {
   adjustTaskDay: (taskId: number, dayOfWeek: number) => Promise<void>;
   saveCellNote: (cropInstanceId: number, weekDate: string, content: string) => Promise<void>;
   deleteNote: (noteId: number) => Promise<void>;
-  addLocationGroup: (name: string) => Promise<void>;
-  addLocation: (groupId: number, name: string) => Promise<void>;
-  addSection: (locationId: number, name: string) => Promise<void>;
-  removeLocationGroup: (id: number) => Promise<void>;
+  addLocation: (name: string) => Promise<number>;
+  addGarden: (locationId: number, name: string) => Promise<number>;
+  addSection: (gardenId: number, name: string) => Promise<number>;
   removeLocation: (id: number) => Promise<void>;
+  removeGarden: (id: number) => Promise<void>;
   removeSection: (id: number) => Promise<void>;
-  ensureDefaultGarden: () => Promise<void>;
+  ensureDefaultHierarchy: () => Promise<void>;
   resetAllData: () => Promise<void>;
   setSelectedCrop: (id: number | null) => void;
   focusPlannerCrop: (id: number | null, focusDate?: string | null) => void;
@@ -88,42 +89,39 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
   plannerFocusCropId: null,
   plannerFocusDate: null,
 
-  addLocationGroup: async (name) => {
+  addLocation: async (name) => {
     try {
-      await insertLocationGroup(name);
+      const id = await insertLocation(name);
       await get().loadData();
-    } catch (e) { showError('Failed to add group', e); throw e; }
-  },
-
-  addLocation: async (groupId, name) => {
-    try {
-      await insertLocation(groupId, name);
-      await get().loadData();
+      return id;
     } catch (e) { showError('Failed to add location', e); throw e; }
   },
 
-  addSection: async (locationId, name) => {
+  addGarden: async (locationId, name) => {
     try {
-      await insertSection(locationId, name);
+      const id = await insertGarden(locationId, name);
       await get().loadData();
+      return id;
+    } catch (e) { showError('Failed to add garden', e); throw e; }
+  },
+
+  addSection: async (gardenId, name) => {
+    try {
+      const id = await insertSection(gardenId, name);
+      await get().loadData();
+      return id;
     } catch (e) { showError('Failed to add section', e); throw e; }
   },
 
-  ensureDefaultGarden: async () => {
+  ensureDefaultHierarchy: async () => {
     try {
       const sections = await getAllSections();
       if (sections.length > 0) return;
-      await insertLocationGroup('Home');
-      const groups = await getAllLocationGroups();
-      const group = groups[0];
-      if (!group) return;
-      await insertLocation(group.id, 'My Garden');
-      const locations = await getAllLocations();
-      const loc = locations.find(l => l.location_group_id === group.id);
-      if (!loc) return;
-      await insertSection(loc.id, 'My Section');
+      const locationId = await insertLocation('Home');
+      const gardenId = await insertGarden(locationId, 'My Garden');
+      await insertSection(gardenId, 'My Section');
       await get().loadData();
-    } catch (e) { showError('Failed to set up default garden', e); throw e; }
+    } catch (e) { showError('Failed to set up default hierarchy', e); throw e; }
   },
 
   resetAllData: async () => {
@@ -133,18 +131,18 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
     } catch (e) { showError('Failed to reset data', e); throw e; }
   },
 
-  removeLocationGroup: async (id) => {
-    try {
-      await deleteLocationGroup(id);
-      await get().loadData();
-    } catch (e) { showError('Failed to remove group', e); throw e; }
-  },
-
   removeLocation: async (id) => {
     try {
       await deleteLocation(id);
       await get().loadData();
     } catch (e) { showError('Failed to remove location', e); throw e; }
+  },
+
+  removeGarden: async (id) => {
+    try {
+      await deleteGarden(id);
+      await get().loadData();
+    } catch (e) { showError('Failed to remove garden', e); throw e; }
   },
 
   removeSection: async (id) => {
@@ -261,9 +259,9 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
     const calendarStart = get().calendarStart;
     const showArchived  = get().showArchivedRows;
 
-    const [groups, locations, sections, allCrops, stageDefs, taskTypeList, { due: todayDueTasks, overdue: todayOverdueTasks }] = await Promise.all([
-      getAllLocationGroups(),
+    const [locations, gardens, sections, allCrops, stageDefs, taskTypeList, { due: todayDueTasks, overdue: todayOverdueTasks }] = await Promise.all([
       getAllLocations(),
+      getAllGardens(),
       getAllSections(),
       getAllCrops(showArchived),
       getStageDefs(),
@@ -281,16 +279,16 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
     ]);
 
     // Pre-index everything by parent key for O(1) lookup in the render loop
-    const locationsByGroup = new Map<number, Location[]>();
-    for (const loc of locations) {
-      const arr = locationsByGroup.get(loc.location_group_id);
-      if (arr) arr.push(loc); else locationsByGroup.set(loc.location_group_id, [loc]);
+    const gardensByLocation = new Map<number, Garden[]>();
+    for (const garden of gardens) {
+      const arr = gardensByLocation.get(garden.location_id);
+      if (arr) arr.push(garden); else gardensByLocation.set(garden.location_id, [garden]);
     }
 
-    const sectionsByLocation = new Map<number, Section[]>();
+    const sectionsByGarden = new Map<number, Section[]>();
     for (const sec of sections) {
-      const arr = sectionsByLocation.get(sec.location_id);
-      if (arr) arr.push(sec); else sectionsByLocation.set(sec.location_id, [sec]);
+      const arr = sectionsByGarden.get(sec.garden_id);
+      if (arr) arr.push(sec); else sectionsByGarden.set(sec.garden_id, [sec]);
     }
 
     const cropsBySection = new Map<number, typeof allCrops>();
@@ -334,17 +332,17 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
       currentTop += getRowHeight(row);
     };
 
-    for (const group of groups) {
-      pushRow({ type: 'group_header', group });
+    for (const location of locations) {
+      pushRow({ type: 'location_header', location });
 
-      const groupLocations = locationsByGroup.get(group.id) ?? [];
+      const locationGardens = gardensByLocation.get(location.id) ?? [];
 
-      for (const location of groupLocations) {
-        const locationSections = sectionsByLocation.get(location.id) ?? [];
+      for (const garden of locationGardens) {
+        const gardenSections = sectionsByGarden.get(garden.id) ?? [];
 
-        pushRow({ type: 'location_header', location });
+        pushRow({ type: 'garden_header', garden });
 
-        for (const section of locationSections) {
+        for (const section of gardenSections) {
           pushRow({ type: 'section_header', section });
 
           const crops = cropsBySection.get(section.id) ?? [];
@@ -420,9 +418,9 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
           }
         }
 
-        pushRow({ type: 'location_footer' });
+        pushRow({ type: 'garden_footer' });
       }
-      pushRow({ type: 'group_footer' });
+      pushRow({ type: 'location_footer' });
     }
 
     set({
