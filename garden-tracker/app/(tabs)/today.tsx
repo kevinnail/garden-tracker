@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import ReanimatedSwipeable from 'react-native-gesture-handler/Swipeable';
 
 import { usePlannerData } from '@/src/hooks/usePlannerData';
+import { useTodayTick } from '@/src/hooks/useTodayTick';
 import { TodayTaskItem } from '@/src/types';
 import { usePlannerStore } from '@/src/store/plannerStore';
 
@@ -158,6 +159,8 @@ function Section({
 
 export default function TodayScreen() {
   usePlannerData();
+  // Re-render across local midnight so `todayLabel` advances.
+  useTodayTick();
 
   const todayDueTasks    = usePlannerStore(s => s.todayDueTasks);
   const todayOverdueTasks = usePlannerStore(s => s.todayOverdueTasks);
