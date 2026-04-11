@@ -54,9 +54,9 @@ interface PlannerState {
   adjustTaskDay: (taskId: number, dayOfWeek: number) => Promise<void>;
   saveCellNote: (cropInstanceId: number, weekDate: string, content: string) => Promise<void>;
   deleteNote: (noteId: number) => Promise<void>;
-  addLocationGroup: (name: string) => Promise<void>;
-  addLocation: (groupId: number, name: string) => Promise<void>;
-  addSection: (locationId: number, name: string) => Promise<void>;
+  addLocationGroup: (name: string) => Promise<number>;
+  addLocation: (groupId: number, name: string) => Promise<number>;
+  addSection: (locationId: number, name: string) => Promise<number>;
   removeLocationGroup: (id: number) => Promise<void>;
   removeLocation: (id: number) => Promise<void>;
   removeSection: (id: number) => Promise<void>;
@@ -90,22 +90,25 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
 
   addLocationGroup: async (name) => {
     try {
-      await insertLocationGroup(name);
+      const id = await insertLocationGroup(name);
       await get().loadData();
+      return id;
     } catch (e) { showError('Failed to add group', e); throw e; }
   },
 
   addLocation: async (groupId, name) => {
     try {
-      await insertLocation(groupId, name);
+      const id = await insertLocation(groupId, name);
       await get().loadData();
+      return id;
     } catch (e) { showError('Failed to add location', e); throw e; }
   },
 
   addSection: async (locationId, name) => {
     try {
-      await insertSection(locationId, name);
+      const id = await insertSection(locationId, name);
       await get().loadData();
+      return id;
     } catch (e) { showError('Failed to add section', e); throw e; }
   },
 
