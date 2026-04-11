@@ -253,6 +253,7 @@ const TASK_ROW = {
   color: '#00CCFF',
   crop_name: 'Tomato',
   section_name: 'Section A',
+  garden_name: 'Raised Beds',
   location_name: 'Test Beds',
   start_date: '2025-03-02',
   day_of_week: 3,
