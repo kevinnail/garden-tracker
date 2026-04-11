@@ -46,12 +46,18 @@ export default function EditCropModal() {
           <Pressable
             style={[styles.tabBtn, isLandscape && styles.tabBtnCompact, activeTab === 'crop' && styles.tabBtnActive]}
             onPress={() => setActiveTab('crop')}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: activeTab === 'crop' }}
+            accessibilityLabel="Crop details tab"
           >
             <Text style={[styles.tabText, activeTab === 'crop' && styles.tabTextActive]}>Crop</Text>
           </Pressable>
           <Pressable
             style={[styles.tabBtn, isLandscape && styles.tabBtnCompact, activeTab === 'tasks' && styles.tabBtnActive]}
             onPress={() => setActiveTab('tasks')}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: activeTab === 'tasks' }}
+            accessibilityLabel="Tasks tab"
           >
             <Text style={[styles.tabText, activeTab === 'tasks' && styles.tabTextActive]}>Tasks</Text>
           </Pressable>
@@ -69,20 +75,43 @@ export default function EditCropModal() {
 
       <View style={[styles.footer, { paddingBottom: Math.max(14, insets.bottom + 8) }]}>
         <View style={styles.footerMainRow}>
-          <Pressable style={styles.closeBtn} onPress={() => router.back()}>
+          <Pressable
+            style={styles.closeBtn}
+            onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+            accessibilityHint="Closes this modal without saving"
+          >
             <Text style={styles.closeBtnText}>Close</Text>
           </Pressable>
-          <Pressable style={styles.saveBtn} onPress={() => cropFormRef.current?.submit()}>
+          <Pressable
+            style={styles.saveBtn}
+            onPress={() => cropFormRef.current?.submit()}
+            accessibilityRole="button"
+            accessibilityLabel="Save crop"
+          >
             <Text style={styles.saveBtnText}>Save Crop</Text>
           </Pressable>
         </View>
 
         {activeTab === 'crop' && (
           <View style={styles.footerDangerRow}>
-            <Pressable style={styles.archiveBtn} onPress={() => cropFormRef.current?.archive()}>
+            <Pressable
+              style={styles.archiveBtn}
+              onPress={() => cropFormRef.current?.archive()}
+              accessibilityRole="button"
+              accessibilityLabel="Archive crop"
+              accessibilityHint="Hides this crop from the planner; can be restored from the Archived toggle"
+            >
               <Text style={styles.archiveBtnText}>Archive</Text>
             </Pressable>
-            <Pressable style={styles.deleteBtn} onPress={() => cropFormRef.current?.remove()}>
+            <Pressable
+              style={styles.deleteBtn}
+              onPress={() => cropFormRef.current?.remove()}
+              accessibilityRole="button"
+              accessibilityLabel="Delete crop"
+              accessibilityHint="Permanently deletes this crop and all its tasks and completions"
+            >
               <Text style={styles.deleteBtnText}>Delete</Text>
             </Pressable>
           </View>
