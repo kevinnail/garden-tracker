@@ -369,15 +369,9 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
             }
 
             // Precompute weekColorMap — O(1) lookup per cell at render time
-            const parsedStartDate = (() => {
-              const strict = parseDateKey(crop.start_date);
-              if (strict) return strict;
-
-              const loose = new Date(crop.start_date);
-              if (!isNaN(loose.getTime())) return toSunday(loose);
-
-              return toSunday(new Date());
-            })();
+            // Strict parse only — never `new Date(string)`, which interprets
+            // YYYY-MM-DD as UTC and can land a day off in local time.
+            const parsedStartDate = parseDateKey(crop.start_date) ?? toSunday(new Date());
             const cropStartWeek = dateToWeekIndex(calendarStart, parsedStartDate);
             const weekColorMap: Record<number, string> = {};
             let cursor = cropStartWeek;
