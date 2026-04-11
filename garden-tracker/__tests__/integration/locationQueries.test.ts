@@ -15,6 +15,9 @@ import {
   insertLocation,
   insertGarden,
   insertSection,
+  deleteSection,
+  deleteGarden,
+  deleteLocation,
 } from '@/src/db/queries/locationQueries';
 import { getDb } from '@/src/db/database';
 import { setupTestDb, SEED } from '../setup';
@@ -166,5 +169,83 @@ describe('insertSection', () => {
     expect(locations.find(l => l.name === 'Greenhouse')).toBeDefined();
     expect(gardens.find(g => g.name === 'North Wing')).toBeDefined();
     expect(sections.find(s => s.name === 'Row A')).toBeDefined();
+  });
+});
+
+// ── deleteSection ──────────────────────────────────────────────────────────────
+
+describe('deleteSection', () => {
+  it('removes the section so it no longer appears in getAllSections', async () => {
+    await deleteSection(SEED.SECTION_ID);
+
+    const sections = await getAllSections();
+
+    expect(sections.find(s => s.id === SEED.SECTION_ID)).toBeUndefined();
+  });
+
+  it('does nothing when section does not exist', async () => {
+    await expect(deleteSection(999)).resolves.toBeUndefined();
+  });
+
+  it('removing a section leaves the parent garden intact', async () => {
+    await deleteSection(SEED.SECTION_ID);
+
+    const gardens = await getAllGardens();
+
+    expect(gardens.length).toBeGreaterThan(0);
+  });
+});
+
+// ── deleteGarden ───────────────────────────────────────────────────────────────
+
+describe('deleteGarden', () => {
+  it('removes the garden and its sections', async () => {
+    const gardens = await getAllGardens();
+    const gardenId = gardens[0].id;
+
+    await deleteGarden(gardenId);
+
+    const remaining = await getAllGardens();
+    expect(remaining.find(g => g.id === gardenId)).toBeUndefined();
+
+    const sections = await getAllSections();
+    expect(sections.find(s => s.id === SEED.SECTION_ID)).toBeUndefined();
+  });
+
+  it('does nothing when garden does not exist', async () => {
+    await expect(deleteGarden(999)).resolves.toBeUndefined();
+  });
+
+  it('removing a garden leaves the parent location intact', async () => {
+    const gardens = await getAllGardens();
+    await deleteGarden(gardens[0].id);
+
+    const locations = await getAllLocations();
+
+    expect(locations.length).toBeGreaterThan(0);
+  });
+});
+
+// ── deleteLocation ─────────────────────────────────────────────────────────────
+
+describe('deleteLocation', () => {
+  it('removes the location and its full hierarchy', async () => {
+    const locations = await getAllLocations();
+    const locationId = locations[0].id;
+
+    await deleteLocation(locationId);
+
+    const remaining = await getAllLocations();
+    expect(remaining.find(l => l.id === locationId)).toBeUndefined();
+
+    const gardens = await getAllGardens();
+    expect(gardens).toHaveLength(0);
+
+    const sections = await getAllSections();
+    expect(sections).toHaveLength(0);
+  });
+
+  it('does nothing when location does not exist', async () => {
+    await expect(deleteLocation(999)).resolves.toBeUndefined();
   });
 });
