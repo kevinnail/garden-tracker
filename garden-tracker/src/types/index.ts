@@ -122,8 +122,10 @@ export interface WeeklyNoteEntry {
 export type GridRowItem =
   | { type: 'location_header'; location: Location }
   | { type: 'location_footer' }
+  | { type: 'location_spacer' }
   | { type: 'garden_header';   garden: Garden }
   | { type: 'garden_footer' }
+  | { type: 'garden_spacer' }
   | { type: 'section_header';  section: Section }
   | { type: 'section_footer' }
   | { type: 'section_spacer' }
