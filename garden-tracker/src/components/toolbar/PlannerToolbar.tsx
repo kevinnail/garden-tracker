@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { View, Pressable, Text, StyleSheet, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -6,9 +6,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { usePlannerStore } from '@/src/store/plannerStore';
 
 export default function PlannerToolbar() {
+  const hasSections = usePlannerStore(s => s.rows.some(r => r.type === 'section_header'));
   const showArchivedRows = usePlannerStore(s => s.showArchivedRows);
   const toggleArchivedRows = usePlannerStore(s => s.toggleArchivedRows);
-  const ensureDefaultGarden = usePlannerStore(s => s.ensureDefaultGarden);
   const dueTodayCount = usePlannerStore(s => s.todayDueTasks.length);
   const overdueCount = usePlannerStore(s => s.todayOverdueTasks.length);
   const todayCount = dueTodayCount + overdueCount;
@@ -72,10 +72,10 @@ export default function PlannerToolbar() {
     <View style={[styles.actionRow, isLandscape && styles.actionRowLandscape]}>
       <Pressable
         style={styles.btn}
-        onPress={async () => { try { await ensureDefaultGarden(); router.push('/(modals)/add-crop'); } catch { /* toast shown by store */ } }}
+        onPress={() => router.push(hasSections ? '/(modals)/add-crop' : '/(modals)/add-garden')}
         accessibilityRole="button"
         accessibilityLabel="Add crop"
-        accessibilityHint="Opens the add crop form"
+        accessibilityHint={hasSections ? 'Opens the add crop form' : 'Opens hierarchy setup first'}
       >
         <Text style={styles.btnText}>+ Crop</Text>
       </Pressable>
