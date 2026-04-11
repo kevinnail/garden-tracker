@@ -38,7 +38,6 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
   const editCrop     = usePlannerStore(s => s.editCrop);
   const archiveCrop  = usePlannerStore(s => s.archiveCrop);
   const deleteCrop   = usePlannerStore(s => s.deleteCrop);
-  const ensureDefaultGarden = usePlannerStore(s => s.ensureDefaultGarden);
   const cropRowAvailable = usePlannerStore(s => (
     cropId == null
       ? true
@@ -63,10 +62,6 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
     const loadFormData = async () => {
       if (isEditMode && !cropRowAvailable) {
         return;
-      }
-
-      if (!isEditMode) {
-        await ensureDefaultGarden();
       }
 
       const [secs, locs, existingStages] = await Promise.all([
@@ -136,7 +131,7 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
     return () => {
       isCancelled = true;
     };
-  }, [cropId, cropRowAvailable, ensureDefaultGarden, isEditMode, stageDefsAvailable]);
+  }, [cropId, cropRowAvailable, isEditMode, stageDefsAvailable]);
 
   const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
     if (Platform.OS === 'android') {
@@ -297,7 +292,13 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
           );
         })}
         {sections.length === 0 && (
-          <Text style={styles.emptyStateText}>No garden sections available.</Text>
+          <View style={styles.emptyStateBox}>
+            <Text style={styles.emptyStateText}>No sections available yet.</Text>
+            <Text style={styles.emptyStateSubtext}>Create Garden, then Location, then Section first.</Text>
+            <Pressable style={styles.emptyStateBtn} onPress={() => router.push('/(modals)/add-garden')}>
+              <Text style={styles.emptyStateBtnText}>Set up hierarchy</Text>
+            </Pressable>
+          </View>
         )}
       </View>
 
@@ -468,7 +469,26 @@ const styles = StyleSheet.create({
   sectionSelected: { borderColor: '#5a9', backgroundColor: '#1e3a2a' },
   sectionText: { color: '#aaa', fontSize: 13 },
   sectionTextSelected: { color: '#7dcea0' },
-  emptyStateText: { color: '#777', fontSize: 13, paddingVertical: 8 },
+  emptyStateBox: {
+    borderWidth: 1,
+    borderColor: '#3a3a3a',
+    borderRadius: 8,
+    backgroundColor: '#232323',
+    padding: 10,
+    gap: 8,
+  },
+  emptyStateText: { color: '#bbb', fontSize: 13, fontWeight: '600' },
+  emptyStateSubtext: { color: '#8a8a8a', fontSize: 12 },
+  emptyStateBtn: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#4b6a55',
+    borderRadius: 6,
+    backgroundColor: '#1e3a2a',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  emptyStateBtnText: { color: '#7dcea0', fontSize: 12, fontWeight: '700' },
   stageRow: { marginBottom: 8, gap: 6 },
   stagePicker: { flexGrow: 0 },
   stageChip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1, marginRight: 6 },
