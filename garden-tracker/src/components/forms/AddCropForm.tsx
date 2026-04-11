@@ -10,9 +10,9 @@ import type { DateTimePickerEvent } from '@react-native-community/datetimepicker
 
 import { formatDateKey, parseDateKey, toSunday } from '@/src/utils/dateUtils';
 import { usePlannerStore } from '@/src/store/plannerStore';
-import { getAllSections, getAllLocations } from '@/src/db/queries/locationQueries';
+import { getAllSections, getAllGardens } from '@/src/db/queries/locationQueries';
 import { getCropStages } from '@/src/db/queries/cropQueries';
-import { Section, Location } from '@/src/types';
+import { Section, Garden } from '@/src/types';
 
 interface StageRow {
   stage_definition_id: number;
@@ -52,7 +52,7 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
   const [sectionId, setSectionId]   = useState<number | null>(null);
   const [stages, setStages]         = useState<StageRow[]>([]);
   const [sections, setSections]     = useState<Section[]>([]);
-  const [locations, setLocations]   = useState<Location[]>([]);
+  const [gardens, setGardens]       = useState<Garden[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [loadingInitial, setLoadingInitial] = useState(true);
 
@@ -64,9 +64,9 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
         return;
       }
 
-      const [secs, locs, existingStages] = await Promise.all([
+      const [secs, gds, existingStages] = await Promise.all([
         getAllSections(),
-        getAllLocations(),
+        getAllGardens(),
         isEditMode && cropId != null ? getCropStages(cropId) : Promise.resolve([]),
       ]);
 
@@ -84,13 +84,13 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
 
       if (currentStageDefs.length === 0) {
         setSections(secs);
-        setLocations(locs);
+        setGardens(gds);
         setLoadingInitial(false);
         return;
       }
 
       setSections(secs);
-      setLocations(locs);
+      setGardens(gds);
 
       if (isEditMode && cropRow?.type === 'crop_row') {
         const parsedStart = parseDateKey(cropRow.crop.start_date);
@@ -277,8 +277,8 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
       <Text style={styles.label}>Section</Text>
       <View style={styles.sectionList}>
         {sections.map(sec => {
-          const loc = locations.find(l => l.id === sec.location_id);
-          const label = loc ? `${loc.name} › ${sec.name}` : sec.name;
+          const garden = gardens.find(g => g.id === sec.garden_id);
+          const label = garden ? `${garden.name} › ${sec.name}` : sec.name;
           return (
             <Pressable
               key={sec.id}
@@ -295,7 +295,7 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
           <View style={styles.emptyStateBox}>
             <Text style={styles.emptyStateText}>No sections available yet.</Text>
             <Text style={styles.emptyStateSubtext}>Create Location, then Garden, then Section first.</Text>
-            <Pressable style={styles.emptyStateBtn} onPress={() => router.push('/(modals)/add-garden')}>
+            <Pressable style={styles.emptyStateBtn} onPress={() => router.push('/(modals)/add-location')}>
               <Text style={styles.emptyStateBtnText}>Set up hierarchy</Text>
             </Pressable>
           </View>
