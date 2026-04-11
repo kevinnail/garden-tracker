@@ -17,15 +17,15 @@ type Mode = 'garden' | 'location' | 'section';
 
 const HELP_TEXT: Record<Mode, string[]> = {
   garden: [
-    'Garden is the top level, such as Backyard or Greenhouse.',
-    'Each Garden can contain multiple Locations.',
+    'Location is the top level, such as Home or Farm.',
+    'Each Location can contain multiple Gardens.',
   ],
   location: [
-    'Location sits inside a Garden, such as Raised Beds.',
-    'Each Location can contain multiple Sections.',
+    'Garden sits inside a Location, such as Backyard Beds.',
+    'Each Garden can contain multiple Sections.',
   ],
   section: [
-    'Section is where crops are assigned, such as Bed 1.',
+    'Section sits inside a Garden, such as Bed 1.',
     'At least one Section is required before adding crops.',
   ],
 };
@@ -39,7 +39,7 @@ function gardenStatus(g: LocationGroup, locations: Location[], sections: Section
 
 const STATUS_LABEL: Record<string, string> = {
   ready: 'Ready',
-  'needs-location': 'Add Location',
+  'needs-location': 'Add Garden',
   'needs-section': 'Add Section',
 };
 const STATUS_COLOR: Record<string, string> = {
@@ -72,6 +72,7 @@ export default function AddGardenForm() {
   const [initialCropCount, setInitialCropCount] = useState<number | null>(null);
   const [allowDismiss, setAllowDismiss] = useState(false);
   const [createdEntityCount, setCreatedEntityCount] = useState(0);
+  const [prefilledTopLevel, setPrefilledTopLevel] = useState(false);
 
   const createdGroupIds = useRef<Set<number>>(new Set());
   const createdLocationIds = useRef<Set<number>>(new Set());
@@ -112,6 +113,17 @@ export default function AddGardenForm() {
       cancelled = true;
     };
   }, [reload]);
+
+  useEffect(() => {
+    if (prefilledTopLevel) return;
+    if (initialCropCount !== 0) return;
+    if (mode !== 'garden') return;
+    if (groups.length > 0) return;
+    if (name.trim().length > 0) return;
+
+    setName('Home');
+    setPrefilledTopLevel(true);
+  }, [groups.length, initialCropCount, mode, name, prefilledTopLevel]);
 
   // Keep locationId in sync when groupId changes
   useEffect(() => {
@@ -223,9 +235,9 @@ export default function AddGardenForm() {
   const handleSubmit = async () => {
     if (!name.trim()) return Alert.alert('Validation', 'Name is required.');
     if (mode === 'location' && groupId == null)
-      return Alert.alert('Validation', 'Select a Garden first.');
-    if (mode === 'section' && locationId == null)
       return Alert.alert('Validation', 'Select a Location first.');
+    if (mode === 'section' && locationId == null)
+      return Alert.alert('Validation', 'Select a Garden first.');
 
     setSubmitting(true);
     try {
@@ -264,9 +276,9 @@ export default function AddGardenForm() {
     const groupLocationIds = locations.filter(l => l.location_group_id === g.id).map(l => l.id);
     const groupSectionIds = sections.filter(s => groupLocationIds.includes(s.location_id)).map(s => s.id);
     const locCount = locations.filter(l => l.location_group_id === g.id).length;
-    const detail = locCount > 0 ? ` It contains ${locCount} location(s) and all their crops.` : '';
+    const detail = locCount > 0 ? ` It contains ${locCount} garden(s) and all their crops.` : '';
     Alert.alert(
-      'Delete Garden',
+      'Delete Location',
       `Delete "${g.name}"?${detail} This cannot be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
@@ -292,7 +304,7 @@ export default function AddGardenForm() {
     const secCount = sections.filter(s => s.location_id === l.id).length;
     const detail = secCount > 0 ? ` It contains ${secCount} section(s) and all their crops.` : '';
     Alert.alert(
-      'Delete Location',
+      'Delete Garden',
       `Delete "${l.name}"?${detail} This cannot be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
@@ -338,14 +350,14 @@ export default function AddGardenForm() {
 
   const modeContext =
     mode === 'garden'
-      ? 'Add a top-level Garden.'
+      ? 'Add a top-level Location.'
       : mode === 'location'
         ? selectedGroup
-          ? `Parent Garden: ${selectedGroup.name}`
-          : 'Select a Garden above first.'
+          ? `Parent Location: ${selectedGroup.name}`
+          : 'Select a Location above first.'
         : selectedGroup && selectedLocation
           ? `Parent: ${selectedGroup.name} > ${selectedLocation.name}`
-          : 'Select Garden and Location above first.';
+          : 'Select Location and Garden above first.';
 
   const handleDone = () => {
     handleExitAttempt(() => {
@@ -370,9 +382,9 @@ export default function AddGardenForm() {
         <View style={styles.hierarchyBox}>
           <Text style={styles.boxTitle}>Hierarchy</Text>
 
-          <Text style={styles.levelTitle}>1. Garden</Text>
+          <Text style={styles.levelTitle}>1. Location</Text>
           {groups.length === 0 ? (
-            <Text style={styles.emptyHint}>No gardens yet.</Text>
+            <Text style={styles.emptyHint}>No locations yet.</Text>
           ) : (
             <View style={styles.pickerList}>
               {groups.map(g => (
@@ -387,10 +399,10 @@ export default function AddGardenForm() {
             </View>
           )}
 
-          <Text style={styles.levelTitle}>2. Location</Text>
+          <Text style={styles.levelTitle}>2. Garden</Text>
           {filteredLocations.length === 0 ? (
             <Text style={styles.emptyHint}>
-              {groupId == null ? 'Select a garden first.' : 'No locations in this garden yet.'}
+              {groupId == null ? 'Select a location first.' : 'No gardens in this location yet.'}
             </Text>
           ) : (
             <View style={styles.pickerList}>
@@ -409,7 +421,7 @@ export default function AddGardenForm() {
           <Text style={styles.levelTitle}>3. Section</Text>
           {filteredSections.length === 0 ? (
             <Text style={styles.emptyHint}>
-              {locationId == null ? 'Select a location first.' : 'No sections in this location yet.'}
+              {locationId == null ? 'Select a garden first.' : 'No sections in this garden yet.'}
             </Text>
           ) : (
             <View style={styles.sectionBadgeList}>
@@ -429,7 +441,7 @@ export default function AddGardenForm() {
             {(['garden', 'location', 'section'] as Mode[]).map((m) => (
               <Pressable key={m} style={[styles.tab, mode === m && styles.tabActive]} onPress={() => switchMode(m)}>
                 <Text style={[styles.tabText, mode === m && styles.tabTextActive]}>
-                  {m === 'garden' ? 'Garden' : m === 'location' ? 'Location' : 'Section'}
+                  {m === 'garden' ? 'Location' : m === 'location' ? 'Garden' : 'Section'}
                 </Text>
               </Pressable>
             ))}
@@ -438,7 +450,7 @@ export default function AddGardenForm() {
           <Text style={styles.modeContext}>{modeContext}</Text>
 
           <Text style={styles.label}>
-            {mode === 'garden' ? 'New Garden Name' : mode === 'location' ? 'New Location Name' : 'New Section Name'}
+            {mode === 'garden' ? 'New Location Name' : mode === 'location' ? 'New Garden Name' : 'New Section Name'}
           </Text>
 
           <View style={styles.inputRow}>
@@ -448,8 +460,8 @@ export default function AddGardenForm() {
               value={name}
               onChangeText={setName}
               placeholder={
-                mode === 'garden' ? 'e.g. Backyard' :
-                mode === 'location' ? 'e.g. Raised Beds' :
+                mode === 'garden' ? 'e.g. Home, Farm' :
+                mode === 'location' ? 'e.g. Backyard Beds' :
                 'e.g. Bed 1'
               }
               placeholderTextColor="#555"
@@ -488,7 +500,7 @@ export default function AddGardenForm() {
 
         {mode === 'garden' && groups.length > 0 && (
           <>
-            <Text style={styles.label}>Current Gardens</Text>
+            <Text style={styles.label}>Current Locations</Text>
             {groups.map(g => {
               const status = gardenStatus(g, locations, sections);
               return (
@@ -510,7 +522,7 @@ export default function AddGardenForm() {
 
         {mode === 'location' && filteredLocations.length > 0 && (
           <>
-            <Text style={styles.label}>Locations in this Garden</Text>
+            <Text style={styles.label}>Gardens in this Location</Text>
             {filteredLocations.map(l => (
               <View key={l.id} style={styles.existingRow}>
                 <Text style={[styles.existingName, { flex: 1 }]}>{l.name}</Text>
@@ -524,7 +536,7 @@ export default function AddGardenForm() {
 
         {mode === 'section' && filteredSections.length > 0 && (
           <>
-            <Text style={styles.label}>Sections in this Location</Text>
+            <Text style={styles.label}>Sections in this Garden</Text>
             {filteredSections.map(s => (
               <View key={s.id} style={styles.existingRow}>
                 <Text style={[styles.existingName, { flex: 1 }]}>{s.name}</Text>
