@@ -129,6 +129,9 @@ export function dayXOffset(dayOfWeek: number): number {
  * This gives a bit of historical context to the left of today on first load.
  */
 export function defaultCalendarStart(): Date {
-  const eightWeeksAgo = new Date(Date.now() - 8 * 7 * 24 * 60 * 60 * 1000);
-  return toSunday(eightWeeksAgo);
+  // Day-based arithmetic: setDate honors local calendar, so this can't drift
+  // across DST boundaries the way subtracting a fixed number of milliseconds would.
+  const d = new Date();
+  d.setDate(d.getDate() - 56);
+  return toSunday(d);
 }

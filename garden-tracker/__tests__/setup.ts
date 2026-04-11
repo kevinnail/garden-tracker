@@ -14,6 +14,7 @@
 import BetterSqlite3 from 'better-sqlite3';
 import { PRESET_STAGES } from '@/src/constants/stages';
 import { PRESET_TASK_TYPES } from '@/src/constants/taskTypes';
+import { SCHEMA_SQL } from '@/src/db/schema';
 
 // Known seed values — import these in integration tests for assertions
 export const SEED = {
@@ -49,79 +50,8 @@ export function createTestAdapter(db: BetterSqlite3.Database) {
 export function setupTestDb() {
   const db = new BetterSqlite3(':memory:');
 
-  db.exec(`
-    CREATE TABLE stage_definitions (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      name        TEXT NOT NULL,
-      color       TEXT NOT NULL,
-      order_index INTEGER NOT NULL DEFAULT 0
-    );
-    CREATE TABLE task_types (
-      id    INTEGER PRIMARY KEY AUTOINCREMENT,
-      name  TEXT NOT NULL,
-      color TEXT NOT NULL
-    );
-    CREATE TABLE locations (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      name        TEXT NOT NULL,
-      order_index INTEGER NOT NULL DEFAULT 0
-    );
-    CREATE TABLE gardens (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      location_id INTEGER NOT NULL,
-      name              TEXT NOT NULL,
-      order_index       INTEGER NOT NULL DEFAULT 0
-    );
-    CREATE TABLE sections (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      garden_id   INTEGER NOT NULL,
-      name        TEXT NOT NULL,
-      order_index INTEGER NOT NULL DEFAULT 0
-    );
-    CREATE TABLE crop_instances (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      section_id  INTEGER NOT NULL,
-      name        TEXT NOT NULL,
-      plant_count INTEGER NOT NULL DEFAULT 1,
-      start_date  TEXT NOT NULL,
-      archived    INTEGER NOT NULL DEFAULT 0,
-      notes       TEXT,
-      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE crop_stages (
-      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-      crop_instance_id    INTEGER NOT NULL,
-      stage_definition_id INTEGER NOT NULL,
-      duration_weeks      INTEGER NOT NULL,
-      order_index         INTEGER NOT NULL DEFAULT 0
-    );
-    CREATE TABLE tasks (
-      id                 INTEGER PRIMARY KEY AUTOINCREMENT,
-      crop_instance_id   INTEGER NOT NULL,
-      task_type_id       INTEGER NOT NULL,
-      day_of_week        INTEGER NOT NULL,
-      frequency_weeks    INTEGER NOT NULL DEFAULT 1,
-      start_offset_weeks INTEGER NOT NULL DEFAULT 0,
-      created_at         TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE task_completions (
-      id             INTEGER PRIMARY KEY AUTOINCREMENT,
-      task_id        INTEGER NOT NULL,
-      completed_date TEXT NOT NULL,
-      UNIQUE(task_id, completed_date)
-    );
-    CREATE TABLE notes (
-      id               INTEGER PRIMARY KEY AUTOINCREMENT,
-      entity_type      TEXT NOT NULL,
-      entity_id        INTEGER,
-      week_date        TEXT,
-      crop_instance_id INTEGER,
-      content          TEXT NOT NULL,
-      created_at       TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at       TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-  `);
+  db.pragma('foreign_keys = ON');
+  db.exec(SCHEMA_SQL);
 
   // Stage definitions (all 7 presets)
   for (const s of PRESET_STAGES) {

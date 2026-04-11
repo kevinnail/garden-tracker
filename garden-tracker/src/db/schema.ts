@@ -90,4 +90,11 @@ export const SCHEMA_SQL = `
   CREATE INDEX IF NOT EXISTS idx_tasks_crop_instance_id      ON tasks(crop_instance_id);
   CREATE INDEX IF NOT EXISTS idx_task_completions_task_id    ON task_completions(task_id);
   CREATE INDEX IF NOT EXISTS idx_notes_crop_instance_id      ON notes(crop_instance_id);
+
+  -- At most one week_cell note per (crop, week). Partial index lets SQLite
+  -- enforce uniqueness only for the week-cell shape, where both columns are
+  -- guaranteed non-null, and serves as the conflict target for upsertNote.
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_notes_week_cell_unique
+    ON notes(entity_type, crop_instance_id, week_date)
+    WHERE entity_type = 'week_cell' AND crop_instance_id IS NOT NULL AND week_date IS NOT NULL;
 `;

@@ -49,9 +49,9 @@ describe('getNoteForCell', () => {
 });
 
 describe('upsertNote', () => {
-  it('inserts a new note when one does not exist', async () => {
-    mockDb.getFirstAsync.mockResolvedValueOnce(null);
+  it('inserts a new note and returns the inserted id', async () => {
     mockDb.runAsync.mockResolvedValueOnce({ lastInsertRowId: 8, changes: 1 });
+    mockDb.getFirstAsync.mockResolvedValueOnce({ id: 8 });
 
     const id = await upsertNote(1, '2025-03-02', 'hello');
 
@@ -63,19 +63,27 @@ describe('upsertNote', () => {
       '2025-03-02',
       'hello'
     );
+    expect(mockDb.getFirstAsync).toHaveBeenCalledWith(
+      expect.stringContaining('SELECT id FROM notes WHERE entity_type = ? AND crop_instance_id = ? AND week_date = ?'),
+      'week_cell',
+      1,
+      '2025-03-02'
+    );
   });
 
-  it('updates an existing note when one already exists', async () => {
-    mockDb.getFirstAsync.mockResolvedValueOnce({ id: 3, content: 'old' });
+  it('updates an existing note via the upsert path and returns the existing id', async () => {
     mockDb.runAsync.mockResolvedValueOnce({ lastInsertRowId: 3, changes: 1 });
+    mockDb.getFirstAsync.mockResolvedValueOnce({ id: 3 });
 
     const id = await upsertNote(1, '2025-03-02', 'updated');
 
     expect(id).toBe(3);
     expect(mockDb.runAsync).toHaveBeenCalledWith(
-      expect.stringContaining("UPDATE notes SET content = ?, updated_at = datetime('now') WHERE id = ?"),
-      'updated',
-      3
+      expect.stringContaining('INSERT INTO notes'),
+      'week_cell',
+      1,
+      '2025-03-02',
+      'updated'
     );
   });
 

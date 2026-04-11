@@ -4,6 +4,7 @@ import {
   getNoteForCell,
   upsertNote,
 } from '@/src/db/queries/noteQueries';
+import { insertCropInstance } from '@/src/db/queries/cropQueries';
 import { getDb } from '@/src/db/database';
 import { setupTestDb, SEED } from '../setup';
 
@@ -50,8 +51,10 @@ describe('noteQueries', () => {
   });
 
   it('getAllNotesForCrop only returns notes for the requested crop', async () => {
+    const otherCropId = await insertCropInstance(SEED.SECTION_ID, 'Pepper', 2, '2025-03-02');
+
     await upsertNote(SEED.CROP_ID, '2025-03-02', 'crop one');
-    await upsertNote(999, '2025-03-02', 'other crop');
+    await upsertNote(otherCropId, '2025-03-02', 'other crop');
 
     const notes = await getAllNotesForCrop(SEED.CROP_ID);
 

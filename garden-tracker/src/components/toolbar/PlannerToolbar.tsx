@@ -4,8 +4,11 @@ import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { usePlannerStore } from '@/src/store/plannerStore';
+import { useTodayTick } from '@/src/hooks/useTodayTick';
 
 export default function PlannerToolbar() {
+  // Re-render at midnight so `todayLabel` (computed from `new Date()`) flips.
+  useTodayTick();
   const hasSections = usePlannerStore(s => s.rows.some(r => r.type === 'section_header'));
   const showArchivedRows = usePlannerStore(s => s.showArchivedRows);
   const toggleArchivedRows = usePlannerStore(s => s.toggleArchivedRows);

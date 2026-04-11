@@ -20,6 +20,7 @@ import {
 } from '@/src/constants/layout';
 import { parseDateKey, todayWeekIndex, dateToWeekIndex } from '@/src/utils/dateUtils';
 import { usePlannerStore } from '@/src/store/plannerStore';
+import { useTodayTick } from '@/src/hooks/useTodayTick';
 import { getRowOffsets } from '../../utils/rowLayout';
 
 import ColumnHeader from './ColumnHeader';
@@ -29,6 +30,9 @@ import TaskOverlay from './TaskOverlay';
 
 export default function PlannerGrid() {
   const { left: leftInset } = useSafeAreaInsets();
+  // Re-render at the next midnight so todayLabel/today cursor advance in a
+  // long-running session.
+  useTodayTick();
 
   const rows         = usePlannerStore(s => s.rows);
   const allTaskLines = usePlannerStore(s => s.allTaskLines);

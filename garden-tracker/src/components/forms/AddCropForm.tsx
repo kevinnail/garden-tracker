@@ -96,7 +96,11 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
         const parsedStart = parseDateKey(cropRow.crop.start_date);
         setName(cropRow.crop.name);
         setPlantCount(String(cropRow.crop.plant_count));
-        setStartDate(parsedStart ?? toSunday(new Date(cropRow.crop.start_date)));
+        // parseDateKey is the strict local-midnight path. If it can't parse the
+        // stored string, treat the row as corrupted and fall back to today —
+        // never `new Date(string)`, which interprets YYYY-MM-DD as UTC and
+        // can land on the wrong local day.
+        setStartDate(parsedStart ?? toSunday(new Date()));
         setSectionId(cropRow.crop.section_id);
         setStages(
           existingStages.length > 0
