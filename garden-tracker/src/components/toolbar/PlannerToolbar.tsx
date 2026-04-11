@@ -63,7 +63,7 @@ export default function PlannerToolbar() {
 
   const actionButtons = (
     <View style={[styles.actionRow, isLandscape && styles.actionRowLandscape]}>
-      <Pressable style={styles.btn} onPress={async () => { try { await ensureDefaultGarden(); } catch { /* toast shown by store */ } router.push('/(modals)/add-crop'); }}>
+      <Pressable style={styles.btn} onPress={async () => { try { await ensureDefaultGarden(); router.push('/(modals)/add-crop'); } catch { /* toast shown by store */ } }}>
         <Text style={styles.btnText}>+ Crop</Text>
       </Pressable>
       <Pressable style={styles.locationBtn} onPress={() => router.push('/(modals)/add-garden')}>
