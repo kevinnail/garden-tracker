@@ -28,7 +28,6 @@ const mockDb = {
   getAllAsync: jest.fn(),
   getFirstAsync: jest.fn(),
   runAsync: jest.fn(),
-  withTransactionAsync: jest.fn(async (fn: () => Promise<void>) => { await fn(); }),
 };
 
 beforeEach(() => {
@@ -211,25 +210,16 @@ describe('insertSection', () => {
 // ── deleteSection ──────────────────────────────────────────────────────────────
 
 describe('deleteSection', () => {
-  it('runs inside a transaction', async () => {
+  it('deletes the section by id', async () => {
     mockDb.runAsync.mockResolvedValue({});
 
     await deleteSection(1);
 
-    expect(mockDb.withTransactionAsync).toHaveBeenCalledTimes(1);
-  });
-
-  it('deletes task_completions, tasks, crop_stages, crop_instances, then section', async () => {
-    mockDb.runAsync.mockResolvedValue({});
-
-    await deleteSection(5);
-
-    const calls = mockDb.runAsync.mock.calls.map((c: string[]) => c[0]);
-    expect(calls.some((s: string) => s.includes('DELETE FROM task_completions'))).toBe(true);
-    expect(calls.some((s: string) => s.includes('DELETE FROM tasks'))).toBe(true);
-    expect(calls.some((s: string) => s.includes('DELETE FROM crop_stages'))).toBe(true);
-    expect(calls.some((s: string) => s.includes('DELETE FROM crop_instances'))).toBe(true);
-    expect(calls.some((s: string) => s.includes('DELETE FROM sections WHERE id'))).toBe(true);
+    expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
+    expect(mockDb.runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('DELETE FROM sections WHERE id = ?'),
+      1
+    );
   });
 
   it('resolves without a return value', async () => {
@@ -242,24 +232,16 @@ describe('deleteSection', () => {
 // ── deleteGarden ───────────────────────────────────────────────────────────────
 
 describe('deleteGarden', () => {
-  it('runs inside a transaction', async () => {
+  it('deletes the garden by id', async () => {
     mockDb.runAsync.mockResolvedValue({});
 
     await deleteGarden(1);
 
-    expect(mockDb.withTransactionAsync).toHaveBeenCalledTimes(1);
-  });
-
-  it('deletes task_completions, tasks, crop_stages, crop_instances, sections, then garden', async () => {
-    mockDb.runAsync.mockResolvedValue({});
-
-    await deleteGarden(2);
-
-    const calls = mockDb.runAsync.mock.calls.map((c: string[]) => c[0]);
-    expect(calls.some((s: string) => s.includes('DELETE FROM task_completions'))).toBe(true);
-    expect(calls.some((s: string) => s.includes('DELETE FROM tasks'))).toBe(true);
-    expect(calls.some((s: string) => s.includes('DELETE FROM sections'))).toBe(true);
-    expect(calls.some((s: string) => s.includes('DELETE FROM gardens WHERE id'))).toBe(true);
+    expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
+    expect(mockDb.runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('DELETE FROM gardens WHERE id = ?'),
+      1
+    );
   });
 
   it('resolves without a return value', async () => {
@@ -272,23 +254,16 @@ describe('deleteGarden', () => {
 // ── deleteLocation ─────────────────────────────────────────────────────────────
 
 describe('deleteLocation', () => {
-  it('runs inside a transaction', async () => {
+  it('deletes the location by id', async () => {
     mockDb.runAsync.mockResolvedValue({});
 
     await deleteLocation(1);
 
-    expect(mockDb.withTransactionAsync).toHaveBeenCalledTimes(1);
-  });
-
-  it('deletes the full hierarchy down to the location', async () => {
-    mockDb.runAsync.mockResolvedValue({});
-
-    await deleteLocation(3);
-
-    const calls = mockDb.runAsync.mock.calls.map((c: string[]) => c[0]);
-    expect(calls.some((s: string) => s.includes('DELETE FROM task_completions'))).toBe(true);
-    expect(calls.some((s: string) => s.includes('DELETE FROM gardens'))).toBe(true);
-    expect(calls.some((s: string) => s.includes('DELETE FROM locations WHERE id'))).toBe(true);
+    expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
+    expect(mockDb.runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('DELETE FROM locations WHERE id = ?'),
+      1
+    );
   });
 
   it('resolves without a return value', async () => {
