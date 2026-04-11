@@ -51,3 +51,15 @@ export async function getAllNotesForCrop(cropInstanceId: number): Promise<Note[]
     ORDER BY week_date, updated_at DESC, id DESC
   `, WEEK_CELL_ENTITY, cropInstanceId);
 }
+
+export async function getNotesForCrops(cropInstanceIds: number[]): Promise<Note[]> {
+  if (cropInstanceIds.length === 0) return [];
+  const db = await getDb();
+  const placeholders = cropInstanceIds.map(() => '?').join(',');
+  return db.getAllAsync<Note>(`
+    SELECT id, entity_type, entity_id, week_date, crop_instance_id, content, created_at, updated_at
+    FROM notes
+    WHERE entity_type = ? AND crop_instance_id IN (${placeholders})
+    ORDER BY crop_instance_id, week_date, updated_at DESC, id DESC
+  `, WEEK_CELL_ENTITY, ...cropInstanceIds);
+}

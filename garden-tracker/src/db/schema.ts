@@ -41,7 +41,7 @@ export const SCHEMA_SQL = `
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     section_id  INTEGER NOT NULL REFERENCES sections(id) ON DELETE CASCADE,
     name        TEXT NOT NULL,
-    plant_count INTEGER NOT NULL DEFAULT 1,
+    plant_count INTEGER NOT NULL DEFAULT 1 CHECK (plant_count > 0),
     start_date  TEXT NOT NULL,
     archived    INTEGER NOT NULL DEFAULT 0,
     notes       TEXT,
@@ -53,7 +53,7 @@ export const SCHEMA_SQL = `
     id                  INTEGER PRIMARY KEY AUTOINCREMENT,
     crop_instance_id    INTEGER NOT NULL REFERENCES crop_instances(id) ON DELETE CASCADE,
     stage_definition_id INTEGER NOT NULL REFERENCES stage_definitions(id),
-    duration_weeks      INTEGER NOT NULL,
+    duration_weeks      INTEGER NOT NULL CHECK (duration_weeks > 0),
     order_index         INTEGER NOT NULL DEFAULT 0
   );
 
@@ -61,9 +61,9 @@ export const SCHEMA_SQL = `
     id                 INTEGER PRIMARY KEY AUTOINCREMENT,
     crop_instance_id   INTEGER NOT NULL REFERENCES crop_instances(id) ON DELETE CASCADE,
     task_type_id       INTEGER NOT NULL REFERENCES task_types(id),
-    day_of_week        INTEGER NOT NULL,
-    frequency_weeks    INTEGER NOT NULL DEFAULT 1,
-    start_offset_weeks INTEGER NOT NULL DEFAULT 0,
+    day_of_week        INTEGER NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
+    frequency_weeks    INTEGER NOT NULL DEFAULT 1 CHECK (frequency_weeks > 0),
+    start_offset_weeks INTEGER NOT NULL DEFAULT 0 CHECK (start_offset_weeks >= 0),
     created_at         TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -84,4 +84,10 @@ export const SCHEMA_SQL = `
     created_at       TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at       TEXT NOT NULL DEFAULT (datetime('now'))
   );
+
+  CREATE INDEX IF NOT EXISTS idx_crop_instances_section_id  ON crop_instances(section_id);
+  CREATE INDEX IF NOT EXISTS idx_crop_instances_archived     ON crop_instances(archived);
+  CREATE INDEX IF NOT EXISTS idx_tasks_crop_instance_id      ON tasks(crop_instance_id);
+  CREATE INDEX IF NOT EXISTS idx_task_completions_task_id    ON task_completions(task_id);
+  CREATE INDEX IF NOT EXISTS idx_notes_crop_instance_id      ON notes(crop_instance_id);
 `;

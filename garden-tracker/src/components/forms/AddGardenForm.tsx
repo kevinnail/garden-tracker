@@ -221,6 +221,7 @@ export default function AddGardenForm() {
                                     'e.g. Bed 1, Row A...'
             }
             placeholderTextColor="#555"
+            maxLength={100}
             autoFocus
             onSubmitEditing={handleSubmit}
             returnKeyType="done"

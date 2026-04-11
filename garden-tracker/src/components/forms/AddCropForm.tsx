@@ -1,4 +1,4 @@
-import React, { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from 'react';
 import {
   View, Text, TextInput, StyleSheet, ScrollView,
   Pressable, Alert, ActivityIndicator, Platform,
@@ -33,15 +33,18 @@ export interface AddCropFormHandle {
 
 const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function AddCropForm({ cropId, embedded = false }: AddCropFormProps, ref) {
   const stageDefs    = usePlannerStore(s => s.stageDefinitions);
-  const rows         = usePlannerStore(s => s.rows);
+  const stageDefsAvailable = usePlannerStore(s => s.stageDefinitions.length > 0);
   const addCrop      = usePlannerStore(s => s.addCrop);
   const editCrop     = usePlannerStore(s => s.editCrop);
   const archiveCrop  = usePlannerStore(s => s.archiveCrop);
   const deleteCrop   = usePlannerStore(s => s.deleteCrop);
+  const ensureDefaultGarden = usePlannerStore(s => s.ensureDefaultGarden);
+  const cropRowAvailable = usePlannerStore(s => (
+    cropId == null
+      ? true
+      : s.rows.some(row => row.type === 'crop_row' && row.crop.id === cropId)
+  ));
   const isEditMode   = cropId != null;
-  const cropRow = isEditMode
-    ? rows.find(row => row.type === 'crop_row' && row.crop.id === cropId)
-    : null;
 
   const [name, setName]             = useState('');
   const [plantCount, setPlantCount] = useState('1');
@@ -52,12 +55,20 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
   const [sections, setSections]     = useState<Section[]>([]);
   const [locations, setLocations]   = useState<Location[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const [loadingInitial, setLoadingInitial] = useState(isEditMode);
+  const [loadingInitial, setLoadingInitial] = useState(true);
 
   useEffect(() => {
     let isCancelled = false;
 
     const loadFormData = async () => {
+      if (isEditMode && !cropRowAvailable) {
+        return;
+      }
+
+      if (!isEditMode) {
+        await ensureDefaultGarden();
+      }
+
       const [secs, locs, existingStages] = await Promise.all([
         getAllSections(),
         getAllLocations(),
@@ -65,6 +76,21 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
       ]);
 
       if (isCancelled) {
+        return;
+      }
+
+      // Read store snapshots inline instead of subscribing — avoids retriggering
+      // this effect (and resetting form state) every time loadData fires.
+      const storeState = usePlannerStore.getState();
+      const currentStageDefs = storeState.stageDefinitions;
+      const cropRow = isEditMode && cropId != null
+        ? storeState.rows.find(row => row.type === 'crop_row' && row.crop.id === cropId)
+        : null;
+
+      if (currentStageDefs.length === 0) {
+        setSections(secs);
+        setLocations(locs);
+        setLoadingInitial(false);
         return;
       }
 
@@ -83,7 +109,7 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
                 stage_definition_id: stage.stage_definition_id,
                 duration_weeks: String(stage.duration_weeks),
               }))
-            : [{ stage_definition_id: stageDefs[0]?.id ?? 1, duration_weeks: '1' }]
+            : [{ stage_definition_id: currentStageDefs[0]?.id ?? 1, duration_weeks: '1' }]
         );
         setLoadingInitial(false);
         return;
@@ -93,7 +119,7 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
         setSectionId(secs[0].id);
       }
       setStages(
-        stageDefs.slice(0, 3).map((def, i) => ({
+        currentStageDefs.slice(0, 3).map((def, i) => ({
           stage_definition_id: def.id,
           duration_weeks: ['2', '4', '8'][i] ?? '4',
         }))
@@ -110,7 +136,7 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
     return () => {
       isCancelled = true;
     };
-  }, [cropId, cropRow, isEditMode, stageDefs]);
+  }, [cropId, cropRowAvailable, ensureDefaultGarden, isEditMode, stageDefsAvailable]);
 
   const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
     if (Platform.OS === 'android') {
@@ -139,7 +165,7 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
     setStages(prev => prev.filter((_, i) => i !== index));
   };
 
-  const submitCrop = async () => {
+  const submitCrop = useCallback(async () => {
     if (!name.trim()) return Alert.alert('Validation', 'Crop name is required.');
     const count = parseInt(plantCount, 10);
     if (isNaN(count) || count < 1) return Alert.alert('Validation', 'Plant count must be at least 1.');
@@ -175,13 +201,13 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
     } finally {
       setSubmitting(false);
     }
-  };
+  }, [addCrop, cropId, editCrop, isEditMode, name, plantCount, sectionId, stages, startDate]);
 
   const handleSubmit = async () => {
     await submitCrop();
   };
 
-  const handleArchive = () => {
+  const handleArchive = useCallback(() => {
     if (!isEditMode || cropId == null) return;
 
     Alert.alert(
@@ -201,9 +227,9 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
         },
       ]
     );
-  };
+  }, [archiveCrop, cropId, isEditMode, name]);
 
-  const handleDelete = () => {
+  const handleDelete = useCallback(() => {
     if (!isEditMode || cropId == null) return;
 
     Alert.alert(
@@ -223,13 +249,13 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
         },
       ]
     );
-  };
+  }, [cropId, deleteCrop, isEditMode, name]);
 
   useImperativeHandle(ref, () => ({
     submit: submitCrop,
     archive: handleArchive,
     remove: handleDelete,
-  }), [name, plantCount, startDate, sectionId, stages, submitting, cropId, isEditMode, cropRow, stageDefs]);
+  }), [handleArchive, handleDelete, submitCrop]);
 
   if (loadingInitial) {
     const loadingContent = (
@@ -270,6 +296,9 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
             </Pressable>
           );
         })}
+        {sections.length === 0 && (
+          <Text style={styles.emptyStateText}>No garden sections available.</Text>
+        )}
       </View>
 
 
@@ -280,6 +309,7 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
         onChangeText={setName}
         placeholder="e.g. Tomato"
         placeholderTextColor="#555"
+        maxLength={100}
         autoFocus={!isEditMode}
       />
 
@@ -291,6 +321,7 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
         keyboardType="numeric"
         placeholder="1"
         placeholderTextColor="#555"
+        maxLength={4}
       />
 
       <Text style={styles.label}>Start Date (snaps to Sunday on save)</Text>
@@ -343,6 +374,7 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
               value={stage.duration_weeks}
               onChangeText={v => updateStageDuration(i, v)}
               keyboardType="numeric"
+              maxLength={3}
             />
             <Text style={styles.weekLabel}>wk</Text>
             {stages.length > 1 && (
@@ -436,6 +468,7 @@ const styles = StyleSheet.create({
   sectionSelected: { borderColor: '#5a9', backgroundColor: '#1e3a2a' },
   sectionText: { color: '#aaa', fontSize: 13 },
   sectionTextSelected: { color: '#7dcea0' },
+  emptyStateText: { color: '#777', fontSize: 13, paddingVertical: 8 },
   stageRow: { marginBottom: 8, gap: 6 },
   stagePicker: { flexGrow: 0 },
   stageChip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1, marginRight: 6 },

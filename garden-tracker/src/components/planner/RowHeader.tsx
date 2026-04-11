@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { router } from 'expo-router';
 
@@ -10,10 +10,11 @@ import {
 } from '@/src/constants/layout';
 import { GridRowItem } from '@/src/types';
 import { usePlannerStore } from '@/src/store/plannerStore';
-import { getRowHeight, getRowOffsets, getTotalRowsHeight } from '../../utils/rowLayout';
+import { getRowHeight } from '../../utils/rowLayout';
 
 interface Props {
   rows: GridRowItem[];
+  rowOffsets: number[];
 }
 
 // ── Visual hierarchy ──────────────────────────────────────────────────────────
@@ -36,11 +37,10 @@ const CROP_BG = '#191928';
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function RowHeader({ rows }: Props) {
+export default function RowHeader({ rows, rowOffsets }: Props) {
   const selectedCropId = usePlannerStore(s => s.selectedCropId);
   const setSelectedCrop = usePlannerStore(s => s.setSelectedCrop);
-  const rowOffsets = useMemo(() => getRowOffsets(rows), [rows]);
-  const totalHeight = useMemo(() => getTotalRowsHeight(rows), [rows]);
+  const totalHeight = rowOffsets[rowOffsets.length - 1] ?? 0;
 
   return (
     <View style={[styles.container, { height: totalHeight }] }>

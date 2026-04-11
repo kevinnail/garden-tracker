@@ -35,6 +35,13 @@ export default function PlannerToolbar() {
             : styles.todayBannerIdle,
       ]}
       onPress={() => router.navigate('/(tabs)/today')}
+      accessibilityRole="button"
+      accessibilityLabel={
+        todayCount > 0
+          ? `Today: ${dueTodayCount} due, ${overdueCount} overdue`
+          : 'Today: all clear'
+      }
+      accessibilityHint="Opens the Today dashboard"
       >
       <View style={styles.todayBannerMain}>
         <Text style={styles.todayBannerTitle}>Today</Text>
@@ -63,15 +70,30 @@ export default function PlannerToolbar() {
 
   const actionButtons = (
     <View style={[styles.actionRow, isLandscape && styles.actionRowLandscape]}>
-      <Pressable style={styles.btn} onPress={async () => { try { await ensureDefaultGarden(); router.push('/(modals)/add-crop'); } catch { /* toast shown by store */ } }}>
+      <Pressable
+        style={styles.btn}
+        onPress={async () => { try { await ensureDefaultGarden(); router.push('/(modals)/add-crop'); } catch { /* toast shown by store */ } }}
+        accessibilityRole="button"
+        accessibilityLabel="Add crop"
+        accessibilityHint="Opens the add crop form"
+      >
         <Text style={styles.btnText}>+ Crop</Text>
       </Pressable>
-      <Pressable style={styles.locationBtn} onPress={() => router.push('/(modals)/add-garden')}>
+      <Pressable
+        style={styles.locationBtn}
+        onPress={() => router.push('/(modals)/add-garden')}
+        accessibilityRole="button"
+        accessibilityLabel="Manage gardens"
+        accessibilityHint="Opens the gardens, locations, and sections editor"
+      >
         <Text style={styles.locationBtnText}>Gardens</Text>
       </Pressable>
       <Pressable
         style={[styles.archiveBtn, showArchivedRows && styles.archiveBtnActive]}
         onPress={toggleArchivedRows}
+        accessibilityRole="switch"
+        accessibilityState={{ checked: showArchivedRows }}
+        accessibilityLabel="Show archived crops"
       >
         <Text style={[styles.archiveBtnText, showArchivedRows && styles.archiveBtnTextActive]}>
           {showArchivedRows ? 'Archived On' : 'Archived'}

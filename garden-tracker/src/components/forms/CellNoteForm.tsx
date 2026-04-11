@@ -271,6 +271,7 @@ export default function CellNoteForm({ cropId, weekDate }: CellNoteFormProps) {
               multiline
               value={draft}
               onChangeText={setDraft}
+              maxLength={2000}
               placeholder="What happened, what changed, what to remember next time?"
               placeholderTextColor="#5a5a5a"
               textAlignVertical="top"
