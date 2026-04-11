@@ -33,6 +33,7 @@ export default function PlannerGrid() {
   const rows         = usePlannerStore(s => s.rows);
   const allTaskLines = usePlannerStore(s => s.allTaskLines);
   const calendarStart = usePlannerStore(s => s.calendarStart);
+  const isLoaded     = usePlannerStore(s => s.isLoaded);
   const plannerFocusCropId = usePlannerStore(s => s.plannerFocusCropId);
   const plannerFocusDate = usePlannerStore(s => s.plannerFocusDate);
   const clearPlannerFocus = usePlannerStore(s => s.clearPlannerFocus);
@@ -150,7 +151,7 @@ export default function PlannerGrid() {
     month: 'numeric', day: 'numeric', year: '2-digit',
   });
 
-  if (rows.length === 0) {
+  if (isLoaded && rows.length === 0) {
     return (
       <View style={[styles.root, styles.emptyRoot, { paddingLeft: leftInset }]}>
         <View style={styles.emptyState}>
