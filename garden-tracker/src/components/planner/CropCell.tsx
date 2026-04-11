@@ -1,5 +1,5 @@
-import React from 'react';
-import { Pressable, View, StyleSheet, ViewStyle } from 'react-native';
+import React, { useRef } from 'react';
+import { Pressable, StyleSheet, ViewStyle } from 'react-native';
 import Svg, { Defs, Pattern, Line, Rect, Polygon } from 'react-native-svg';
 
 import { CELL_WIDTH, ROW_HEIGHT, EMPTY_CELL_COLOR } from '@/src/constants/layout';
@@ -26,12 +26,27 @@ interface Props {
  */
 export default function CropCell({ stageColor, isPast, hasNote = false, style, onPress, onLongPress }: Props) {
   const bg = stageColor ?? EMPTY_CELL_COLOR;
+  const longPressTriggered = useRef(false);
+
+  const handlePress = () => {
+    if (longPressTriggered.current) {
+      longPressTriggered.current = false;
+      return;
+    }
+
+    onPress?.();
+  };
+
+  const handleLongPress = () => {
+    longPressTriggered.current = true;
+    onLongPress?.();
+  };
 
   return (
     <Pressable
       style={[styles.cell, { backgroundColor: bg }, style]}
-      onPress={hasNote ? onPress : undefined}
-      onLongPress={onLongPress}
+      onPress={hasNote ? handlePress : undefined}
+      onLongPress={handleLongPress}
       delayLongPress={250}
     >
       {isPast && (
