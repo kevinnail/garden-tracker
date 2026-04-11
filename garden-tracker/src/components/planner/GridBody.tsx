@@ -93,6 +93,9 @@ export default function GridBody({
         case 'section_spacer':
           bandColor = GARDEN_BAND;
           break;
+        case 'garden_spacer':
+          bandColor = LOCATION_BAND;
+          break;
         case 'section_header':
         case 'section_footer':
           bandColor = SECTION_BAND;
