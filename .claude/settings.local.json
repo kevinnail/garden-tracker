@@ -9,7 +9,8 @@
       "Bash(npx jest:*)",
       "Bash(npm install:*)",
       "Bash(npm test:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(echo \"exit=$?\")"
     ]
   }
 }
