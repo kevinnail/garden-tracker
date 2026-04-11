@@ -16,25 +16,26 @@ export async function getNoteForCell(cropInstanceId: number, weekDate: string): 
 
 export async function upsertNote(cropInstanceId: number, weekDate: string, content: string): Promise<number> {
   const db = await getDb();
-  const existing = await getNoteForCell(cropInstanceId, weekDate);
-
-  if (existing) {
-    await db.runAsync(
-      `UPDATE notes SET content = ?, updated_at = datetime('now') WHERE id = ?`,
-      content,
-      existing.id
-    );
-    return existing.id;
-  }
-
-  const result = await db.runAsync(
-    `INSERT INTO notes (entity_type, crop_instance_id, week_date, content) VALUES (?, ?, ?, ?)`,
+  // Atomic upsert against the partial unique index on
+  // (entity_type, crop_instance_id, week_date). No pre-read race possible.
+  await db.runAsync(
+    `INSERT INTO notes (entity_type, crop_instance_id, week_date, content)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(entity_type, crop_instance_id, week_date)
+     WHERE entity_type = 'week_cell' AND crop_instance_id IS NOT NULL AND week_date IS NOT NULL
+     DO UPDATE SET content = excluded.content, updated_at = datetime('now')`,
     WEEK_CELL_ENTITY,
     cropInstanceId,
     weekDate,
     content
   );
-  return result.lastInsertRowId;
+  const row = await db.getFirstAsync<{ id: number }>(
+    `SELECT id FROM notes WHERE entity_type = ? AND crop_instance_id = ? AND week_date = ? LIMIT 1`,
+    WEEK_CELL_ENTITY,
+    cropInstanceId,
+    weekDate
+  );
+  return row?.id ?? 0;
 }
 
 export async function deleteNote(id: number): Promise<void> {
