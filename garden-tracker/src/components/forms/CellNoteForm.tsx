@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { WeeklyNoteEntry } from '@/src/types';
 import { usePlannerStore } from '@/src/store/plannerStore';
 import {
+  compareWeeklyNoteEntries,
   createWeeklyNoteEntry,
   dateForWeekEntry,
   formatWeekEntryLabel,
@@ -33,6 +34,7 @@ const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 interface CellNoteFormProps {
   cropId: number;
   weekDate: string;
+  initialMode?: 'view' | 'compose';
 }
 
 function defaultDayOfWeek(weekDate: string): number {
@@ -52,7 +54,7 @@ function defaultDayOfWeek(weekDate: string): number {
   return 0;
 }
 
-export default function CellNoteForm({ cropId, weekDate }: CellNoteFormProps) {
+export default function CellNoteForm({ cropId, weekDate, initialMode = 'view' }: CellNoteFormProps) {
   const headerHeight = useHeaderHeight();
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
@@ -68,6 +70,7 @@ export default function CellNoteForm({ cropId, weekDate }: CellNoteFormProps) {
   const [draft, setDraft] = useState('');
   const [selectedDay, setSelectedDay] = useState(() => defaultDayOfWeek(weekDate));
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [composerOpen, setComposerOpen] = useState(initialMode === 'compose');
   const [saving, setSaving] = useState(false);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   // Ref guard stops a double-tap from queuing two persistEntries calls before
@@ -80,7 +83,8 @@ export default function CellNoteForm({ cropId, weekDate }: CellNoteFormProps) {
     setDraft('');
     setSelectedDay(defaultDayOfWeek(weekDate));
     setEditingEntryId(null);
-  }, [note, weekDate]);
+    setComposerOpen(initialMode === 'compose' || parsed.length === 0);
+  }, [initialMode, note, weekDate]);
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -99,6 +103,17 @@ export default function CellNoteForm({ cropId, weekDate }: CellNoteFormProps) {
   const editingEntry = useMemo(
     () => entries.find(entry => entry.id === editingEntryId) ?? null,
     [editingEntryId, entries]
+  );
+  const entriesByDay = useMemo(
+    () => DAYS
+      .map((day, index) => ({
+        day,
+        index,
+        date: dateForWeekEntry(weekDate, index),
+        entries: entries.filter(entry => entry.day_of_week === index),
+      }))
+      .filter(group => group.entries.length > 0),
+    [entries, weekDate]
   );
 
   const persistEntries = async (nextEntries: WeeklyNoteEntry[]) => {
@@ -146,10 +161,14 @@ export default function CellNoteForm({ cropId, weekDate }: CellNoteFormProps) {
     const saved = await persistEntries(nextEntries);
     if (!saved) return;
 
-    setEntries(nextEntries);
+    const sortedEntries = [...nextEntries].sort(compareWeeklyNoteEntries);
+    setEntries(sortedEntries);
     setDraft('');
     setEditingEntryId(null);
     setSelectedDay(defaultDayOfWeek(weekDate));
+    if (initialMode === 'view' && sortedEntries.length > 0) {
+      setComposerOpen(false);
+    }
   };
 
   const handleDeleteEntry = async (entryId: string) => {
@@ -163,18 +182,32 @@ export default function CellNoteForm({ cropId, weekDate }: CellNoteFormProps) {
       setEditingEntryId(null);
       setSelectedDay(defaultDayOfWeek(weekDate));
     }
+    if (nextEntries.length === 0) {
+      setComposerOpen(true);
+    }
   };
 
   const beginEdit = (entry: WeeklyNoteEntry) => {
     setEditingEntryId(entry.id);
     setDraft(entry.text);
     setSelectedDay(entry.day_of_week);
+    setComposerOpen(true);
   };
 
   const cancelEdit = () => {
     setEditingEntryId(null);
     setDraft('');
     setSelectedDay(defaultDayOfWeek(weekDate));
+    if (entries.length > 0 && initialMode === 'view') {
+      setComposerOpen(false);
+    }
+  };
+
+  const openComposer = (dayOfWeek = defaultDayOfWeek(weekDate)) => {
+    setEditingEntryId(null);
+    setDraft('');
+    setSelectedDay(dayOfWeek);
+    setComposerOpen(true);
   };
 
   const handleSecondaryAction = () => {
@@ -215,94 +248,157 @@ export default function CellNoteForm({ cropId, weekDate }: CellNoteFormProps) {
           {/* Header — collapsed to one line in landscape to save vertical space */}
           <View style={[styles.header, isLandscape && styles.headerCompact]}>
             <Text style={styles.cropName}>{cropName}</Text>
-            <Text style={styles.weekLabel}>{formatWeekRangeLabel(weekDate)}</Text>
+            <Text style={[styles.weekLabel, isLandscape && styles.weekLabelCompact]}>{formatWeekRangeLabel(weekDate)}</Text>
             {!isLandscape && (
-              <Text style={styles.helperText}>Each entry gets its own day label so this weekly cell stays readable.</Text>
+              <Text style={styles.helperText}>
+                {entries.length > 0
+                  ? 'Quick tap reads the week first. Long press from the planner jumps straight into adding.'
+                  : 'Add short daily notes so the week reads like a timeline instead of one long paragraph.'}
+              </Text>
             )}
           </View>
 
-          {/* Existing entries */}
+          <View style={styles.sectionHeader}>
+            <View>
+              <Text style={styles.sectionTitle}>This week</Text>
+              <Text style={styles.sectionSubtitle}>
+                {entries.length === 0
+                  ? 'No notes yet for this week.'
+                  : `${entries.length} ${entries.length === 1 ? 'note' : 'notes'} arranged by day.`}
+              </Text>
+            </View>
+            {entries.length > 0 && !composerOpen && (
+              <Pressable style={styles.sectionAction} onPress={() => openComposer()}>
+                <Text style={styles.sectionActionText}>Add Note</Text>
+              </Pressable>
+            )}
+          </View>
+
           <View style={styles.list}>
             {entries.length === 0 ? (
               <View style={styles.emptyCard}>
                 <Text style={styles.emptyCardTitle}>No entries yet</Text>
                 {!isLandscape && (
-                  <Text style={styles.emptyCardText}>Add short daily notes here instead of mixing the whole week into one paragraph.</Text>
+                  <Text style={styles.emptyCardText}>Long press a week in the planner to jump right into adding. Once notes exist, a quick tap brings you here to read them first.</Text>
                 )}
               </View>
             ) : (
-              entries.map(entry => (
-                <View key={entry.id} style={[styles.entryCard, editingEntryId === entry.id && styles.entryCardEditing]}>
-                  <View style={styles.entryHeader}>
-                    <Text style={styles.entryLabel}>{formatWeekEntryLabel(weekDate, entry)}</Text>
-                    <View style={styles.entryActions}>
-                      <Pressable style={styles.inlineBtn} onPress={() => beginEdit(entry)}>
-                        <Text style={styles.inlineBtnText}>Edit</Text>
-                      </Pressable>
-                      <Pressable style={styles.inlineBtn} onPress={() => handleDeleteEntry(entry.id)}>
-                        <Text style={[styles.inlineBtnText, styles.deleteInlineText]}>Delete</Text>
-                      </Pressable>
-                    </View>
+              <View style={styles.weekPanel}>
+                {entriesByDay.map(group => (
+                  <View key={group.index} style={styles.daySection}>
+                    <Text style={styles.daySectionLabel}>
+                      {group.date
+                        ? group.date.toLocaleDateString('en-US', {
+                            weekday: 'long',
+                            month: 'short',
+                            day: 'numeric',
+                          })
+                        : group.day}
+                    </Text>
+
+                    {group.entries.map((entry, index) => (
+                      <View
+                        key={entry.id}
+                        style={[
+                          styles.entryRow,
+                          editingEntryId === entry.id && styles.entryRowEditing,
+                          index < group.entries.length - 1 && styles.entryRowDivider,
+                        ]}
+                      >
+                        <View style={styles.entryHeader}>
+                          <Text style={styles.entryLabel}>{formatWeekEntryLabel(weekDate, entry)}</Text>
+                          <View style={styles.entryActions}>
+                            <Pressable style={styles.inlineBtn} onPress={() => beginEdit(entry)}>
+                              <Text style={styles.inlineBtnText}>Edit</Text>
+                            </Pressable>
+                            <Pressable style={styles.inlineBtn} onPress={() => handleDeleteEntry(entry.id)}>
+                              <Text style={[styles.inlineBtnText, styles.deleteInlineText]}>Delete</Text>
+                            </Pressable>
+                          </View>
+                        </View>
+                        <Text style={styles.entryBody}>{entry.text}</Text>
+                      </View>
+                    ))}
+
+                    <Pressable style={styles.dayAddBtn} onPress={() => openComposer(group.index)}>
+                      <Text style={styles.dayAddBtnText}>Add note for {group.day}</Text>
+                    </Pressable>
                   </View>
-                  <Text style={styles.entryBody}>{entry.text}</Text>
-                </View>
-              ))
+                ))}
+              </View>
             )}
           </View>
 
-          {/* Composer */}
-          <View style={styles.composerCard}>
-            <View style={styles.composerHeader}>
-              <View style={styles.composerHeaderText}>
-                <Text style={styles.composerTitle}>{editingEntry ? 'Edit entry' : 'New entry'}</Text>
-                {!editingEntry && !keyboardOpen && !draft.trim() && !isLandscape && (
-                  <Text style={styles.composerSubtitle}>Tap below to add a dated note for this week.</Text>
+          {composerOpen ? (
+            <View style={styles.composerCard}>
+              <View style={styles.composerHeader}>
+                <View style={styles.composerHeaderText}>
+                  <Text style={styles.composerTitle}>{editingEntry ? 'Edit note' : 'Add note'}</Text>
+                  {!keyboardOpen && !draft.trim() && !isLandscape && (
+                    <Text style={styles.composerSubtitle}>
+                      {editingEntry
+                        ? 'Adjust the day or wording, then save it back into the weekly timeline.'
+                        : 'Choose the day first, then add a short note that is easy to scan later.'}
+                    </Text>
+                  )}
+                </View>
+              </View>
+
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dayPicker} keyboardShouldPersistTaps="handled">
+                {DAYS.map((day, index) => (
+                  <Pressable
+                    key={day}
+                    style={[styles.dayChip, selectedDay === index && styles.dayChipSelected]}
+                    onPress={() => setSelectedDay(index)}
+                  >
+                    <Text style={[styles.dayChipText, selectedDay === index && styles.dayChipTextSelected]}>{day}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+
+              <TextInput
+                style={[styles.input, isLandscape && styles.inputCompact]}
+                multiline
+                value={draft}
+                onChangeText={setDraft}
+                maxLength={2000}
+                placeholder="What happened, what changed, what to remember next time?"
+                placeholderTextColor="#5a5a5a"
+                textAlignVertical="top"
+                scrollEnabled
+              />
+
+              <View style={styles.actionRow}>
+                {editingEntry ? (
+                  <Pressable style={styles.secondaryBtn} onPress={cancelEdit} disabled={saving}>
+                    <Text style={styles.secondaryBtnText}>Cancel Edit</Text>
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    style={styles.secondaryBtn}
+                    onPress={entries.length > 0 ? () => setComposerOpen(false) : handleSecondaryAction}
+                    disabled={saving}
+                  >
+                    <Text style={styles.secondaryBtnText}>
+                      {entries.length > 0 ? 'Back to Notes' : keyboardOpen ? 'Done' : 'Close'}
+                    </Text>
+                  </Pressable>
                 )}
+
+                <Pressable style={styles.primaryBtn} onPress={handleSaveEntry} disabled={saving}>
+                  <Text style={styles.primaryBtnText}>
+                    {editingEntry ? 'Save Note' : 'Add Note'}
+                  </Text>
+                </Pressable>
               </View>
             </View>
-
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dayPicker} keyboardShouldPersistTaps="handled">
-              {DAYS.map((day, index) => (
-                <Pressable
-                  key={day}
-                  style={[styles.dayChip, selectedDay === index && styles.dayChipSelected]}
-                  onPress={() => setSelectedDay(index)}
-                >
-                  <Text style={[styles.dayChipText, selectedDay === index && styles.dayChipTextSelected]}>{day}</Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-
-            <TextInput
-              style={[styles.input, isLandscape && styles.inputCompact]}
-              multiline
-              value={draft}
-              onChangeText={setDraft}
-              maxLength={2000}
-              placeholder="What happened, what changed, what to remember next time?"
-              placeholderTextColor="#5a5a5a"
-              textAlignVertical="top"
-              scrollEnabled
-            />
-
-            <View style={styles.actionRow}>
-              {editingEntry ? (
-                <Pressable style={styles.secondaryBtn} onPress={cancelEdit} disabled={saving}>
-                  <Text style={styles.secondaryBtnText}>Cancel Edit</Text>
-                </Pressable>
-              ) : (
-                <Pressable style={styles.secondaryBtn} onPress={handleSecondaryAction} disabled={saving}>
-                  <Text style={styles.secondaryBtnText}>{keyboardOpen ? 'Done' : 'Close'}</Text>
-                </Pressable>
-              )}
-
-              <Pressable style={styles.primaryBtn} onPress={handleSaveEntry} disabled={saving}>
-                <Text style={styles.primaryBtnText}>
-                  {editingEntry ? 'Save Entry' : 'Add Entry'}
-                </Text>
+          ) : (
+            <View style={styles.footer}>
+              <Pressable style={styles.footerCloseBtn} onPress={() => router.back()}>
+                <Text style={styles.footerCloseBtnText}>Close</Text>
               </Pressable>
             </View>
-          </View>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -334,9 +430,6 @@ const styles = StyleSheet.create({
   headerCompact: {
     paddingTop: 6,
     paddingBottom: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
   },
   cropName: {
     color: '#e7e7e7',
@@ -348,11 +441,45 @@ const styles = StyleSheet.create({
     color: '#9cb2bf',
     fontSize: 13,
   },
+  weekLabelCompact: {
+    marginTop: 2,
+  },
   helperText: {
     marginTop: 8,
     color: '#7d7d7d',
     fontSize: 12,
     lineHeight: 18,
+  },
+  sectionHeader: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+  },
+  sectionTitle: {
+    color: '#ececec',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  sectionSubtitle: {
+    marginTop: 4,
+    color: '#8c989d',
+    fontSize: 12,
+  },
+  sectionAction: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#2f6b86',
+    backgroundColor: '#173745',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  sectionActionText: {
+    color: '#dff4ff',
+    fontSize: 12,
+    fontWeight: '700',
   },
   list: {
     padding: 16,
@@ -376,17 +503,39 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
   },
-  entryCard: {
-    backgroundColor: '#1d1d1d',
+  weekPanel: {
+    backgroundColor: '#171b1d',
     borderWidth: 1,
     borderColor: '#2e2e2e',
     borderRadius: 12,
-    padding: 14,
-    marginBottom: 12,
+    overflow: 'hidden',
   },
-  entryCardEditing: {
-    borderColor: '#2f6b86',
+  daySection: {
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#252b2f',
+  },
+  daySectionLabel: {
+    color: '#9bd1eb',
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 10,
+  },
+  entryRow: {
+    borderRadius: 10,
+    paddingVertical: 10,
+  },
+  entryRowEditing: {
     backgroundColor: '#192127',
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#2f6b86',
+  },
+  entryRowDivider: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#252b2f',
   },
   entryHeader: {
     flexDirection: 'row',
@@ -420,6 +569,16 @@ const styles = StyleSheet.create({
     color: '#dfdfdf',
     fontSize: 14,
     lineHeight: 21,
+  },
+  dayAddBtn: {
+    alignSelf: 'flex-start',
+    marginTop: 10,
+    paddingVertical: 4,
+  },
+  dayAddBtnText: {
+    color: '#8fc4dd',
+    fontSize: 12,
+    fontWeight: '700',
   },
   composerCard: {
     borderTopWidth: 1,
@@ -524,6 +683,24 @@ const styles = StyleSheet.create({
     color: '#e5f7ff',
     fontSize: 14,
     fontWeight: '700',
+  },
+  footer: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  footerCloseBtn: {
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#363636',
+    backgroundColor: '#202020',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+  },
+  footerCloseBtnText: {
+    color: '#d0d0d0',
+    fontSize: 14,
+    fontWeight: '600',
   },
   emptyState: {
     flex: 1,
