@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
   Pressable, Alert, ActivityIndicator,
@@ -15,18 +15,25 @@ export default function AddTaskForm() {
   const taskTypes      = usePlannerStore(s => s.taskTypes);
   const selectedCropId = usePlannerStore(s => s.selectedCropId);
   const addTask        = usePlannerStore(s => s.addTask);
-  const rows           = usePlannerStore(s => s.rows);
 
-  const cropRow = rows.find(r => r.type === 'crop_row' && r.crop.id === selectedCropId);
-
-  const [taskTypeId, setTaskTypeId]       = useState<number>(taskTypes[0]?.id ?? 1);
+  const [taskTypeId, setTaskTypeId]       = useState<number | null>(null);
   const [dayOfWeek, setDayOfWeek]         = useState<number>(1);
   const [frequencyWeeks, setFrequency]    = useState<number>(1);
   const [startOffsetWeeks, setOffset]     = useState<number>(0);
   const [submitting, setSubmitting]       = useState(false);
 
+  // Sync initial task type once taskTypes loads. The useState initializer only
+  // runs on mount, so if the form opens before the store populates, we'd otherwise
+  // fall through to a hardcoded id that may not exist.
+  useEffect(() => {
+    if (taskTypeId == null && taskTypes.length > 0) {
+      setTaskTypeId(taskTypes[0].id);
+    }
+  }, [taskTypes, taskTypeId]);
+
   const handleSubmit = async () => {
     if (selectedCropId == null) return Alert.alert('Error', 'No crop selected.');
+    if (taskTypeId == null) return Alert.alert('Error', 'Please select a task type.');
 
     setSubmitting(true);
     try {
