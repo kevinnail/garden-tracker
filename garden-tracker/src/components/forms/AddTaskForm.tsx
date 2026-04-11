@@ -109,7 +109,7 @@ export default function AddTaskForm() {
           <Text style={styles.stepperValue}>{startOffsetWeeks}</Text>
           <Pressable
             style={styles.stepperBtn}
-            onPress={() => setOffset(o => o + 1)}
+            onPress={() => setOffset(o => Math.min(o + 1, 155))}
           >
             <Text style={styles.stepperBtnText}>+</Text>
           </Pressable>
