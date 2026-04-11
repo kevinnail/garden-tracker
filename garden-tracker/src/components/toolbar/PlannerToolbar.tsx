@@ -83,10 +83,10 @@ export default function PlannerToolbar() {
         style={styles.locationBtn}
         onPress={() => router.push('/(modals)/add-garden')}
         accessibilityRole="button"
-        accessibilityLabel="Manage gardens"
-        accessibilityHint="Opens the gardens, locations, and sections editor"
+        accessibilityLabel="Manage locations"
+        accessibilityHint="Opens the locations, gardens, and sections editor"
       >
-        <Text style={styles.locationBtnText}>Gardens</Text>
+        <Text style={styles.locationBtnText}>Locations</Text>
       </Pressable>
       <Pressable
         style={[styles.archiveBtn, showArchivedRows && styles.archiveBtnActive]}
