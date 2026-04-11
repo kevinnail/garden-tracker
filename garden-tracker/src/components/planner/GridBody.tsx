@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 
@@ -9,7 +9,7 @@ import {
 } from '@/src/constants/layout';
 import { formatDateKey, todayWeekIndex, weekIndexToDate } from '@/src/utils/dateUtils';
 import { GridRowItem } from '@/src/types';
-import { getRowHeight, getRowOffsets, getVisibleRowRange } from '../../utils/rowLayout';
+import { getRowHeight, getVisibleRowRange } from '../../utils/rowLayout';
 import CropCell from './CropCell';
 
 // Must match RowHeader band colors so the full-width strips feel continuous
@@ -23,6 +23,7 @@ const TOTAL_WIDTH = TOTAL_WEEKS * CELL_WIDTH;
 
 interface Props {
   rows: GridRowItem[];
+  rowOffsets: number[];
   calendarStart: Date;
   renderScrollX: number;
   renderScrollY: number;
@@ -32,6 +33,7 @@ interface Props {
 
 export default function GridBody({
   rows,
+  rowOffsets,
   calendarStart,
   renderScrollX,
   renderScrollY,
@@ -39,7 +41,6 @@ export default function GridBody({
   viewHeight,
 }: Props) {
   const todayCol = todayWeekIndex(calendarStart);
-  const rowOffsets = useMemo(() => getRowOffsets(rows), [rows]);
 
   const colStart = Math.max(0, Math.floor(renderScrollX / CELL_WIDTH) - 1);
   const colEnd   = Math.min(TOTAL_WEEKS - 1, Math.ceil((renderScrollX + viewWidth) / CELL_WIDTH) + 1);
