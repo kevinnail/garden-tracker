@@ -7,7 +7,7 @@ export const ROW_HEIGHT = 28;         // px per crop row
 // Left panel: plant count column + crop name column
 export const PLANT_COUNT_WIDTH = 30;
 export const CROP_NAME_WIDTH = 140;
-export const ROW_HEADER_WIDTH = PLANT_COUNT_WIDTH + CROP_NAME_WIDTH; // 200
+export const ROW_HEADER_WIDTH = PLANT_COUNT_WIDTH + CROP_NAME_WIDTH; // 170
 
 // Calendar header rows (stacked at the top)
 export const YEAR_ROW_HEIGHT = 10;    // thin color strip showing year boundary
