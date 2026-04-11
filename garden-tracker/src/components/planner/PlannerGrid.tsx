@@ -20,7 +20,7 @@ import {
 } from '@/src/constants/layout';
 import { parseDateKey, todayWeekIndex, dateToWeekIndex } from '@/src/utils/dateUtils';
 import { usePlannerStore } from '@/src/store/plannerStore';
-import { getRowOffsets, getTotalRowsHeight } from '../../utils/rowLayout';
+import { getRowOffsets } from '../../utils/rowLayout';
 
 import ColumnHeader from './ColumnHeader';
 import RowHeader from './RowHeader';
@@ -39,8 +39,8 @@ export default function PlannerGrid() {
   const clearPlannerFocus = usePlannerStore(s => s.clearPlannerFocus);
 
   const totalWidth  = TOTAL_WEEKS * CELL_WIDTH;
-  const totalHeight = Math.max(getTotalRowsHeight(rows), 1);
   const rowOffsets = useMemo(() => getRowOffsets(rows), [rows]);
+  const totalHeight = Math.max(rowOffsets[rowOffsets.length - 1] ?? 0, 1);
 
   // ── Shared values (UI thread) ─────────────────────────────────────────────
   const scrollX      = useSharedValue(0);
@@ -188,7 +188,7 @@ export default function PlannerGrid() {
           <Animated.View
             style={[{ position: 'absolute', width: ROW_HEADER_WIDTH, height: totalHeight }, rowHeaderStyle]}
           >
-            <RowHeader rows={rows} />
+            <RowHeader rows={rows} rowOffsets={rowOffsets} />
           </Animated.View>
         </View>
 
@@ -200,6 +200,7 @@ export default function PlannerGrid() {
               >
                 <GridBody
                   rows={rows}
+                  rowOffsets={rowOffsets}
                   calendarStart={calendarStart}
                   renderScrollX={renderScrollX}
                   renderScrollY={renderScrollY}
