@@ -48,6 +48,26 @@ export async function getCropStages(cropInstanceId: number): Promise<CropStage[]
   `, cropInstanceId);
 }
 
+export async function getCropStagesForCrops(cropInstanceIds: number[]): Promise<CropStage[]> {
+  if (cropInstanceIds.length === 0) return [];
+  const db = await getDb();
+  const placeholders = cropInstanceIds.map(() => '?').join(',');
+  return db.getAllAsync<CropStage>(`
+    SELECT
+      cs.id,
+      cs.crop_instance_id,
+      cs.stage_definition_id,
+      cs.duration_weeks,
+      cs.order_index,
+      sd.color,
+      sd.name AS stage_name
+    FROM crop_stages cs
+    JOIN stage_definitions sd ON sd.id = cs.stage_definition_id
+    WHERE cs.crop_instance_id IN (${placeholders})
+    ORDER BY cs.crop_instance_id, cs.order_index
+  `, ...cropInstanceIds);
+}
+
 export async function getStageDefs(): Promise<StageDefinition[]> {
   const db = await getDb();
   return db.getAllAsync<StageDefinition>(
