@@ -42,7 +42,14 @@
       ],
       "expo-sqlite",
       "expo-font",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Garden Tracker to access your photos for note attachments.",
+          "cameraPermission": "Allow Garden Tracker to take photos for note attachments."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
