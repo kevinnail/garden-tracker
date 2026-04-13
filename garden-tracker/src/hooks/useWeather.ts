@@ -49,9 +49,18 @@ export function wmoEmoji(code: number): string {
   return '🌡️';
 }
 
+// ── Error classification ──────────────────────────────────────────────────────
+
+export function classifyWeatherError(err: unknown): Extract<WeatherState, { status: 'no_network' | 'error' }> {
+  if (err instanceof TypeError && /network request failed/i.test(err.message)) {
+    return { status: 'no_network' };
+  }
+  return { status: 'error', message: err instanceof Error ? err.message : String(err) };
+}
+
 // ── Fetch ─────────────────────────────────────────────────────────────────────
 
-async function fetchWeather(lat: number, lon: number): Promise<DayForecast[]> {
+export async function fetchWeather(lat: number, lon: number): Promise<DayForecast[]> {
   const params = new URLSearchParams({
     latitude: String(lat),
     longitude: String(lon),
@@ -128,12 +137,7 @@ export function useWeather(): WeatherState {
         if (!cancelled) setState({ status: 'ok', days, timezone: '' });
       } catch (err) {
         if (cancelled) return;
-        // TypeError "Network request failed" → device is offline
-        if (err instanceof TypeError && /network request failed/i.test(err.message)) {
-          setState({ status: 'no_network' });
-        } else {
-          setState({ status: 'error', message: err instanceof Error ? err.message : String(err) });
-        }
+        setState(classifyWeatherError(err));
       }
     }
 
