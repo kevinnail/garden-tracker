@@ -400,7 +400,8 @@ export default function AddLocationForm() {
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         >
           <View style={styles.hierarchyBox}>
-            <Text style={styles.boxTitle}>Hierarchy</Text>
+            <Text style={styles.boxTitle}>Select Current</Text>
+            <Text style={styles.helpText}>Select Location to see current gardens, select gardens to see current sections</Text>
 
             <Text style={styles.levelTitle}>1. Location</Text>
             {locations.length === 0 ? (
@@ -486,7 +487,6 @@ export default function AddLocationForm() {
                 }
                 placeholderTextColor="#555"
                 maxLength={100}
-                autoFocus
                 onFocus={ensureEditorVisible}
                 onSubmitEditing={handleSubmit}
                 returnKeyType="done"
