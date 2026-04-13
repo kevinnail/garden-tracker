@@ -1,5 +1,5 @@
-import React from 'react';
-import { Pressable, View, StyleSheet, ViewStyle } from 'react-native';
+import React, { useRef } from 'react';
+import { Pressable, StyleSheet, ViewStyle } from 'react-native';
 import Svg, { Defs, Pattern, Line, Rect, Polygon } from 'react-native-svg';
 
 import { CELL_WIDTH, ROW_HEIGHT, EMPTY_CELL_COLOR } from '@/src/constants/layout';
@@ -26,12 +26,27 @@ interface Props {
  */
 export default function CropCell({ stageColor, isPast, hasNote = false, style, onPress, onLongPress }: Props) {
   const bg = stageColor ?? EMPTY_CELL_COLOR;
+  const longPressTriggered = useRef(false);
+
+  const handlePress = () => {
+    if (longPressTriggered.current) {
+      longPressTriggered.current = false;
+      return;
+    }
+
+    onPress?.();
+  };
+
+  const handleLongPress = () => {
+    longPressTriggered.current = true;
+    onLongPress?.();
+  };
 
   return (
     <Pressable
       style={[styles.cell, { backgroundColor: bg }, style]}
-      onPress={hasNote ? onPress : undefined}
-      onLongPress={onLongPress}
+      onPress={hasNote ? handlePress : undefined}
+      onLongPress={handleLongPress}
       delayLongPress={250}
     >
       {isPast && (
@@ -39,12 +54,12 @@ export default function CropCell({ stageColor, isPast, hasNote = false, style, o
           <Defs>
             <Pattern
               id="hatch"
-              width="4"
-              height="4"
+              width="3"
+              height="3"
               patternTransform="rotate(45)"
               patternUnits="userSpaceOnUse"
             >
-              <Line x1="0" y1="0" x2="0" y2="4" stroke="rgba(0,0,0,0.5)" strokeWidth="2" />
+              <Line x1="0" y1="0" x2="0" y2="3" stroke="rgba(0,0,0,0.88)" strokeWidth="2" />
             </Pattern>
           </Defs>
           <Rect width={CELL_WIDTH} height={ROW_HEIGHT} fill="url(#hatch)" />

@@ -58,12 +58,13 @@ export default function GridBody({
         const weekDate = formatDateKey(weekIndexToDate(calendarStart, col));
         const hasNote = Boolean(rowItem.notesByWeek[weekDate]);
 
-        const openNote = () => {
+        const openNote = (mode: 'view' | 'compose') => {
           router.push({
             pathname: '/(modals)/cell-note',
             params: {
               cropId: String(rowItem.crop.id),
               weekDate,
+              mode,
             },
           });
         };
@@ -75,8 +76,8 @@ export default function GridBody({
             isPast={col < todayCol}
             hasNote={hasNote}
             style={{ left: col * CELL_WIDTH, top }}
-            onPress={openNote}
-            onLongPress={openNote}
+            onPress={hasNote ? () => openNote('view') : undefined}
+            onLongPress={() => openNote('compose')}
           />
         );
       }

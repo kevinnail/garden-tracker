@@ -18,6 +18,9 @@ import {
   deleteSection,
   deleteGarden,
   deleteLocation,
+  updateLocationName,
+  updateGardenName,
+  updateSectionName,
 } from '@/src/db/queries/locationQueries';
 import { getDb } from '@/src/db/database';
 import { setupTestDb, SEED } from '../setup';
@@ -169,6 +172,90 @@ describe('insertSection', () => {
     expect(locations.find(l => l.name === 'Greenhouse')).toBeDefined();
     expect(gardens.find(g => g.name === 'North Wing')).toBeDefined();
     expect(sections.find(s => s.name === 'Row A')).toBeDefined();
+  });
+});
+
+// ── updateLocationName ─────────────────────────────────────────────────────────
+
+describe('updateLocationName', () => {
+  it('renames a location so the new name appears in getAllLocations', async () => {
+    const locations = await getAllLocations();
+    const id = locations[0].id;
+
+    await updateLocationName(id, 'Renamed Location');
+
+    const updated = await getAllLocations();
+    expect(updated.find(l => l.id === id)!.name).toBe('Renamed Location');
+  });
+
+  it('does not affect other locations', async () => {
+    const id1 = await insertLocation('Alpha');
+    const id2 = await insertLocation('Beta');
+
+    await updateLocationName(id1, 'Alpha Renamed');
+
+    const locations = await getAllLocations();
+    expect(locations.find(l => l.id === id2)!.name).toBe('Beta');
+  });
+
+  it('does nothing when id does not exist', async () => {
+    await expect(updateLocationName(999, 'Ghost')).resolves.toBeUndefined();
+  });
+});
+
+// ── updateGardenName ───────────────────────────────────────────────────────────
+
+describe('updateGardenName', () => {
+  it('renames a garden so the new name appears in getAllGardens', async () => {
+    const gardens = await getAllGardens();
+    const id = gardens[0].id;
+
+    await updateGardenName(id, 'Renamed Garden');
+
+    const updated = await getAllGardens();
+    expect(updated.find(g => g.id === id)!.name).toBe('Renamed Garden');
+  });
+
+  it('does not affect other gardens', async () => {
+    const locationId = await insertLocation('Loc');
+    const id1 = await insertGarden(locationId, 'Garden One');
+    const id2 = await insertGarden(locationId, 'Garden Two');
+
+    await updateGardenName(id1, 'Garden One Renamed');
+
+    const gardens = await getAllGardens();
+    expect(gardens.find(g => g.id === id2)!.name).toBe('Garden Two');
+  });
+
+  it('does nothing when id does not exist', async () => {
+    await expect(updateGardenName(999, 'Ghost')).resolves.toBeUndefined();
+  });
+});
+
+// ── updateSectionName ──────────────────────────────────────────────────────────
+
+describe('updateSectionName', () => {
+  it('renames a section so the new name appears in getAllSections', async () => {
+    await updateSectionName(SEED.SECTION_ID, 'Renamed Section');
+
+    const sections = await getAllSections();
+    expect(sections.find(s => s.id === SEED.SECTION_ID)!.name).toBe('Renamed Section');
+  });
+
+  it('does not affect other sections', async () => {
+    const locationId = await insertLocation('Loc');
+    const gardenId = await insertGarden(locationId, 'Garden');
+    const id1 = await insertSection(gardenId, 'Bed A');
+    const id2 = await insertSection(gardenId, 'Bed B');
+
+    await updateSectionName(id1, 'Bed A Renamed');
+
+    const sections = await getAllSections();
+    expect(sections.find(s => s.id === id2)!.name).toBe('Bed B');
+  });
+
+  it('does nothing when id does not exist', async () => {
+    await expect(updateSectionName(999, 'Ghost')).resolves.toBeUndefined();
   });
 });
 
