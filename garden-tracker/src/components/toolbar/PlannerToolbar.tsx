@@ -109,14 +109,24 @@ export default function PlannerToolbar() {
         <Text style={styles.todayBannerTitle}>Today</Text>
         {!isLandscape && (
           <Text style={styles.todayBannerText} numberOfLines={1}>
-            {todayCount > 0
-              ? `${dueTodayCount} due today · ${overdueCount} overdue`
-              : `${todayLabel}`}
+            {todayCount > 0 ? (
+              <>
+                <Text style={dueTodayCount > 0 ? styles.todayBannerDueToday : undefined}>
+                  {dueTodayCount} due today
+                </Text>
+                {' · '}
+                {overdueCount} overdue
+              </>
+            ) : `${todayLabel}`}
           </Text>
         )}
         {isLandscape && todayCount > 0 && (
           <Text style={styles.todayBannerText} numberOfLines={1}>
-            {dueTodayCount} due · {overdueCount} overdue
+            <Text style={dueTodayCount > 0 ? styles.todayBannerDueToday : undefined}>
+              {dueTodayCount} due
+            </Text>
+            {' · '}
+            {overdueCount} overdue
           </Text>
         )}
       </View>
@@ -302,7 +312,8 @@ const styles = StyleSheet.create({
   todayBannerOverdue:{ backgroundColor: '#2a1c1c', borderColor: '#6a3d3d' },
   todayBannerMain: { flex: 1 },
   todayBannerTitle: { color: '#edf4ff', fontSize: 14, fontWeight: '700' },
-  todayBannerText:  { color: '#a8b6c7', fontSize: 12 },
+  todayBannerText:      { color: '#a8b6c7', fontSize: 12 },
+  todayBannerDueToday:  { color: '#f5c842', fontWeight: '600' },
   todayBannerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   weatherChip: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   weatherEmoji: { fontSize: 16 },
