@@ -1,10 +1,16 @@
+import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 
+import { useWeatherStore } from '@/src/store/weatherStore';
+
 export default function RootLayout() {
+  const loadWeather = useWeatherStore(s => s.load);
+  useEffect(() => { loadWeather().catch(() => {}); }, [loadWeather]);
+
   return (
     <SafeAreaProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>
