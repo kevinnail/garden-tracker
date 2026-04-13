@@ -180,7 +180,7 @@ function DayCard({ day, isToday }: { day: DayForecast; isToday: boolean }) {
         <Text style={wxStyles.cardPrecip}>💧 {day.precipPct}%</Text>
       )}
       {day.precipIn > 0 && (
-        <Text style={wxStyles.cardPrecipAmt}>{day.precipIn.toFixed(2)}"</Text>
+        <Text style={wxStyles.cardPrecipAmt}>{day.precipIn.toFixed(2)}&quot;</Text>
       )}
       {day.uvIndex >= 6 && (
         <Text style={wxStyles.cardUv}>UV {day.uvIndex}</Text>
@@ -242,7 +242,10 @@ function WeatherSection() {
 
   return (
     <View style={wxStyles.container}>
-      <Text style={wxStyles.sectionTitle}>Weather</Text>
+      <View style={wxStyles.sectionHeaderRow}>
+        <Text style={wxStyles.sectionTitle}>Weather</Text>
+        <Text style={wxStyles.locationLabel}>{wx.locationLabel}</Text>
+      </View>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -488,10 +491,20 @@ const wxStyles = StyleSheet.create({
   container: {
     gap: 10,
   },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+  },
   sectionTitle: {
     color: '#f0f0f0',
     fontSize: 18,
     fontWeight: '700',
+  },
+  locationLabel: {
+    color: '#4a7a9b',
+    fontSize: 12,
+    fontWeight: '500',
   },
   scrollContent: {
     gap: 8,
