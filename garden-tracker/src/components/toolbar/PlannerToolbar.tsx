@@ -5,6 +5,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { usePlannerStore } from '@/src/store/plannerStore';
 import { useTodayTick } from '@/src/hooks/useTodayTick';
+import { useWeatherStore } from '@/src/store/weatherStore';
+import { wmoEmoji } from '@/src/hooks/useWeather';
 
 export default function PlannerToolbar() {
   // Re-render at midnight so `todayLabel` (computed from `new Date()`) flips.
@@ -12,6 +14,9 @@ export default function PlannerToolbar() {
   const hasSections = usePlannerStore(s => s.rows.some(r => r.type === 'section_header'));
   const showArchivedRows = usePlannerStore(s => s.showArchivedRows);
   const toggleArchivedRows = usePlannerStore(s => s.toggleArchivedRows);
+  const weather = useWeatherStore(s => s.weather);
+  const todayWeather = weather.status === 'ok' ? weather.days[0] : null;
+
   const dueTodayCount = usePlannerStore(s => s.todayDueTasks.length);
   const overdueCount = usePlannerStore(s => s.todayOverdueTasks.length);
   const todayCount = dueTodayCount + overdueCount;
@@ -62,11 +67,17 @@ export default function PlannerToolbar() {
         )}
       </View>
       <View style={styles.todayBannerRight}>
+        {todayWeather && (
+          <View style={styles.weatherChip}>
+            <Text style={styles.weatherEmoji}>{wmoEmoji(todayWeather.code)}</Text>
+            <Text style={styles.weatherTemp}>{todayWeather.tempMax}°</Text>
+          </View>
+        )}
         {todayCount > 0 && (
           <View style={styles.badge}>
             <Text style={styles.badgeText}>{todayCount}</Text>
           </View>
-        ) }
+        )}
       </View>
     </Pressable>
   );
@@ -185,9 +196,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   todayBannerRight: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
+    gap: 8,
+  },
+  weatherChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  weatherEmoji: {
+    fontSize: 16,
+  },
+  weatherTemp: {
+    color: '#f0c060',
+    fontSize: 13,
+    fontWeight: '700',
   },
   todayBannerHint: {
     color: '#dce8f8',
