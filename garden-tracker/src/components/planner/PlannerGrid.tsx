@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, LayoutChangeEvent } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, View, Text, StyleSheet, LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue,
@@ -41,6 +41,7 @@ export default function PlannerGrid() {
   const plannerFocusCropId = usePlannerStore(s => s.plannerFocusCropId);
   const plannerFocusDate = usePlannerStore(s => s.plannerFocusDate);
   const clearPlannerFocus = usePlannerStore(s => s.clearPlannerFocus);
+  const resetViewState = usePlannerStore(s => s.resetViewState);
 
   const totalWidth  = TOTAL_WEEKS * cellWidth;
   const rowOffsets = useMemo(() => getRowOffsets(rows), [rows]);
@@ -155,6 +156,16 @@ export default function PlannerGrid() {
     month: 'numeric', day: 'numeric', year: '2-digit',
   });
 
+  const handleHomePress = useCallback(() => {
+    resetViewState();
+    const todayCol = todayWeekIndex(calendarStart);
+    const newX = Math.max(0, (todayCol - 3) * cellWidth);
+    scrollX.value = newX;
+    scrollY.value = 0;
+    setRenderScrollX(newX);
+    setRenderScrollY(0);
+  }, [calendarStart, cellWidth, resetViewState, scrollX, scrollY]);
+
   if (isLoaded && rows.length === 0) {
     return (
       <View style={[styles.root, styles.emptyRoot, { paddingLeft: leftInset }]}>
@@ -176,9 +187,10 @@ export default function PlannerGrid() {
 
       {/* ── Top row: corner + column header ── */}
       <View style={styles.headerRow}>
-        <View style={styles.corner}>
+        <Pressable style={styles.corner} onPress={handleHomePress} accessibilityLabel="Home — reset view to today">
           <Text style={styles.cornerText}>{todayLabel}</Text>
-        </View>
+          <Text style={styles.cornerHint}>⌂ Home</Text>
+        </Pressable>
         <View style={styles.columnHeaderClip}>
           <Animated.View style={[{ position: 'absolute', width: totalWidth }, columnHeaderStyle]}>
             <ColumnHeader calendarStart={calendarStart} />
@@ -244,6 +256,7 @@ const styles = StyleSheet.create({
     borderColor: '#444',
   },
   cornerText: { color: '#888', fontSize: 11, fontWeight: 'bold' },
+  cornerHint: { color: '#555', fontSize: 9, marginTop: 2 },
   columnHeaderClip: { flex: 1, height: TOTAL_HEADER_HEIGHT, overflow: 'hidden' },
   mainRow: { flex: 1, flexDirection: 'row' },
   rowHeaderClip: { width: ROW_HEADER_WIDTH, overflow: 'hidden' },
