@@ -54,12 +54,12 @@ export default function CropCell({ stageColor, isPast, hasNote = false, style, o
           <Defs>
             <Pattern
               id="hatch"
-              width="4"
-              height="4"
+              width="3"
+              height="3"
               patternTransform="rotate(45)"
               patternUnits="userSpaceOnUse"
             >
-              <Line x1="0" y1="0" x2="0" y2="4" stroke="rgba(0,0,0,0.5)" strokeWidth="2" />
+              <Line x1="0" y1="0" x2="0" y2="3" stroke="rgba(0,0,0,0.88)" strokeWidth="2" />
             </Pattern>
           </Defs>
           <Rect width={CELL_WIDTH} height={ROW_HEIGHT} fill="url(#hatch)" />
