@@ -58,6 +58,9 @@ export default function AddLocationForm() {
   const removeLocation = usePlannerStore(s => s.removeLocation);
   const removeGarden = usePlannerStore(s => s.removeGarden);
   const removeSection = usePlannerStore(s => s.removeSection);
+  const renameLocation = usePlannerStore(s => s.renameLocation);
+  const renameGarden = usePlannerStore(s => s.renameGarden);
+  const renameSection = usePlannerStore(s => s.renameSection);
   const resetAllData = usePlannerStore(s => s.resetAllData);
 
   const [mode, setMode] = useState<Mode>('location');
@@ -71,6 +74,7 @@ export default function AddLocationForm() {
   const [lastAdded, setLastAdded] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [page, setPage] = useState<1 | 2>(1);
+  const [editingItem, setEditingItem] = useState<{ type: 'location' | 'garden' | 'section'; id: number; value: string } | null>(null);
   const [initialCropCount, setInitialCropCount] = useState<number | null>(null);
   const [allowDismiss, setAllowDismiss] = useState(false);
   const [createdEntityCount, setCreatedEntityCount] = useState(0);
@@ -363,6 +367,21 @@ export default function AddLocationForm() {
     );
   };
 
+  const handleSaveRename = async () => {
+    if (!editingItem) return;
+    const trimmed = editingItem.value.trim();
+    if (!trimmed) return Alert.alert('Validation', 'Name cannot be empty.');
+    try {
+      if (editingItem.type === 'location') await renameLocation(editingItem.id, trimmed);
+      else if (editingItem.type === 'garden') await renameGarden(editingItem.id, trimmed);
+      else await renameSection(editingItem.id, trimmed);
+      setEditingItem(null);
+      await reload();
+    } catch {
+      // toast shown by store
+    }
+  };
+
   const filteredGardens = gardens.filter(g => g.location_id === locationId);
   const filteredSections = sections.filter(s => s.garden_id === gardenId);
   const selectedLocation = locations.find(l => l.id === locationId) ?? null;
@@ -544,17 +563,42 @@ export default function AddLocationForm() {
                   <Text style={styles.label}>Current Locations</Text>
                   {locations.map(location => {
                     const status = locationStatus(location, gardens, sections);
+                    const isEditing = editingItem?.type === 'location' && editingItem.id === location.id;
                     return (
                       <View key={location.id} style={styles.existingRow}>
-                        <View style={styles.existingInfo}>
-                          <Text style={styles.existingName}>{location.name}</Text>
-                          <Text style={[styles.existingStatus, { color: STATUS_COLOR[status] }]}>
-                            {STATUS_LABEL[status]}
-                          </Text>
-                        </View>
-                        <Pressable style={styles.deleteBtn} onPress={() => confirmDeleteLocation(location)}>
-                          <Text style={styles.deleteBtnText}>x</Text>
-                        </Pressable>
+                        {isEditing ? (
+                          <>
+                            <TextInput
+                              style={[styles.input, styles.inlineEditInput]}
+                              value={editingItem.value}
+                              onChangeText={v => setEditingItem(e => e ? { ...e, value: v } : e)}
+                              onSubmitEditing={handleSaveRename}
+                              returnKeyType="done"
+                              autoFocus
+                            />
+                            <Pressable style={styles.saveBtn} onPress={handleSaveRename}>
+                              <Text style={styles.saveBtnText}>✓</Text>
+                            </Pressable>
+                            <Pressable style={styles.deleteBtn} onPress={() => setEditingItem(null)}>
+                              <Text style={styles.deleteBtnText}>✕</Text>
+                            </Pressable>
+                          </>
+                        ) : (
+                          <>
+                            <View style={styles.existingInfo}>
+                              <Text style={styles.existingName}>{location.name}</Text>
+                              <Text style={[styles.existingStatus, { color: STATUS_COLOR[status] }]}>
+                                {STATUS_LABEL[status]}
+                              </Text>
+                            </View>
+                            <Pressable style={styles.editBtn} onPress={() => setEditingItem({ type: 'location', id: location.id, value: location.name })}>
+                              <Text style={styles.editBtnText}>✎</Text>
+                            </Pressable>
+                            <Pressable style={styles.deleteBtn} onPress={() => confirmDeleteLocation(location)}>
+                              <Text style={styles.deleteBtnText}>x</Text>
+                            </Pressable>
+                          </>
+                        )}
                       </View>
                     );
                   })}
@@ -564,28 +608,82 @@ export default function AddLocationForm() {
               {mode === 'garden' && filteredGardens.length > 0 && (
                 <>
                   <Text style={styles.label}>Gardens in this Location</Text>
-                  {filteredGardens.map(garden => (
-                    <View key={garden.id} style={styles.existingRow}>
-                      <Text style={[styles.existingName, { flex: 1 }]}>{garden.name}</Text>
-                      <Pressable style={styles.deleteBtn} onPress={() => confirmDeleteGarden(garden)}>
-                        <Text style={styles.deleteBtnText}>x</Text>
-                      </Pressable>
-                    </View>
-                  ))}
+                  {filteredGardens.map(garden => {
+                    const isEditing = editingItem?.type === 'garden' && editingItem.id === garden.id;
+                    return (
+                      <View key={garden.id} style={styles.existingRow}>
+                        {isEditing ? (
+                          <>
+                            <TextInput
+                              style={[styles.input, styles.inlineEditInput]}
+                              value={editingItem.value}
+                              onChangeText={v => setEditingItem(e => e ? { ...e, value: v } : e)}
+                              onSubmitEditing={handleSaveRename}
+                              returnKeyType="done"
+                              autoFocus
+                            />
+                            <Pressable style={styles.saveBtn} onPress={handleSaveRename}>
+                              <Text style={styles.saveBtnText}>✓</Text>
+                            </Pressable>
+                            <Pressable style={styles.deleteBtn} onPress={() => setEditingItem(null)}>
+                              <Text style={styles.deleteBtnText}>✕</Text>
+                            </Pressable>
+                          </>
+                        ) : (
+                          <>
+                            <Text style={[styles.existingName, { flex: 1 }]}>{garden.name}</Text>
+                            <Pressable style={styles.editBtn} onPress={() => setEditingItem({ type: 'garden', id: garden.id, value: garden.name })}>
+                              <Text style={styles.editBtnText}>✎</Text>
+                            </Pressable>
+                            <Pressable style={styles.deleteBtn} onPress={() => confirmDeleteGarden(garden)}>
+                              <Text style={styles.deleteBtnText}>x</Text>
+                            </Pressable>
+                          </>
+                        )}
+                      </View>
+                    );
+                  })}
                 </>
               )}
 
               {mode === 'section' && filteredSections.length > 0 && (
                 <>
                   <Text style={styles.label}>Sections in this Garden</Text>
-                  {filteredSections.map(section => (
-                    <View key={section.id} style={styles.existingRow}>
-                      <Text style={[styles.existingName, { flex: 1 }]}>{section.name}</Text>
-                      <Pressable style={styles.deleteBtn} onPress={() => confirmDeleteSection(section)}>
-                        <Text style={styles.deleteBtnText}>x</Text>
-                      </Pressable>
-                    </View>
-                  ))}
+                  {filteredSections.map(section => {
+                    const isEditing = editingItem?.type === 'section' && editingItem.id === section.id;
+                    return (
+                      <View key={section.id} style={styles.existingRow}>
+                        {isEditing ? (
+                          <>
+                            <TextInput
+                              style={[styles.input, styles.inlineEditInput]}
+                              value={editingItem.value}
+                              onChangeText={v => setEditingItem(e => e ? { ...e, value: v } : e)}
+                              onSubmitEditing={handleSaveRename}
+                              returnKeyType="done"
+                              autoFocus
+                            />
+                            <Pressable style={styles.saveBtn} onPress={handleSaveRename}>
+                              <Text style={styles.saveBtnText}>✓</Text>
+                            </Pressable>
+                            <Pressable style={styles.deleteBtn} onPress={() => setEditingItem(null)}>
+                              <Text style={styles.deleteBtnText}>✕</Text>
+                            </Pressable>
+                          </>
+                        ) : (
+                          <>
+                            <Text style={[styles.existingName, { flex: 1 }]}>{section.name}</Text>
+                            <Pressable style={styles.editBtn} onPress={() => setEditingItem({ type: 'section', id: section.id, value: section.name })}>
+                              <Text style={styles.editBtnText}>✎</Text>
+                            </Pressable>
+                            <Pressable style={styles.deleteBtn} onPress={() => confirmDeleteSection(section)}>
+                              <Text style={styles.deleteBtnText}>x</Text>
+                            </Pressable>
+                          </>
+                        )}
+                      </View>
+                    );
+                  })}
                 </>
               )}
 
@@ -728,8 +826,13 @@ const styles = StyleSheet.create({
   existingInfo: { flex: 1 },
   existingName: { color: '#ccc', fontSize: 13 },
   existingStatus: { fontSize: 11, marginTop: 2 },
+  editBtn: { padding: 6 },
+  editBtnText: {marginRight:10, color: '#7dcea0', fontSize: 15 },
+  saveBtn: { padding: 6 },
+  saveBtnText: {marginRight:10, color: '#2ecc71', fontSize: 16, fontWeight: '700' },
   deleteBtn: { padding: 6 },
   deleteBtnText: { color: '#664444', fontSize: 14 },
+  inlineEditInput: { flex: 1, paddingVertical: 4, marginRight: 4 },
   addCropBtn: { marginTop: 24, paddingVertical: 14, borderRadius: 8, backgroundColor: '#2ecc71', alignItems: 'center' },
   addCropBtnText: { color: '#111', fontWeight: '700', fontSize: 15 },
   actionRow: { marginTop: 10, flexDirection: 'row', gap: 10 },
