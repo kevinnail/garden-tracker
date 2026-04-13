@@ -57,7 +57,7 @@ function overdueBadgeLabel(missed_count: number): string {
   return `${missed_count} wks overdue`;
 }
 
-function TaskSwipeRow({ item, overdue }: { item: TodayTaskItem; overdue: boolean }) {
+function TaskSwipeRow({ item, overdue, onPress }: { item: TodayTaskItem; overdue: boolean; onPress: () => void }) {
   const completeTask = usePlannerStore(s => s.completeTask);
 
   return (
@@ -68,15 +68,15 @@ function TaskSwipeRow({ item, overdue }: { item: TodayTaskItem; overdue: boolean
       onSwipeableOpen={() => { completeTask(item.task_id, item.week_date).catch(() => {}); }}
     >
       <View style={styles.taskRow}>
-        <View style={styles.taskBody}>
+        <Pressable style={styles.taskBody} onPress={onPress}>
           <View style={styles.taskTopRow}>
             <Text style={styles.taskTitle}>{item.task_type_name}</Text>
             <Text style={[styles.taskBadge, overdue ? styles.overdueBadge : styles.dueBadge]}>
-              {overdue ? overdueBadgeLabel(item.missed_count) : 'Due Today'}
+              {overdue ? overdueBadgeLabel(item.missed_count) : 'Do today'}
             </Text>
           </View>
           <Text style={styles.taskMeta}>{DAY_LABELS[item.day_of_week]} · {item.due_date}</Text>
-        </View>
+        </Pressable>
       </View>
     </ReanimatedSwipeable>
   );
@@ -113,6 +113,7 @@ function CropGroup({ group, overdue }: { group: CropTaskGroup; overdue: boolean 
             key={`${task.task_id}:${task.week_date}`}
             item={task}
             overdue={overdue}
+            onPress={handleHeaderPress}
           />
         ))}
       </View>
@@ -186,7 +187,7 @@ export default function TodayScreen() {
 
       <ScrollView contentContainerStyle={styles.content}>
         <Section
-          title="Due Today"
+          title="Up Today"
           groups={dueGroups}
           emptyText="Nothing is due today."
         />
@@ -310,7 +311,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   cropArrow: {
-    color: '#2d5070',
+    color: '#0891b2',
     fontSize: 12,
     fontWeight: '600',
     paddingLeft: 12,
@@ -319,12 +320,12 @@ const styles = StyleSheet.create({
   // Task list inside the group
   taskList: {
     gap: 0,
-    backgroundColor: '#080e14',
+    backgroundColor: '#081820',
   },
   taskRow: {
-    backgroundColor: '#080e14',
+    backgroundColor: '#081820',
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#1a2535',
+    borderTopColor: '#0e3040',
   },
   taskBody: {
     flex: 1,
@@ -340,7 +341,7 @@ const styles = StyleSheet.create({
   },
   taskTitle: {
     flex: 1,
-    color: '#9db8cc',
+    color: '#a0d4e0',
     fontSize: 13,
     fontWeight: '500',
   },
@@ -353,15 +354,15 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   dueBadge: {
-    color: '#d0e4ff',
-    backgroundColor: '#213148',
+    color: '#67e8f9',
+    backgroundColor: '#0c2d36',
   },
   overdueBadge: {
     color: '#ffd7d7',
     backgroundColor: '#4a2020',
   },
   taskMeta: {
-    color: '#2e4a5e',
+    color: '#1e5a6a',
     fontSize: 11,
   },
 
