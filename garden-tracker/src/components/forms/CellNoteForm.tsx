@@ -331,13 +331,6 @@ export default function CellNoteForm({ cropId, weekDate, initialMode = 'view' }:
           <View style={[styles.header, isLandscape && styles.headerCompact]}>
             <Text style={styles.cropName}>{cropName}</Text>
             <Text style={[styles.weekLabel, isLandscape && styles.weekLabelCompact]}>{formatWeekRangeLabel(weekDate)}</Text>
-            {!isLandscape && (
-              <Text style={styles.helperText}>
-                {entries.length > 0
-                  ? 'Quick tap reads the week first. Long press from the planner jumps straight into adding.'
-                  : 'Add short daily notes so the week reads like a timeline instead of one long paragraph.'}
-              </Text>
-            )}
           </View>
 
           <View style={styles.sectionHeader}>
