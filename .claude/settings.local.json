@@ -17,7 +17,9 @@
       "Bash(npx expo:*)",
       "WebSearch",
       "WebFetch(domain:docs.expo.dev)",
-      "WebFetch(domain:app.unpkg.com)"
+      "WebFetch(domain:app.unpkg.com)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('jest',{}\\), indent=2\\)\\)\")",
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\(JSON.stringify\\(p.jest,null,2\\)\\)\")"
     ]
   }
 }
