@@ -2,7 +2,6 @@ import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
 import {
-  CELL_WIDTH,
   TOTAL_WEEKS,
   YEAR_ROW_HEIGHT,
   MONTH_ROW_HEIGHT,
@@ -12,6 +11,7 @@ import {
   BACKGROUND_COLOR,
 } from '@/src/constants/layout';
 import { weekIndexToDate } from '@/src/utils/dateUtils';
+import { useCellLayout } from '@/src/hooks/useCellLayout';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -110,12 +110,13 @@ interface Props {
  * that translates horizontally to stay in sync with GridBody's scroll.
  */
 export default function ColumnHeader({ calendarStart }: Props) {
+  const { cellWidth } = useCellLayout();
   const { yearBlocks, monthLabels, weekCells } = useMemo(
     () => computeHeaderData(calendarStart),
     [calendarStart],
   );
 
-  const totalWidth = TOTAL_WEEKS * CELL_WIDTH;
+  const totalWidth = TOTAL_WEEKS * cellWidth;
 
   return (
     <View style={[styles.container, { width: totalWidth }]}>
@@ -127,9 +128,9 @@ export default function ColumnHeader({ calendarStart }: Props) {
             key={block.startCol}
             style={{
               position: 'absolute',
-              left: block.startCol * CELL_WIDTH,
+              left: block.startCol * cellWidth,
               top: 0,
-              width: block.colCount * CELL_WIDTH,
+              width: block.colCount * cellWidth,
               height: YEAR_ROW_HEIGHT,
               backgroundColor: block.color,
             }}
@@ -145,7 +146,7 @@ export default function ColumnHeader({ calendarStart }: Props) {
             <View
               style={{
                 position: 'absolute',
-                left: col * CELL_WIDTH,
+                left: col * cellWidth,
                 top: 0,
                 width: 2,
                 height: MONTH_ROW_HEIGHT,
@@ -156,7 +157,7 @@ export default function ColumnHeader({ calendarStart }: Props) {
             <Text
               style={{
                 position: 'absolute',
-                left: col * CELL_WIDTH + 4,
+                left: col * cellWidth + 4,
                 top: 0,
                 height: MONTH_ROW_HEIGHT,
                 lineHeight: MONTH_ROW_HEIGHT,
@@ -178,7 +179,7 @@ export default function ColumnHeader({ calendarStart }: Props) {
             key={col}
             style={[
               styles.weekCell,
-              { left: col * CELL_WIDTH },
+              { left: col * cellWidth, width: cellWidth },
               isMonthBoundary && styles.weekCellMonthBoundary,
             ]}
           >
@@ -229,7 +230,6 @@ const styles = StyleSheet.create({
   weekCell: {
     position: 'absolute',
     top: 0,
-    width: CELL_WIDTH,
     height: WEEK_ROW_HEIGHT,
     alignItems: 'center',
     justifyContent: 'center',

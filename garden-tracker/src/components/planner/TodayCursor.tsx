@@ -1,8 +1,8 @@
 import React from 'react';
 import { Line, Polygon } from 'react-native-svg';
 
-import { CELL_WIDTH } from '@/src/constants/layout';
 import { dayXOffset, todayWeekIndex } from '@/src/utils/dateUtils';
+import { useCellLayout } from '@/src/hooks/useCellLayout';
 
 interface Props {
   calendarStart: Date;
@@ -10,16 +10,17 @@ interface Props {
 }
 
 /**
- * Red vertical line at today's exact day-of-week slot.
+ * Purple double-line cursor at today's exact day-of-week slot.
  * Rendered inside TaskOverlay's <Svg> — no wrapper element.
  *
- * x = todayCol * CELL_WIDTH + dayXOffset(today.getDay())
+ * x = todayCol * cellWidth + dayXOffset(today.getDay())
  */
 export default function TodayCursor({ calendarStart, totalHeight }: Props) {
+  const { cellWidth } = useCellLayout();
   const today = new Date();
   const col = todayWeekIndex(calendarStart);
 
-  const x = col * CELL_WIDTH + dayXOffset(today.getDay());
+  const x = col * cellWidth + dayXOffset(today.getDay());
   const y1 = 0;
   const y2 = totalHeight;
 

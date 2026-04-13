@@ -139,10 +139,12 @@ export type GridRowItem =
   | { type: 'crop_row';        crop: CropInstance; weekColorMap: Record<number, string>; tasks: Task[]; completions: TaskCompletion[]; notesByWeek: Record<string, Note> }
   | { type: 'placeholder';     index: number };
 
-// Precomputed task line ready to hand directly to the SVG renderer — zero work at render time
+// Precomputed task line — positions stored as zoom-independent values.
+// x is computed at render time: weekIndex * cellWidth + dayFraction * cellWidth
 export interface PrecomputedTaskLine {
   key: string;
-  x: number;
+  weekIndex: number;   // integer column index
+  dayFraction: number; // 0..1 fractional position within the week (day_of_week based)
   y1: number;
   y2: number;
   color: string;
