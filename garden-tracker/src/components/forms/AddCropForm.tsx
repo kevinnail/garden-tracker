@@ -280,21 +280,31 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
 
       <Text style={styles.label}>Section</Text>
       <View style={styles.sectionList}>
-        {sections.map(sec => {
-          const garden = gardens.find(g => g.id === sec.garden_id);
-          const label = garden ? `${garden.name} › ${sec.name}` : sec.name;
-          return (
-            <Pressable
-              key={sec.id}
-              style={[styles.sectionOption, sectionId === sec.id && styles.sectionSelected]}
-              onPress={() => setSectionId(sec.id)}
-            >
-              <Text style={[styles.sectionText, sectionId === sec.id && styles.sectionTextSelected]}>
-                {label}
-              </Text>
-            </Pressable>
-          );
-        })}
+        {(() => {
+          const sortedGardens = [...gardens].sort((a, b) => a.name.localeCompare(b.name));
+          return sortedGardens.map(garden => {
+            const gardenSections = sections
+              .filter(s => s.garden_id === garden.id)
+              .sort((a, b) => a.name.localeCompare(b.name));
+            if (gardenSections.length === 0) return null;
+            return (
+              <View key={garden.id}>
+                <Text style={styles.sectionGroupLabel}>{garden.name}</Text>
+                {gardenSections.map(sec => (
+                  <Pressable
+                    key={sec.id}
+                    style={[styles.sectionOption, sectionId === sec.id && styles.sectionSelected]}
+                    onPress={() => setSectionId(sec.id)}
+                  >
+                    <Text style={[styles.sectionText, sectionId === sec.id && styles.sectionTextSelected]}>
+                      {sec.name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            );
+          });
+        })()}
         {sections.length === 0 && (
           <View style={styles.emptyStateBox}>
             <Text style={styles.emptyStateText}>No sections available yet.</Text>
@@ -469,6 +479,7 @@ const styles = StyleSheet.create({
   },
   dateDoneText: { color: '#7dcea0', fontWeight: '600', fontSize: 14 },
   sectionList: { gap: 6 },
+  sectionGroupLabel: { color: '#888', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginTop: 8, marginBottom: 4, paddingHorizontal: 2 },
   sectionOption: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, borderWidth: 1, borderColor: '#3a3a3a', backgroundColor: '#2a2a2a' },
   sectionSelected: { borderColor: '#5a9', backgroundColor: '#1e3a2a' },
   sectionText: { color: '#aaa', fontSize: 13 },
