@@ -62,9 +62,10 @@ export default function CropCell({ stageColor, isPast, hasNote = false, showNote
               patternTransform="rotate(45)"
               patternUnits="userSpaceOnUse"
             >
-              <Line x1="0" y1="0" x2="0" y2="3" stroke="rgba(0,0,0,0.88)" strokeWidth="2" />
+              <Line x1="0" y1="0" x2="0" y2="3" stroke="rgba(0,0,0,0.75)" strokeWidth="2" />
             </Pattern>
           </Defs>
+          <Rect width={cellWidth} height={rowHeight} fill="rgba(0,0,0,0.45)" />
           <Rect width={cellWidth} height={rowHeight} fill="url(#hatch)" />
         </Svg>
       )}
