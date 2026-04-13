@@ -55,6 +55,7 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
   const [gardens, setGardens]       = useState<Garden[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [loadingInitial, setLoadingInitial] = useState(true);
+  const [page, setPage] = useState<1 | 2>(1);
 
   useEffect(() => {
     let isCancelled = false;
@@ -271,14 +272,9 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
     );
   }
 
-  const formContent = (
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={[styles.content, embedded && styles.embeddedContent]}
-        keyboardShouldPersistTaps="handled"
-      >
-
-      <Text style={styles.label}>Section</Text>
+  const page1Content = (
+    <>
+      <Text style={styles.label}>Choose garden/ section for new crop</Text>
       <View style={styles.sectionList}>
         {(() => {
           const sortedGardens = [...gardens].sort((a, b) => a.name.localeCompare(b.name));
@@ -286,10 +282,12 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
             const gardenSections = sections
               .filter(s => s.garden_id === garden.id)
               .sort((a, b) => a.name.localeCompare(b.name));
+              console.log('gardenSections',gardenSections)
             if (gardenSections.length === 0) return null;
             return (
               <View key={garden.id}>
-                <Text style={styles.sectionGroupLabel}>{garden.name}</Text>
+                
+                <Text style={styles.sectionGroupLabel}>{garden.name} Garden</Text>
                 {gardenSections.map(sec => (
                   <Pressable
                     key={sec.id}
@@ -316,7 +314,6 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
         )}
       </View>
 
-
       <Text style={styles.label}>Crop Name</Text>
       <TextInput
         style={styles.input}
@@ -325,7 +322,7 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
         placeholder="e.g. Tomato"
         placeholderTextColor="#555"
         maxLength={100}
-        autoFocus={!isEditMode}
+        // autoFocus={!isEditMode}
       />
 
       <Text style={styles.label}>Plant Count</Text>
@@ -339,6 +336,21 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
         maxLength={4}
       />
 
+      {!embedded && (
+        <View style={styles.actionRow}>
+          <Pressable style={styles.cancelBtn} onPress={() => router.back()}>
+            <Text style={styles.cancelBtnText}>Cancel</Text>
+          </Pressable>
+          <Pressable style={styles.submitBtn} onPress={() => setPage(2)}>
+            <Text style={styles.submitBtnText}>Next</Text>
+          </Pressable>
+        </View>
+      )}
+    </>
+  );
+
+  const page2Content = (
+    <>
       <Text style={styles.label}>Start Date (snaps to Sunday on save)</Text>
       <Pressable style={styles.dateButton} onPress={() => setShowDatePicker(true)}>
         <Text style={styles.dateButtonMain}>
@@ -364,12 +376,9 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
         </View>
       )}
 
-
-
       <Text style={styles.label}>Stages</Text>
       {stages.map((stage, i) => (
         <View key={i} style={styles.stageRow}>
-          {/* Stage type selector */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.stagePicker}>
             {stageDefs.map(def => (
               <Pressable
@@ -430,7 +439,23 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
           )}
         </>
       )}
+    </>
+  );
 
+  const formContent = (
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={[styles.content, embedded && styles.embeddedContent]}
+        keyboardShouldPersistTaps="handled"
+      >
+        {embedded ? (
+          <>
+            {page1Content}
+            {page2Content}
+          </>
+        ) : (
+          page === 1 ? page1Content : page2Content
+        )}
       </ScrollView>
   );
 
