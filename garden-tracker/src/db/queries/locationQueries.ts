@@ -66,6 +66,21 @@ export async function insertSection(gardenId: number, name: string): Promise<num
 // single DELETE at any level propagates all the way down via FK enforcement.
 // `PRAGMA foreign_keys = ON` is set in initSchema and applies to this connection.
 
+export async function updateLocationName(id: number, name: string): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(`UPDATE locations SET name = ? WHERE id = ?`, name, id);
+}
+
+export async function updateGardenName(id: number, name: string): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(`UPDATE gardens SET name = ? WHERE id = ?`, name, id);
+}
+
+export async function updateSectionName(id: number, name: string): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(`UPDATE sections SET name = ? WHERE id = ?`, name, id);
+}
+
 export async function deleteSection(id: number): Promise<void> {
   const db = await getDb();
   await db.runAsync(`DELETE FROM sections WHERE id = ?`, id);
