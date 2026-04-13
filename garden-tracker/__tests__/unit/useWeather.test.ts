@@ -10,11 +10,7 @@
 // *
 // * ==================================================
 
-// expo-location is a native module — mock it so Jest (node env) can parse the file.
-// None of the functions under test call into it.
-jest.mock('expo-location', () => ({}));
-
-import { wmoLabel, wmoEmoji, classifyWeatherError, fetchWeather } from '@/src/hooks/useWeather';
+import { wmoLabel, wmoEmoji, classifyWeatherError, fetchWeather } from '@/src/utils/weatherUtils';
 
 // ── wmoLabel ──────────────────────────────────────────────────────────────────
 
