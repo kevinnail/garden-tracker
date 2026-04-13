@@ -2,13 +2,15 @@ import React, { useRef } from 'react';
 import { Pressable, StyleSheet, ViewStyle } from 'react-native';
 import Svg, { Defs, Pattern, Line, Rect, Polygon } from 'react-native-svg';
 
-import { CELL_WIDTH, ROW_HEIGHT, EMPTY_CELL_COLOR } from '@/src/constants/layout';
+import { EMPTY_CELL_COLOR } from '@/src/constants/layout';
+import { useCellLayout } from '@/src/hooks/useCellLayout';
 
 interface Props {
-  stageColor: string | null; // null = empty cell (outside crop span)
-  isPast: boolean;           // true = left of today's column
-  hasNote?: boolean;         // shows red triangle in top-right corner
-  style?: ViewStyle;         // position: absolute left/top injected by GridBody
+  stageColor: string | null;     // null = empty cell (outside crop span)
+  isPast: boolean;               // true = left of today's column
+  hasNote?: boolean;             // shows red triangle in top-right corner
+  showNoteIndicators?: boolean;  // when false, suppresses the red triangle
+  style?: ViewStyle;             // position: absolute left/top injected by GridBody
   onPress?: () => void;
   onLongPress?: () => void;
 }
@@ -24,7 +26,8 @@ interface Props {
  * Past hatch applies regardless of stage color — empty past cells also get hatched.
  * Per VBA: ALL cells left of today get the hatch, inside AND outside crop spans.
  */
-export default function CropCell({ stageColor, isPast, hasNote = false, style, onPress, onLongPress }: Props) {
+export default function CropCell({ stageColor, isPast, hasNote = false, showNoteIndicators = true, style, onPress, onLongPress }: Props) {
+  const { cellWidth, rowHeight } = useCellLayout();
   const bg = stageColor ?? EMPTY_CELL_COLOR;
   const longPressTriggered = useRef(false);
 
@@ -44,13 +47,13 @@ export default function CropCell({ stageColor, isPast, hasNote = false, style, o
 
   return (
     <Pressable
-      style={[styles.cell, { backgroundColor: bg }, style]}
+      style={[{ position: 'absolute', width: cellWidth - 1, height: rowHeight - 1, overflow: 'hidden', backgroundColor: bg }, style]}
       onPress={hasNote ? handlePress : undefined}
       onLongPress={handleLongPress}
       delayLongPress={250}
     >
       {isPast && (
-        <Svg style={StyleSheet.absoluteFill} width={CELL_WIDTH} height={ROW_HEIGHT}>
+        <Svg style={StyleSheet.absoluteFill} width={cellWidth} height={rowHeight}>
           <Defs>
             <Pattern
               id="hatch"
@@ -62,11 +65,11 @@ export default function CropCell({ stageColor, isPast, hasNote = false, style, o
               <Line x1="0" y1="0" x2="0" y2="3" stroke="rgba(0,0,0,0.88)" strokeWidth="2" />
             </Pattern>
           </Defs>
-          <Rect width={CELL_WIDTH} height={ROW_HEIGHT} fill="url(#hatch)" />
+          <Rect width={cellWidth} height={rowHeight} fill="url(#hatch)" />
         </Svg>
       )}
 
-      {hasNote && (
+      {showNoteIndicators && hasNote && (
         <Svg style={styles.noteCorner} width={8} height={8}>
           <Polygon points="0,0 8,0 8,8" fill="#FF0000" />
         </Svg>
@@ -76,12 +79,6 @@ export default function CropCell({ stageColor, isPast, hasNote = false, style, o
 }
 
 const styles = StyleSheet.create({
-  cell: {
-    position: 'absolute',
-    width: CELL_WIDTH - 1,
-    height: ROW_HEIGHT - 1,
-    overflow: 'hidden',
-  },
   noteCorner: {
     position: 'absolute',
     top: 0,
