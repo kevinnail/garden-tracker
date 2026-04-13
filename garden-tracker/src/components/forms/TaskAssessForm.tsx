@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  Pressable, Alert,
+  Pressable, Alert, useWindowDimensions,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,8 +16,10 @@ interface TaskAssessFormProps {
 }
 
 const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const WINDOW_PAST = 4;
-const WINDOW_AHEAD = 8;
+function formatShortDate(date: Date | null): string {
+  if (!date) return 'Unknown';
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
 
 function formatOccurrenceDate(weekSunday: string, dayOfWeek: number): string {
   const sunday = parseDateKey(weekSunday);
@@ -28,6 +30,8 @@ function formatOccurrenceDate(weekSunday: string, dayOfWeek: number): string {
 }
 
 export default function TaskAssessForm({ embedded = false }: TaskAssessFormProps) {
+  const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
   const rows = usePlannerStore(s => s.rows);
   const calendarStart = usePlannerStore(s => s.calendarStart);
   const selectedCropId = usePlannerStore(s => s.selectedCropId);
@@ -72,11 +76,19 @@ export default function TaskAssessForm({ embedded = false }: TaskAssessFormProps
     return d ?? toSunday(new Date());
   })());
   const cropEndWeek = colorKeys.length > 0 ? colorKeys.reduce((a, b) => a > b ? a : b) : cropStartWeek;
+  const cropEndDate = (() => {
+    if (colorKeys.length === 0) {
+      return parseDateKey(crop.start_date);
+    }
+    const endDate = new Date(calendarStart);
+    endDate.setDate(endDate.getDate() + cropEndWeek * 7 + 6);
+    endDate.setHours(0, 0, 0, 0);
+    return endDate;
+  })();
+  const cropSummary = `${crop.plant_count} ${crop.plant_count === 1 ? 'plant' : 'plants'} • ${formatShortDate(parseDateKey(crop.start_date))} to ${formatShortDate(cropEndDate)}`;
 
-  const todayWeek = dateToWeekIndex(calendarStart, toSunday(new Date()));
   const todayDate = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; })();
-  const windowStart = Math.max(cropStartWeek, todayWeek - WINDOW_PAST);
-  const windowEnd = Math.min(cropEndWeek, todayWeek + WINDOW_AHEAD);
+  const todayWeek = dateToWeekIndex(calendarStart, toSunday(new Date()));
 
   const handleToggle = async (task: Task, weekSunday: string) => {
     try {
@@ -113,6 +125,12 @@ export default function TaskAssessForm({ embedded = false }: TaskAssessFormProps
   if (tasks.length === 0) {
     return wrapInSafeArea(
       <View style={styles.container}>
+        {!embedded && (
+          <View style={[styles.header, isLandscape && styles.headerCompact]}>
+            <Text style={styles.cropName}>{crop.name}</Text>
+            <Text style={[styles.cropSummary, isLandscape && styles.cropSummaryCompact]}>{cropSummary}</Text>
+          </View>
+        )}
         <Text style={styles.empty}>
           No tasks for {crop.name}.{"\n"}Tap + Task to add your first one.
         </Text>
@@ -131,12 +149,18 @@ export default function TaskAssessForm({ embedded = false }: TaskAssessFormProps
   }
 
   return wrapInSafeArea(
-    <ScrollView contentContainerStyle={[styles.content, embedded && styles.embeddedContent]}>
-      <Text style={styles.cropLabel}>{crop.name}</Text>
+    <View style={styles.container}>
+      {!embedded && (
+        <View style={[styles.header, isLandscape && styles.headerCompact]}>
+          <Text style={styles.cropName}>{crop.name}</Text>
+          <Text style={[styles.cropSummary, isLandscape && styles.cropSummaryCompact]}>{cropSummary}</Text>
+        </View>
+      )}
+      <ScrollView contentContainerStyle={[styles.content, embedded && styles.embeddedContent]}>
 
-      {tasks.map(task => {
+        {tasks.map(task => {
         const occurrences = getTaskLineOccurrences(task, cropStartWeek, cropEndWeek, calendarStart)
-          .filter(occ => occ.weekIndex >= windowStart && occ.weekIndex <= windowEnd);
+          .filter(occ => occ.weekIndex >= cropStartWeek && occ.weekIndex <= cropEndWeek);
 
         return (
           <View key={task.id} style={styles.taskBlock}>
@@ -197,27 +221,53 @@ export default function TaskAssessForm({ embedded = false }: TaskAssessFormProps
             )}
           </View>
         );
-      })}
+        })}
 
-      <View style={styles.actionRow}>
-        <Pressable style={styles.addTaskBtn} onPress={handleAddTask}>
-          <Text style={styles.addTaskBtnText}>+ Task</Text>
-        </Pressable>
-        {!embedded && (
-          <Pressable style={styles.doneBtn} onPress={() => router.back()}>
-            <Text style={styles.doneBtnText}>Done</Text>
+        <View style={styles.actionRow}>
+          <Pressable style={styles.addTaskBtn} onPress={handleAddTask}>
+            <Text style={styles.addTaskBtnText}>+ Task</Text>
           </Pressable>
-        )}
-      </View>
-    </ScrollView>
+          {!embedded && (
+            <Pressable style={styles.doneBtn} onPress={() => router.back()}>
+              <Text style={styles.doneBtnText}>Done</Text>
+            </Pressable>
+          )}
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#1a1a1a' },
+  header: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#148a3e',
+    backgroundColor: '#1a9148',
+  },
+  headerCompact: {
+    paddingTop: 6,
+    paddingBottom: 6,
+  },
+  cropName: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  cropSummary: {
+    marginTop: 4,
+    color: '#c8ffe0',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  cropSummaryCompact: {
+    marginTop: 2,
+  },
   content: { padding: 16, paddingBottom: 40 },
   embeddedContent: { paddingBottom: 20 },
-  cropLabel: { color: '#aaa', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 16 },
   empty: { color: '#555', fontSize: 14, padding: 24, textAlign: 'center', lineHeight: 22 },
 
   taskBlock: {
