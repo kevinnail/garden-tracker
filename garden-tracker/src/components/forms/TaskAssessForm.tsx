@@ -74,6 +74,7 @@ export default function TaskAssessForm({ embedded = false }: TaskAssessFormProps
   const cropEndWeek = colorKeys.length > 0 ? colorKeys.reduce((a, b) => a > b ? a : b) : cropStartWeek;
 
   const todayWeek = dateToWeekIndex(calendarStart, toSunday(new Date()));
+  const todayDate = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; })();
   const windowStart = Math.max(cropStartWeek, todayWeek - WINDOW_PAST);
   const windowEnd = Math.min(cropEndWeek, todayWeek + WINDOW_AHEAD);
 
@@ -162,7 +163,12 @@ export default function TaskAssessForm({ embedded = false }: TaskAssessFormProps
             ) : (
               occurrences.map(occ => {
                 const done = completionSet.has(`${task.id}:${occ.weekSunday}`);
-                const isPast = occ.weekIndex < todayWeek;
+                const taskSunday = parseDateKey(occ.weekSunday);
+                const taskDate = taskSunday
+                  ? new Date(taskSunday.getTime() + task.day_of_week * 24 * 60 * 60 * 1000)
+                  : null;
+                const isPast = taskDate ? taskDate < todayDate : occ.weekIndex < todayWeek;
+                const isThisWeek = occ.weekIndex === todayWeek;
                 return (
                   <Pressable
                     key={occ.weekSunday}
@@ -180,7 +186,7 @@ export default function TaskAssessForm({ embedded = false }: TaskAssessFormProps
                         <Text style={styles.overdueBadgeText}>Overdue</Text>
                       </View>
                     )}
-                    {!isPast && !done && (
+                    {!isPast && !done && isThisWeek && (
                       <View style={styles.dueBadge}>
                         <Text style={styles.dueBadgeText}>Due</Text>
                       </View>
