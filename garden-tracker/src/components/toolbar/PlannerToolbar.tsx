@@ -111,7 +111,7 @@ export default function PlannerToolbar() {
           <Text style={styles.todayBannerText} numberOfLines={1}>
             {todayCount > 0
               ? `${dueTodayCount} due today · ${overdueCount} overdue`
-              : `All clear · ${todayLabel}`}
+              : `${todayLabel}`}
           </Text>
         )}
         {isLandscape && todayCount > 0 && (
@@ -166,8 +166,8 @@ export default function PlannerToolbar() {
       >
         <Ionicons
           name={showViewControls ? 'eye' : 'eye-outline'}
-          size={14}
-          color={showViewControls ? '#111' : '#ddd'}
+          size={15}
+          color={showViewControls ? '#fff' : '#666'}
         />
         <Text style={[styles.viewBtnText, showViewControls && styles.viewBtnTextActive]}>
           View {showViewControls ? '▲' : '▾'}
@@ -328,35 +328,37 @@ const styles = StyleSheet.create({
   },
   btn: {
     paddingHorizontal: 14,
-    paddingVertical: 6,
-    backgroundColor: '#2ecc71',
-    borderRadius: 6,
+    paddingVertical: 8,
+    backgroundColor: '#1a9148',
+    borderRadius: 8,
   },
-  btnText: { color: '#111', fontWeight: 'bold', fontSize: 13 },
+  btnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
   locationBtn: {
     paddingHorizontal: 14,
-    paddingVertical: 6,
-    backgroundColor: '#555',
-    borderRadius: 6,
+    paddingVertical: 8,
+    backgroundColor: '#161e1a',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#2a5a3a',
   },
-  locationBtnText: { color: '#ddd', fontWeight: 'bold', fontSize: 13 },
+  locationBtnText: { color: '#7dcea0', fontWeight: '700', fontSize: 13 },
   viewBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#2a2a2a',
-    borderRadius: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: '#1e1e1e',
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#444',
+    borderColor: '#3a3a3a',
   },
   viewBtnActive: {
-    backgroundColor: '#ddd',
-    borderColor: '#ddd',
+    backgroundColor: '#1a9148',
+    borderColor: '#1a9148',
   },
-  viewBtnText: { color: '#ddd', fontWeight: 'bold', fontSize: 13 },
-  viewBtnTextActive: { color: '#111' },
+  viewBtnText: { color: '#777', fontWeight: '700', fontSize: 13 },
+  viewBtnTextActive: { color: '#fff' },
 
   // ── View panel ─────────────────────────────────────────────────────────────
   viewPanel: {
