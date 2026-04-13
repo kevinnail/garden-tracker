@@ -8,6 +8,8 @@
 // *
 // * ==================================================
 
+(global as any).__DEV__ = false;
+
 import { createNoteImage, copyImageToAppStorage, deleteImageFile } from '@/src/utils/imageStorage';
 
 // ---------------------------------------------------------------------------
