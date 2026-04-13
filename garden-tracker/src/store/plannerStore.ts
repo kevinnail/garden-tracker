@@ -79,6 +79,7 @@ interface PlannerState {
   toggleShowNoteIndicators: () => void;
   setCellZoomLevel: (level: number) => void;
   toggleViewControls: () => void;
+  resetViewState: () => void;
 }
 
 function showError(action: string, e: unknown) {
@@ -297,6 +298,13 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
   toggleShowNoteIndicators: () => set(s => ({ showNoteIndicators: !s.showNoteIndicators })),
   setCellZoomLevel: (level) => set({ cellZoomLevel: Math.min(5, Math.max(1, level)) }),
   toggleViewControls: () => set(s => ({ showViewControls: !s.showViewControls })),
+  resetViewState: () => set({
+    showTasks: true,
+    showCursor: true,
+    showNoteIndicators: true,
+    cellZoomLevel: DEFAULT_ZOOM_LEVEL,
+    showViewControls: false,
+  }),
 
   loadData: async () => {
     try {
