@@ -67,11 +67,10 @@
     "testEnvironment": "node",
     "setupFiles": [
       "dotenv/config",
-      "<rootDir>/__tests__/jestSetup.ts"
+      "<rootDir>/jest.setup.ts"
     ],
     "testPathIgnorePatterns": [
-      "<rootDir>/__tests__/setup\\.ts",
-      "<rootDir>/__tests__/jestSetup\\.ts"
+      "<rootDir>/__tests__/setup\\.ts"
     ],
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/$1"
