@@ -33,11 +33,16 @@ export const PLACEHOLDER_ROW_COUNT = 15;
 // Discrete zoom levels — only CELL_WIDTH scales (horizontal axis).
 // Level 3 is the default (matches the original CELL_WIDTH = 52 constant).
 export const ZOOM_LEVELS = [
-  { cellWidth: 32, rowHeight: ROW_HEIGHT }, // level 1 — zoomed out max
-  { cellWidth: 42, rowHeight: ROW_HEIGHT }, // level 2
+  { cellWidth: 24, rowHeight: ROW_HEIGHT }, // level 1 — zoomed out max
+  // { cellWidth: 32, rowHeight: ROW_HEIGHT }, // level 1 — zoomed out max
+  { cellWidth: 32, rowHeight: ROW_HEIGHT }, // level 2
+  // { cellWidth: 42, rowHeight: ROW_HEIGHT }, // level 2
   { cellWidth: 52, rowHeight: ROW_HEIGHT }, // level 3 — default
-  { cellWidth: 64, rowHeight: ROW_HEIGHT }, // level 4
+  // { cellWidth: 64, rowHeight: ROW_HEIGHT }, // level 4
   { cellWidth: 78, rowHeight: ROW_HEIGHT }, // level 5 — zoomed in max
+  // { cellWidth: 78, rowHeight: ROW_HEIGHT }, // level 5 — zoomed in max
+  { cellWidth: 92, rowHeight: ROW_HEIGHT }, // level 5 — zoomed in max
+
 ] as const;
 
 export const DEFAULT_ZOOM_LEVEL = 3;
