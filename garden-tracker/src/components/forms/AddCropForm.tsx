@@ -1,7 +1,7 @@
-import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from 'react';
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import {
   View, Text, TextInput, StyleSheet, ScrollView,
-  Pressable, Alert, ActivityIndicator, Platform,
+  Pressable, Alert, ActivityIndicator, Platform, KeyboardAvoidingView,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,9 +10,9 @@ import type { DateTimePickerEvent } from '@react-native-community/datetimepicker
 
 import { formatDateKey, parseDateKey, toSunday } from '@/src/utils/dateUtils';
 import { usePlannerStore } from '@/src/store/plannerStore';
-import { getAllSections, getAllGardens } from '@/src/db/queries/locationQueries';
+import { getAllSections, getAllGardens, getAllLocations } from '@/src/db/queries/locationQueries';
 import { getCropStages } from '@/src/db/queries/cropQueries';
-import { Section, Garden } from '@/src/types';
+import { Section, Garden, Location } from '@/src/types';
 
 interface StageRow {
   stage_definition_id: number;
@@ -53,9 +53,11 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
   const [stages, setStages]         = useState<StageRow[]>([]);
   const [sections, setSections]     = useState<Section[]>([]);
   const [gardens, setGardens]       = useState<Garden[]>([]);
+  const [locations, setLocations]   = useState<Location[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [page, setPage] = useState<1 | 2>(1);
+  const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     let isCancelled = false;
@@ -65,9 +67,10 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
         return;
       }
 
-      const [secs, gds, existingStages] = await Promise.all([
+      const [secs, gds, locs, existingStages] = await Promise.all([
         getAllSections(),
         getAllGardens(),
+        getAllLocations(),
         isEditMode && cropId != null ? getCropStages(cropId) : Promise.resolve([]),
       ]);
 
@@ -86,12 +89,14 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
       if (currentStageDefs.length === 0) {
         setSections(secs);
         setGardens(gds);
+        setLocations(locs);
         setLoadingInitial(false);
         return;
       }
 
       setSections(secs);
       setGardens(gds);
+      setLocations(locs);
 
       if (isEditMode && cropRow?.type === 'crop_row') {
         const parsedStart = parseDateKey(cropRow.crop.start_date);
@@ -276,33 +281,48 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
     <>
       <Text style={styles.label}>Choose garden/ section for new crop</Text>
       <View style={styles.sectionList}>
-        {(() => {
-          const sortedGardens = [...gardens].sort((a, b) => a.name.localeCompare(b.name));
-          return sortedGardens.map(garden => {
+        {locations.map(location => {
+          const locationGardens = gardens
+            .filter(g => g.location_id === location.id)
+            .sort((a, b) => a.order_index - b.order_index);
+          const gardenRows = locationGardens.flatMap(garden => {
             const gardenSections = sections
               .filter(s => s.garden_id === garden.id)
-              .sort((a, b) => a.name.localeCompare(b.name));
-              console.log('gardenSections',gardenSections)
-            if (gardenSections.length === 0) return null;
-            return (
-              <View key={garden.id}>
-                
-                <Text style={styles.sectionGroupLabel}>{garden.name} Garden</Text>
-                {gardenSections.map(sec => (
-                  <Pressable
-                    key={sec.id}
-                    style={[styles.sectionOption, sectionId === sec.id && styles.sectionSelected]}
-                    onPress={() => setSectionId(sec.id)}
-                  >
-                    <Text style={[styles.sectionText, sectionId === sec.id && styles.sectionTextSelected]}>
-                      {sec.name}
-                    </Text>
-                  </Pressable>
-                ))}
+              .sort((a, b) => a.order_index - b.order_index);
+            if (gardenSections.length === 0) return [];
+            return [(
+              <View key={garden.id} style={styles.gardenGroup}>
+                <View style={styles.gardenHeader}>
+                  <Text style={styles.gardenGroupLabel}>{garden.name}</Text>
+                </View>
+                <View style={styles.sectionItems}>
+                  {gardenSections.map(sec => (
+                    <Pressable
+                      key={sec.id}
+                      style={[styles.sectionOption, sectionId === sec.id && styles.sectionSelected]}
+                      onPress={() => setSectionId(sec.id)}
+                    >
+                      <Text style={[styles.sectionText, sectionId === sec.id && styles.sectionTextSelected]}>
+                        {sec.name}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
               </View>
-            );
+            )];
           });
-        })()}
+          if (gardenRows.length === 0) return null;
+          return (
+            <View key={location.id} style={styles.locationGroup}>
+              <View style={styles.locationHeader}>
+                <Text style={styles.locationGroupLabel}>{location.name}</Text>
+              </View>
+              <View style={styles.locationBody}>
+                {gardenRows}
+              </View>
+            </View>
+          );
+        })}
         {sections.length === 0 && (
           <View style={styles.emptyStateBox}>
             <Text style={styles.emptyStateText}>No sections available yet.</Text>
@@ -322,6 +342,7 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
         placeholder="e.g. Tomato"
         placeholderTextColor="#555"
         maxLength={100}
+        onFocus={() => scrollRef.current?.scrollToEnd({ animated: true })}
         // autoFocus={!isEditMode}
       />
 
@@ -334,6 +355,7 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
         placeholder="1"
         placeholderTextColor="#555"
         maxLength={4}
+        onFocus={() => scrollRef.current?.scrollToEnd({ animated: true })}
       />
 
       {!embedded && (
@@ -442,26 +464,33 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
     </>
   );
 
-  const formContent = (
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={[styles.content, embedded && styles.embeddedContent]}
-        keyboardShouldPersistTaps="handled"
-      >
-        {embedded ? (
-          <>
-            {page1Content}
-            {page2Content}
-          </>
-        ) : (
-          page === 1 ? page1Content : page2Content
-        )}
-      </ScrollView>
+  const scrollContent = (
+    <ScrollView
+      ref={scrollRef}
+      style={styles.container}
+      contentContainerStyle={[styles.content, embedded && styles.embeddedContent]}
+      keyboardShouldPersistTaps="handled"
+    >
+      {embedded ? (
+        <>
+          {page1Content}
+          {page2Content}
+        </>
+      ) : (
+        page === 1 ? page1Content : page2Content
+      )}
+    </ScrollView>
   );
 
-  return embedded ? formContent : (
+  return embedded ? scrollContent : (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
-      {formContent}
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoider}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 12 : 0}
+      >
+        {scrollContent}
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 });
@@ -470,6 +499,7 @@ export default AddCropForm;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#1a1a1a' },
+  keyboardAvoider: { flex: 1 },
   content: { paddingTop: 16, paddingHorizontal: 16, paddingBottom: 40 },
   embeddedContent: { paddingBottom: 16 },
   loadingState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 },
@@ -503,12 +533,37 @@ const styles = StyleSheet.create({
     backgroundColor: '#272727',
   },
   dateDoneText: { color: '#7dcea0', fontWeight: '600', fontSize: 14 },
-  sectionList: { gap: 6 },
-  sectionGroupLabel: { color: '#888', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginTop: 8, marginBottom: 4, paddingHorizontal: 2 },
-  sectionOption: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, borderWidth: 1, borderColor: '#3a3a3a', backgroundColor: '#2a2a2a' },
-  sectionSelected: { borderColor: '#5a9', backgroundColor: '#1e3a2a' },
-  sectionText: { color: '#aaa', fontSize: 13 },
-  sectionTextSelected: { color: '#7dcea0' },
+  sectionList: { gap: 8 },
+  // Location card — near-black, like the planner location band
+  locationGroup: {
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#0d0d0d',
+  },
+  locationHeader: {
+    backgroundColor: '#0d0d0d',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  locationGroupLabel: { color: '#ccc', fontSize: 13, fontWeight: '700', letterSpacing: 0.4 },
+  locationBody: { padding: 8, gap: 6 },
+  // Garden card — dark green, nested inside location
+  gardenGroup: {
+    borderRadius: 6,
+    overflow: 'hidden',
+    backgroundColor: '#003e14',
+  },
+  gardenHeader: {
+    backgroundColor: '#003e14',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  gardenGroupLabel: { color: '#a8e6b8', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
+  sectionItems: { paddingHorizontal: 8, paddingBottom: 8, gap: 5 },
+  sectionOption: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 5, borderWidth: 2, borderColor: 'transparent', backgroundColor: '#cdcdcd' },
+  sectionSelected: { borderColor: 'transparent', backgroundColor: '#1a9148' },
+  sectionText: { color: '#1a1a1a', fontSize: 13, fontWeight: '600' },
+  sectionTextSelected: { color: '#fff', fontWeight: '700' },
   emptyStateBox: {
     borderWidth: 1,
     borderColor: '#3a3a3a',
