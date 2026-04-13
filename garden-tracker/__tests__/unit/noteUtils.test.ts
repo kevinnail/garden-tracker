@@ -9,6 +9,8 @@
 // *
 // * ==================================================
 
+(global as any).__DEV__ = false;
+
 import {
   parseWeeklyNoteEntries,
   serializeWeeklyNoteEntries,
