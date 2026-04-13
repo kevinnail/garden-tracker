@@ -22,7 +22,8 @@ export function createNoteImage(uri: string): NoteImage {
 
 export function copyImageToAppStorage(tempUri: string): string {
   const dir = getNoteImagesDir();
-  const ext = tempUri.split('.').pop()?.split('?')[0]?.toLowerCase() ?? 'jpg';
+  const candidate = tempUri.split('.').pop()?.split('?')[0]?.toLowerCase() ?? '';
+  const ext = /^[a-z]{2,5}$/.test(candidate) ? candidate : 'jpg';
   const fileName = `note-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   const dest = new File(dir, fileName);
   const source = new File(tempUri);
