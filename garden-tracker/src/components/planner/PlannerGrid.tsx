@@ -15,6 +15,8 @@ import {
   TOTAL_HEADER_HEIGHT,
   ROW_HEADER_WIDTH,
   BACKGROUND_COLOR,
+  ZOOM_LEVELS,
+  DEFAULT_ZOOM_LEVEL,
 } from '@/src/constants/layout';
 import { useCellLayout } from '@/src/hooks/useCellLayout';
 import { parseDateKey, todayWeekIndex, dateToWeekIndex } from '@/src/utils/dateUtils';
@@ -159,12 +161,15 @@ export default function PlannerGrid() {
   const handleHomePress = useCallback(() => {
     resetViewState();
     const todayCol = todayWeekIndex(calendarStart);
-    const newX = Math.max(0, (todayCol - 3) * cellWidth);
+    // Use the default zoom cellWidth directly — resetViewState() resets zoom but
+    // the re-render hasn't fired yet, so `cellWidth` is still the old stale value.
+    const defaultCellWidth = ZOOM_LEVELS[DEFAULT_ZOOM_LEVEL - 1].cellWidth;
+    const newX = Math.max(0, (todayCol - 3) * defaultCellWidth);
     scrollX.value = newX;
     scrollY.value = 0;
     setRenderScrollX(newX);
     setRenderScrollY(0);
-  }, [calendarStart, cellWidth, resetViewState, scrollX, scrollY]);
+  }, [calendarStart, resetViewState, scrollX, scrollY]);
 
   if (isLoaded && rows.length === 0) {
     return (
