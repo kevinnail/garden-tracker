@@ -32,6 +32,7 @@ function formatOccurrenceDate(weekSunday: string, dayOfWeek: number): string {
 export default function TaskAssessForm({ embedded = false }: TaskAssessFormProps) {
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
+  const occurrenceListMaxHeight = Math.max(180, Math.min(300, Math.round(height * 0.4)));
   const rows = usePlannerStore(s => s.rows);
   const calendarStart = usePlannerStore(s => s.calendarStart);
   const selectedCropId = usePlannerStore(s => s.selectedCropId);
@@ -185,39 +186,45 @@ export default function TaskAssessForm({ embedded = false }: TaskAssessFormProps
             {occurrences.length === 0 ? (
               <Text style={styles.noOccurrences}>No occurrences in this window</Text>
             ) : (
-              occurrences.map(occ => {
-                const done = completionSet.has(`${task.id}:${occ.weekSunday}`);
-                const taskSunday = parseDateKey(occ.weekSunday);
-                const taskDate = taskSunday
-                  ? new Date(taskSunday.getTime() + task.day_of_week * 24 * 60 * 60 * 1000)
-                  : null;
-                const isPast = taskDate ? taskDate < todayDate : occ.weekIndex < todayWeek;
-                const isThisWeek = occ.weekIndex === todayWeek;
-                return (
-                  <Pressable
-                    key={occ.weekSunday}
-                    style={[styles.occurrenceRow, done && styles.occurrenceRowDone]}
-                    onPress={() => handleToggle(task, occ.weekSunday)}
-                  >
-                    <View style={[styles.checkBox, done && { backgroundColor: task.color, borderColor: task.color }]}>
-                      {done && <Text style={styles.checkMark}>✓</Text>}
-                    </View>
-                    <Text style={[styles.occurrenceDate, done && styles.occurrenceDateDone, isPast && !done && styles.occurrenceDateOverdue]}>
-                      {formatOccurrenceDate(occ.weekSunday, task.day_of_week)}
-                    </Text>
-                    {isPast && !done && (
-                      <View style={styles.overdueBadge}>
-                        <Text style={styles.overdueBadgeText}>Overdue</Text>
+              <ScrollView
+                style={[styles.occurrenceList, { maxHeight: occurrenceListMaxHeight }]}
+                nestedScrollEnabled
+                showsVerticalScrollIndicator={occurrences.length > 4}
+              >
+                {occurrences.map(occ => {
+                  const done = completionSet.has(`${task.id}:${occ.weekSunday}`);
+                  const taskSunday = parseDateKey(occ.weekSunday);
+                  const taskDate = taskSunday
+                    ? new Date(taskSunday.getTime() + task.day_of_week * 24 * 60 * 60 * 1000)
+                    : null;
+                  const isPast = taskDate ? taskDate < todayDate : occ.weekIndex < todayWeek;
+                  const isThisWeek = occ.weekIndex === todayWeek;
+                  return (
+                    <Pressable
+                      key={occ.weekSunday}
+                      style={[styles.occurrenceRow, done && styles.occurrenceRowDone]}
+                      onPress={() => handleToggle(task, occ.weekSunday)}
+                    >
+                      <View style={[styles.checkBox, done && { backgroundColor: task.color, borderColor: task.color }]}>
+                        {done && <Text style={styles.checkMark}>✓</Text>}
                       </View>
-                    )}
-                    {!isPast && !done && isThisWeek && (
-                      <View style={styles.dueBadge}>
-                        <Text style={styles.dueBadgeText}>Due</Text>
-                      </View>
-                    )}
-                  </Pressable>
-                );
-              })
+                      <Text style={[styles.occurrenceDate, done && styles.occurrenceDateDone, isPast && !done && styles.occurrenceDateOverdue]}>
+                        {formatOccurrenceDate(occ.weekSunday, task.day_of_week)}
+                      </Text>
+                      {isPast && !done && (
+                        <View style={styles.overdueBadge}>
+                          <Text style={styles.overdueBadgeText}>Overdue</Text>
+                        </View>
+                      )}
+                      {!isPast && !done && isThisWeek && (
+                        <View style={styles.dueBadge}>
+                          <Text style={styles.dueBadgeText}>Due</Text>
+                        </View>
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
             )}
           </View>
         );
@@ -298,6 +305,7 @@ const styles = StyleSheet.create({
   deleteBtnText: { color: '#664444', fontSize: 13 },
 
   noOccurrences: { color: '#444', fontSize: 12, padding: 12, fontStyle: 'italic' },
+  occurrenceList: { maxHeight: 240 },
 
   occurrenceRow: {
     flexDirection: 'row',
