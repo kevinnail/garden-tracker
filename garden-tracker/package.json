@@ -9,8 +9,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test": "jest --verbose --runInBand --testLocationInResults --setupFiles dotenv/config --passWithNoTests",
-    "test:watch": "jest --watch --verbose --runInBand --setupFiles dotenv/config"
+    "test": "jest --verbose --runInBand --testLocationInResults --passWithNoTests",
+    "test:watch": "jest --watch --verbose --runInBand"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -65,8 +65,13 @@
   },
   "jest": {
     "testEnvironment": "node",
+    "setupFiles": [
+      "dotenv/config",
+      "<rootDir>/__tests__/jestSetup.ts"
+    ],
     "testPathIgnorePatterns": [
-      "<rootDir>/__tests__/setup\\.ts"
+      "<rootDir>/__tests__/setup\\.ts",
+      "<rootDir>/__tests__/jestSetup\\.ts"
     ],
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/$1"
