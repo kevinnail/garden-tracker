@@ -58,6 +58,9 @@ export default function AddLocationForm() {
   const removeLocation = usePlannerStore(s => s.removeLocation);
   const removeGarden = usePlannerStore(s => s.removeGarden);
   const removeSection = usePlannerStore(s => s.removeSection);
+  const renameLocation = usePlannerStore(s => s.renameLocation);
+  const renameGarden = usePlannerStore(s => s.renameGarden);
+  const renameSection = usePlannerStore(s => s.renameSection);
   const resetAllData = usePlannerStore(s => s.resetAllData);
 
   const [mode, setMode] = useState<Mode>('location');
@@ -70,6 +73,8 @@ export default function AddLocationForm() {
   const [submitting, setSubmitting] = useState(false);
   const [lastAdded, setLastAdded] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);
+  const [page, setPage] = useState<1 | 2>(1);
+  const [editingItem, setEditingItem] = useState<{ type: 'location' | 'garden' | 'section'; id: number; value: string } | null>(null);
   const [initialCropCount, setInitialCropCount] = useState<number | null>(null);
   const [allowDismiss, setAllowDismiss] = useState(false);
   const [createdEntityCount, setCreatedEntityCount] = useState(0);
@@ -150,8 +155,7 @@ export default function AddLocationForm() {
     setMode(nextMode);
     setName('');
     setLastAdded(null);
-    focusAndRevealInput();
-  }, [focusAndRevealInput]);
+  }, []);
 
   const syncCreatedEntityCount = useCallback(() => {
     setCreatedEntityCount(
@@ -363,6 +367,21 @@ export default function AddLocationForm() {
     );
   };
 
+  const handleSaveRename = async () => {
+    if (!editingItem) return;
+    const trimmed = editingItem.value.trim();
+    if (!trimmed) return Alert.alert('Validation', 'Name cannot be empty.');
+    try {
+      if (editingItem.type === 'location') await renameLocation(editingItem.id, trimmed);
+      else if (editingItem.type === 'garden') await renameGarden(editingItem.id, trimmed);
+      else await renameSection(editingItem.id, trimmed);
+      setEditingItem(null);
+      await reload();
+    } catch {
+      // toast shown by store
+    }
+  };
+
   const filteredGardens = gardens.filter(g => g.location_id === locationId);
   const filteredSections = sections.filter(s => s.garden_id === gardenId);
   const selectedLocation = locations.find(l => l.id === locationId) ?? null;
@@ -386,6 +405,21 @@ export default function AddLocationForm() {
     });
   };
 
+  const quickGuide = (
+    <>
+      <Pressable style={styles.helpToggle} onPress={() => setShowHelp(v => !v)}>
+        <Text style={styles.helpToggleText}>{showHelp ? 'Hide quick guide' : 'Need a quick guide?'}</Text>
+      </Pressable>
+      {showHelp && (
+        <View style={styles.helpBox}>
+          {HELP_TEXT[mode].map(line => (
+            <Text key={line} style={styles.helpText}>- {line}</Text>
+          ))}
+        </View>
+      )}
+    </>
+  );
+
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
       <KeyboardAvoidingView
@@ -399,204 +433,301 @@ export default function AddLocationForm() {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         >
-          <View style={styles.hierarchyBox}>
-            <Text style={styles.boxTitle}>Hierarchy</Text>
+          {page === 1 ? (
+            <>
+              <View style={styles.hierarchyBox}>
+                <Text style={styles.boxTitle}>Current Hierarchy</Text>
+                <Text style={styles.helpText}>Select Location to see gardens, select a garden to see sections.</Text>
 
-            <Text style={styles.levelTitle}>1. Location</Text>
-            {locations.length === 0 ? (
-              <Text style={styles.emptyHint}>No locations yet.</Text>
-            ) : (
-              <View style={styles.pickerList}>
-                {locations.map(l => (
-                  <Pressable
-                    key={l.id}
-                    style={[styles.pickerOption, locationId === l.id && styles.pickerSelected]}
-                    onPress={() => setLocationId(l.id)}
-                  >
-                    <Text style={[styles.pickerText, locationId === l.id && styles.pickerTextSelected]}>{l.name}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            )}
-
-            <Text style={styles.levelTitle}>2. Garden</Text>
-            {filteredGardens.length === 0 ? (
-              <Text style={styles.emptyHint}>
-                {locationId == null ? 'Select a location first.' : 'No gardens in this location yet.'}
-              </Text>
-            ) : (
-              <View style={styles.pickerList}>
-                {filteredGardens.map(g => (
-                  <Pressable
-                    key={g.id}
-                    style={[styles.pickerOption, gardenId === g.id && styles.pickerSelected]}
-                    onPress={() => setGardenId(g.id)}
-                  >
-                    <Text style={[styles.pickerText, gardenId === g.id && styles.pickerTextSelected]}>{g.name}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            )}
-
-            <Text style={styles.levelTitle}>3. Section</Text>
-            {filteredSections.length === 0 ? (
-              <Text style={styles.emptyHint}>
-                {gardenId == null ? 'Select a garden first.' : 'No sections in this garden yet.'}
-              </Text>
-            ) : (
-              <View style={styles.sectionBadgeList}>
-                {filteredSections.map(s => (
-                  <View key={s.id} style={styles.sectionBadge}>
-                    <Text style={styles.sectionBadgeText}>{s.name}</Text>
+                <Text style={styles.levelTitle}>1. Location</Text>
+                {locations.length === 0 ? (
+                  <Text style={styles.emptyHint}>No locations yet.</Text>
+                ) : (
+                  <View style={styles.pickerList}>
+                    {locations.map(l => (
+                      <Pressable
+                        key={l.id}
+                        style={[styles.pickerOption, locationId === l.id && styles.pickerSelected]}
+                        onPress={() => setLocationId(l.id)}
+                      >
+                        <Text style={[styles.pickerText, locationId === l.id && styles.pickerTextSelected]}>{l.name}</Text>
+                      </Pressable>
+                    ))}
                   </View>
-                ))}
-              </View>
-            )}
-          </View>
+                )}
 
-          <View style={styles.editorBox} onLayout={(e) => setEditorTop(e.nativeEvent.layout.y)}>
-            <Text style={styles.boxTitle}>Add Item</Text>
-
-            <View style={styles.tabs}>
-              {(['location', 'garden', 'section'] as Mode[]).map(m => (
-                <Pressable key={m} style={[styles.tab, mode === m && styles.tabActive]} onPress={() => switchMode(m)}>
-                  <Text style={[styles.tabText, mode === m && styles.tabTextActive]}>
-                    {m === 'location' ? 'Location' : m === 'garden' ? 'Garden' : 'Section'}
+                <Text style={styles.levelTitle}>2. Garden</Text>
+                {filteredGardens.length === 0 ? (
+                  <Text style={styles.emptyHint}>
+                    {locationId == null ? 'Select a location first.' : 'No gardens in this location yet.'}
                   </Text>
-                </Pressable>
-              ))}
-            </View>
-
-            <Text style={styles.modeContext}>{modeContext}</Text>
-
-            <Text style={styles.label}>
-              {mode === 'location' ? 'New Location Name' : mode === 'garden' ? 'New Garden Name' : 'New Section Name'}
-            </Text>
-
-            <View style={styles.inputRow}>
-              <TextInput
-                ref={inputRef}
-                style={[styles.input, { flex: 1 }]}
-                value={name}
-                onChangeText={setName}
-                placeholder={
-                  mode === 'location' ? 'e.g. Home, Farm' :
-                  mode === 'garden' ? 'e.g. Backyard Beds' :
-                  'e.g. Bed 1'
-                }
-                placeholderTextColor="#555"
-                maxLength={100}
-                autoFocus
-                onFocus={ensureEditorVisible}
-                onSubmitEditing={handleSubmit}
-                returnKeyType="done"
-              />
-              <Pressable style={styles.addBtn} onPress={handleSubmit} disabled={submitting}>
-                {submitting ? <ActivityIndicator color="#111" size="small" /> : <Text style={styles.addBtnText}>Add</Text>}
-              </Pressable>
-            </View>
-          </View>
-
-          {lastAdded && (
-            <View style={styles.successBox}>
-              <Text style={styles.successText}>Saved: &quot;{lastAdded}&quot;</Text>
-            </View>
-          )}
-
-          <Pressable style={styles.helpToggle} onPress={() => setShowHelp(v => !v)}>
-            <Text style={styles.helpToggleText}>{showHelp ? 'Hide quick guide' : 'Need a quick guide?'}</Text>
-          </Pressable>
-
-          {showHelp && (
-            <View style={styles.helpBox}>
-              {HELP_TEXT[mode].map(line => (
-                <Text key={line} style={styles.helpText}>- {line}</Text>
-              ))}
-            </View>
-          )}
-
-          {mode === 'location' && locations.length > 0 && (
-            <>
-              <Text style={styles.label}>Current Locations</Text>
-              {locations.map(location => {
-                const status = locationStatus(location, gardens, sections);
-                return (
-                  <View key={location.id} style={styles.existingRow}>
-                    <View style={styles.existingInfo}>
-                      <Text style={styles.existingName}>{location.name}</Text>
-                      <Text style={[styles.existingStatus, { color: STATUS_COLOR[status] }]}>
-                        {STATUS_LABEL[status]}
-                      </Text>
-                    </View>
-                    <Pressable style={styles.deleteBtn} onPress={() => confirmDeleteLocation(location)}>
-                      <Text style={styles.deleteBtnText}>x</Text>
-                    </Pressable>
+                ) : (
+                  <View style={styles.pickerList}>
+                    {filteredGardens.map(g => (
+                      <Pressable
+                        key={g.id}
+                        style={[styles.pickerOption, gardenId === g.id && styles.pickerSelected]}
+                        onPress={() => setGardenId(g.id)}
+                      >
+                        <Text style={[styles.pickerText, gardenId === g.id && styles.pickerTextSelected]}>{g.name}</Text>
+                      </Pressable>
+                    ))}
                   </View>
-                );
-              })}
-            </>
-          )}
+                )}
 
-          {mode === 'garden' && filteredGardens.length > 0 && (
-            <>
-              <Text style={styles.label}>Gardens in this Location</Text>
-              {filteredGardens.map(garden => (
-                <View key={garden.id} style={styles.existingRow}>
-                  <Text style={[styles.existingName, { flex: 1 }]}>{garden.name}</Text>
-                  <Pressable style={styles.deleteBtn} onPress={() => confirmDeleteGarden(garden)}>
-                    <Text style={styles.deleteBtnText}>x</Text>
-                  </Pressable>
+                <View style={styles.sectionResultDivider}>
+                  <View style={styles.sectionResultLine} />
+                  <Text style={styles.sectionResultLabel}>Sections</Text>
+                  <View style={styles.sectionResultLine} />
                 </View>
-              ))}
-            </>
-          )}
+                {filteredSections.length === 0 ? (
+                  <View style={styles.sectionResultEmpty}>
+                    <Text style={styles.sectionResultEmptyText}>
+                      {gardenId == null ? 'Select a location and garden above to see sections.' : 'No sections in this garden yet.'}
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.sectionResultList}>
+                    {filteredSections.map(s => (
+                      <View key={s.id} style={styles.sectionResultRow}>
+                        <Text style={styles.sectionResultName}>{s.name}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
 
-          {mode === 'section' && filteredSections.length > 0 && (
+              {quickGuide}
+
+              <View style={styles.actionRow}>
+                <Pressable style={styles.doneBtn} onPress={handleDone}>
+                  <Text style={styles.doneBtnText}>Done</Text>
+                </Pressable>
+                <Pressable style={styles.nextBtn} onPress={() => setPage(2)}>
+                  <Text style={styles.nextBtnText}>Add / Edit Items</Text>
+                </Pressable>
+              </View>
+            </>
+          ) : (
             <>
-              <Text style={styles.label}>Sections in this Garden</Text>
-              {filteredSections.map(section => (
-                <View key={section.id} style={styles.existingRow}>
-                  <Text style={[styles.existingName, { flex: 1 }]}>{section.name}</Text>
-                  <Pressable style={styles.deleteBtn} onPress={() => confirmDeleteSection(section)}>
-                    <Text style={styles.deleteBtnText}>x</Text>
-                  </Pressable>
+              <View style={styles.editorBox} onLayout={(e) => setEditorTop(e.nativeEvent.layout.y)}>
+                <Text style={styles.boxTitle}>Add Item</Text>
+
+                <View style={styles.tabs}>
+                  {(['location', 'garden', 'section'] as Mode[]).map(m => (
+                    <Pressable key={m} style={[styles.tab, mode === m && styles.tabActive]} onPress={() => switchMode(m)}>
+                      <Text style={[styles.tabText, mode === m && styles.tabTextActive]}>
+                        {m === 'location' ? 'Location' : m === 'garden' ? 'Garden' : 'Section'}
+                      </Text>
+                    </Pressable>
+                  ))}
                 </View>
-              ))}
-            </>
-          )}
 
-          {hasReadyLocation && (
-            <Pressable style={styles.addCropBtn} onPress={openAddCrop}>
-              <Text style={styles.addCropBtnText}>Continue to Add Crop</Text>
-            </Pressable>
-          )}
+                <Text style={styles.modeContext}>{modeContext}</Text>
 
-          <Pressable style={styles.doneBtn} onPress={handleDone}>
-            <Text style={styles.doneBtnText}>Done</Text>
-          </Pressable>
+                <Text style={styles.label}>
+                  {mode === 'location' ? 'New Location Name' : mode === 'garden' ? 'New Garden Name' : 'New Section Name'}
+                </Text>
 
-          <Pressable
-            style={styles.resetBtn}
-            onPress={() =>
-              Alert.alert('Reset All Data', 'Delete everything and start fresh? This cannot be undone.', [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Reset',
-                  style: 'destructive',
-                  onPress: async () => {
-                    try {
-                      await resetAllData();
-                      await reload();
-                    } catch {
-                      // toast shown by store
+                <View style={styles.inputRow}>
+                  <TextInput
+                    ref={inputRef}
+                    style={[styles.input, { flex: 1 }]}
+                    value={name}
+                    onChangeText={setName}
+                    placeholder={
+                      mode === 'location' ? 'e.g. Home, Farm' :
+                      mode === 'garden' ? 'e.g. Backyard Beds' :
+                      'e.g. Bed 1'
                     }
-                  },
-                },
-              ])
-            }
-          >
-            <Text style={styles.resetBtnText}>Reset Database</Text>
-          </Pressable>
+                    placeholderTextColor="#555"
+                    maxLength={100}
+                    onFocus={ensureEditorVisible}
+                    onSubmitEditing={handleSubmit}
+                    returnKeyType="done"
+                  />
+                  <Pressable style={styles.addBtn} onPress={handleSubmit} disabled={submitting}>
+                    {submitting ? <ActivityIndicator color="#111" size="small" /> : <Text style={styles.addBtnText}>Add</Text>}
+                  </Pressable>
+                </View>
+              </View>
+
+              {lastAdded && (
+                <View style={styles.successBox}>
+                  <Text style={styles.successText}>Saved: &quot;{lastAdded}&quot;</Text>
+                </View>
+              )}
+
+              {mode === 'location' && locations.length > 0 && (
+                <>
+                  <Text style={styles.label}>Current Locations</Text>
+                  {locations.map(location => {
+                    const status = locationStatus(location, gardens, sections);
+                    const isEditing = editingItem?.type === 'location' && editingItem.id === location.id;
+                    return (
+                      <View key={location.id} style={styles.existingRow}>
+                        {isEditing ? (
+                          <>
+                            <TextInput
+                              style={[styles.input, styles.inlineEditInput]}
+                              value={editingItem.value}
+                              onChangeText={v => setEditingItem(e => e ? { ...e, value: v } : e)}
+                              onSubmitEditing={handleSaveRename}
+                              returnKeyType="done"
+                              autoFocus
+                            />
+                            <Pressable style={styles.saveBtn} onPress={handleSaveRename}>
+                              <Text style={styles.saveBtnText}>✓</Text>
+                            </Pressable>
+                            <Pressable style={styles.deleteBtn} onPress={() => setEditingItem(null)}>
+                              <Text style={styles.deleteBtnText}>✕</Text>
+                            </Pressable>
+                          </>
+                        ) : (
+                          <>
+                            <View style={styles.existingInfo}>
+                              <Text style={styles.existingName}>{location.name}</Text>
+                              <Text style={[styles.existingStatus, { color: STATUS_COLOR[status] }]}>
+                                {STATUS_LABEL[status]}
+                              </Text>
+                            </View>
+                            <Pressable style={styles.editBtn} onPress={() => setEditingItem({ type: 'location', id: location.id, value: location.name })}>
+                              <Text style={styles.editBtnText}>✎</Text>
+                            </Pressable>
+                            <Pressable style={styles.deleteBtn} onPress={() => confirmDeleteLocation(location)}>
+                              <Text style={styles.deleteBtnText}>x</Text>
+                            </Pressable>
+                          </>
+                        )}
+                      </View>
+                    );
+                  })}
+                </>
+              )}
+
+              {mode === 'garden' && filteredGardens.length > 0 && (
+                <>
+                  <Text style={styles.label}>Gardens in this Location</Text>
+                  {filteredGardens.map(garden => {
+                    const isEditing = editingItem?.type === 'garden' && editingItem.id === garden.id;
+                    return (
+                      <View key={garden.id} style={styles.existingRow}>
+                        {isEditing ? (
+                          <>
+                            <TextInput
+                              style={[styles.input, styles.inlineEditInput]}
+                              value={editingItem.value}
+                              onChangeText={v => setEditingItem(e => e ? { ...e, value: v } : e)}
+                              onSubmitEditing={handleSaveRename}
+                              returnKeyType="done"
+                              autoFocus
+                            />
+                            <Pressable style={styles.saveBtn} onPress={handleSaveRename}>
+                              <Text style={styles.saveBtnText}>✓</Text>
+                            </Pressable>
+                            <Pressable style={styles.deleteBtn} onPress={() => setEditingItem(null)}>
+                              <Text style={styles.deleteBtnText}>✕</Text>
+                            </Pressable>
+                          </>
+                        ) : (
+                          <>
+                            <Text style={[styles.existingName, { flex: 1 }]}>{garden.name}</Text>
+                            <Pressable style={styles.editBtn} onPress={() => setEditingItem({ type: 'garden', id: garden.id, value: garden.name })}>
+                              <Text style={styles.editBtnText}>✎</Text>
+                            </Pressable>
+                            <Pressable style={styles.deleteBtn} onPress={() => confirmDeleteGarden(garden)}>
+                              <Text style={styles.deleteBtnText}>x</Text>
+                            </Pressable>
+                          </>
+                        )}
+                      </View>
+                    );
+                  })}
+                </>
+              )}
+
+              {mode === 'section' && filteredSections.length > 0 && (
+                <>
+                  <Text style={styles.label}>Sections in this Garden</Text>
+                  {filteredSections.map(section => {
+                    const isEditing = editingItem?.type === 'section' && editingItem.id === section.id;
+                    return (
+                      <View key={section.id} style={styles.existingRow}>
+                        {isEditing ? (
+                          <>
+                            <TextInput
+                              style={[styles.input, styles.inlineEditInput]}
+                              value={editingItem.value}
+                              onChangeText={v => setEditingItem(e => e ? { ...e, value: v } : e)}
+                              onSubmitEditing={handleSaveRename}
+                              returnKeyType="done"
+                              autoFocus
+                            />
+                            <Pressable style={styles.saveBtn} onPress={handleSaveRename}>
+                              <Text style={styles.saveBtnText}>✓</Text>
+                            </Pressable>
+                            <Pressable style={styles.deleteBtn} onPress={() => setEditingItem(null)}>
+                              <Text style={styles.deleteBtnText}>✕</Text>
+                            </Pressable>
+                          </>
+                        ) : (
+                          <>
+                            <Text style={[styles.existingName, { flex: 1 }]}>{section.name}</Text>
+                            <Pressable style={styles.editBtn} onPress={() => setEditingItem({ type: 'section', id: section.id, value: section.name })}>
+                              <Text style={styles.editBtnText}>✎</Text>
+                            </Pressable>
+                            <Pressable style={styles.deleteBtn} onPress={() => confirmDeleteSection(section)}>
+                              <Text style={styles.deleteBtnText}>x</Text>
+                            </Pressable>
+                          </>
+                        )}
+                      </View>
+                    );
+                  })}
+                </>
+              )}
+
+              {hasReadyLocation && (
+                <Pressable style={styles.addCropBtn} onPress={openAddCrop}>
+                  <Text style={styles.addCropBtnText}>Continue to Add Crop</Text>
+                </Pressable>
+              )}
+
+              {quickGuide}
+
+              <View style={styles.actionRow}>
+                <Pressable style={styles.backBtn} onPress={() => setPage(1)}>
+                  <Text style={styles.backBtnText}>← View Hierarchy</Text>
+                </Pressable>
+                <Pressable style={styles.doneBtn} onPress={handleDone}>
+                  <Text style={styles.doneBtnText}>Done</Text>
+                </Pressable>
+              </View>
+
+              <Pressable
+                style={styles.resetBtn}
+                onPress={() =>
+                  Alert.alert('Reset All Data', 'Delete everything and start fresh? This cannot be undone.', [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Reset',
+                      style: 'destructive',
+                      onPress: async () => {
+                        try {
+                          await resetAllData();
+                          await reload();
+                        } catch {
+                          // toast shown by store
+                        }
+                      },
+                    },
+                  ])
+                }
+              >
+                <Text style={styles.resetBtnText}>Reset Database</Text>
+              </Pressable>
+            </>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -648,6 +779,29 @@ const styles = StyleSheet.create({
   sectionBadgeList: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   sectionBadge: { borderRadius: 999, borderWidth: 1, borderColor: '#4b6a55', paddingHorizontal: 10, paddingVertical: 4, backgroundColor: '#1e3a2a' },
   sectionBadgeText: { color: '#7dcea0', fontSize: 12, fontWeight: '600' },
+  sectionResultDivider: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 14, marginBottom: 8 },
+  sectionResultLine: { flex: 1, height: 1, backgroundColor: '#3a5a45' },
+  sectionResultLabel: { color: '#7dcea0', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
+  sectionResultList: { gap: 6 },
+  sectionResultRow: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#3a5a45',
+    backgroundColor: '#182e20',
+  },
+  sectionResultName: { color: '#a8e6c0', fontSize: 14, fontWeight: '600' },
+  sectionResultEmpty: {
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#2a3a2e',
+    backgroundColor: '#161e18',
+    alignItems: 'center',
+  },
+  sectionResultEmptyText: { color: '#4a7a5a', fontSize: 13, textAlign: 'center', fontStyle: 'italic' },
   helpToggle: {
     marginTop: 12,
     borderRadius: 8,
@@ -672,12 +826,22 @@ const styles = StyleSheet.create({
   existingInfo: { flex: 1 },
   existingName: { color: '#ccc', fontSize: 13 },
   existingStatus: { fontSize: 11, marginTop: 2 },
+  editBtn: { padding: 6 },
+  editBtnText: {marginRight:10, color: '#7dcea0', fontSize: 15 },
+  saveBtn: { padding: 6 },
+  saveBtnText: {marginRight:10, color: '#2ecc71', fontSize: 16, fontWeight: '700' },
   deleteBtn: { padding: 6 },
   deleteBtnText: { color: '#664444', fontSize: 14 },
+  inlineEditInput: { flex: 1, paddingVertical: 4, marginRight: 4 },
   addCropBtn: { marginTop: 24, paddingVertical: 14, borderRadius: 8, backgroundColor: '#2ecc71', alignItems: 'center' },
   addCropBtnText: { color: '#111', fontWeight: '700', fontSize: 15 },
-  doneBtn: { marginTop: 10, paddingVertical: 14, borderRadius: 8, borderWidth: 1, borderColor: '#4a4a4a', backgroundColor: '#262626', alignItems: 'center' },
+  actionRow: { marginTop: 10, flexDirection: 'row', gap: 10 },
+  doneBtn: { flex: 1, paddingVertical: 14, borderRadius: 8, borderWidth: 1, borderColor: '#4a4a4a', backgroundColor: '#262626', alignItems: 'center' },
   doneBtnText: { color: '#ddd', fontWeight: '600', fontSize: 15 },
+  nextBtn: { flex: 1, paddingVertical: 14, borderRadius: 8, backgroundColor: '#2ecc71', alignItems: 'center' },
+  nextBtnText: { color: '#111', fontWeight: 'bold', fontSize: 15 },
+  backBtn: { flex: 1, paddingVertical: 14, borderRadius: 8, borderWidth: 1, borderColor: '#4a6a55', backgroundColor: '#1e3a2a', alignItems: 'center' },
+  backBtnText: { color: '#7dcea0', fontWeight: '600', fontSize: 15 },
   resetBtn: { marginTop: 32, paddingVertical: 10, alignItems: 'center' },
   resetBtnText: { color: '#5a2020', fontSize: 12, fontWeight: '600' },
 });

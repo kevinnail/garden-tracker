@@ -15,10 +15,14 @@ import {
 import { router } from 'expo-router';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
+import { Image } from 'expo-image';
+import { Ionicons } from '@expo/vector-icons';
 
-import { WeeklyNoteEntry } from '@/src/types';
+import { NoteImage, WeeklyNoteEntry } from '@/src/types';
 import { usePlannerStore } from '@/src/store/plannerStore';
 import {
+  compareWeeklyNoteEntries,
   createWeeklyNoteEntry,
   dateForWeekEntry,
   formatWeekEntryLabel,
@@ -27,12 +31,15 @@ import {
   serializeWeeklyNoteEntries,
   updateWeeklyNoteEntry,
 } from '@/src/utils/noteUtils';
+import { copyImageToAppStorage, createNoteImage, deleteImageFile } from '@/src/utils/imageStorage';
+import NoteImageStrip from '@/src/components/notes/NoteImageStrip';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 interface CellNoteFormProps {
   cropId: number;
   weekDate: string;
+  initialMode?: 'view' | 'compose';
 }
 
 function defaultDayOfWeek(weekDate: string): number {
@@ -52,7 +59,7 @@ function defaultDayOfWeek(weekDate: string): number {
   return 0;
 }
 
-export default function CellNoteForm({ cropId, weekDate }: CellNoteFormProps) {
+export default function CellNoteForm({ cropId, weekDate, initialMode = 'view' }: CellNoteFormProps) {
   const headerHeight = useHeaderHeight();
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
@@ -68,19 +75,26 @@ export default function CellNoteForm({ cropId, weekDate }: CellNoteFormProps) {
   const [draft, setDraft] = useState('');
   const [selectedDay, setSelectedDay] = useState(() => defaultDayOfWeek(weekDate));
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [composerOpen, setComposerOpen] = useState(initialMode === 'compose');
   const [saving, setSaving] = useState(false);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [pendingImages, setPendingImages] = useState<NoteImage[]>([]);
   // Ref guard stops a double-tap from queuing two persistEntries calls before
   // React flushes the `saving` state that would disable the button.
   const saveInFlight = useRef(false);
+  // IDs of images that existed before this compose session started (for cleanup on cancel)
+  const sessionOriginalImageIds = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const parsed = parseWeeklyNoteEntries(note);
     setEntries(parsed);
     setDraft('');
+    setPendingImages([]);
+    sessionOriginalImageIds.current = new Set();
     setSelectedDay(defaultDayOfWeek(weekDate));
     setEditingEntryId(null);
-  }, [note, weekDate]);
+    setComposerOpen(initialMode === 'compose' || parsed.length === 0);
+  }, [initialMode, note, weekDate]);
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -100,12 +114,23 @@ export default function CellNoteForm({ cropId, weekDate }: CellNoteFormProps) {
     () => entries.find(entry => entry.id === editingEntryId) ?? null,
     [editingEntryId, entries]
   );
+  const entriesByDay = useMemo(
+    () => DAYS
+      .map((day, index) => ({
+        day,
+        index,
+        date: dateForWeekEntry(weekDate, index),
+        entries: entries.filter(entry => entry.day_of_week === index),
+      }))
+      .filter(group => group.entries.length > 0),
+    [entries, weekDate]
+  );
 
   const persistEntries = async (nextEntries: WeeklyNoteEntry[]) => {
     if (saveInFlight.current) return false;
     saveInFlight.current = true;
 
-    const filtered = nextEntries.filter(entry => entry.text.trim().length > 0);
+    const filtered = nextEntries.filter(entry => entry.text.trim().length > 0 || (entry.images?.length ?? 0) > 0);
     setSaving(true);
 
     try {
@@ -128,31 +153,56 @@ export default function CellNoteForm({ cropId, weekDate }: CellNoteFormProps) {
 
   const handleSaveEntry = async () => {
     const trimmed = draft.trim();
-    if (!trimmed) {
+    const hasImages = pendingImages.length > 0;
+
+    if (!trimmed && !hasImages) {
       if (editingEntry) {
         await handleDeleteEntry(editingEntry.id);
       }
       return;
     }
 
+    // Delete files for pre-existing images the user removed during this edit
+    if (editingEntry) {
+      for (const originalId of sessionOriginalImageIds.current) {
+        if (!pendingImages.find(i => i.id === originalId)) {
+          const img = editingEntry.images?.find(i => i.id === originalId);
+          if (img) deleteImageFile(img.uri);
+        }
+      }
+    }
+
     const nextEntries = editingEntry
       ? entries.map(entry => (
           entry.id === editingEntry.id
-            ? updateWeeklyNoteEntry(entry, selectedDay, trimmed)
+            ? updateWeeklyNoteEntry(entry, selectedDay, trimmed, pendingImages.length > 0 ? pendingImages : undefined)
             : entry
         ))
-      : [...entries, createWeeklyNoteEntry(selectedDay, trimmed)];
+      : [...entries, createWeeklyNoteEntry(selectedDay, trimmed, pendingImages.length > 0 ? pendingImages : undefined)];
 
     const saved = await persistEntries(nextEntries);
     if (!saved) return;
 
-    setEntries(nextEntries);
+    const sortedEntries = [...nextEntries].sort(compareWeeklyNoteEntries);
+    setEntries(sortedEntries);
     setDraft('');
+    setPendingImages([]);
+    sessionOriginalImageIds.current = new Set();
     setEditingEntryId(null);
     setSelectedDay(defaultDayOfWeek(weekDate));
+    if (initialMode === 'view' && sortedEntries.length > 0) {
+      setComposerOpen(false);
+    }
   };
 
   const handleDeleteEntry = async (entryId: string) => {
+    const entryToDelete = entries.find(e => e.id === entryId);
+    if (entryToDelete?.images) {
+      for (const img of entryToDelete.images) {
+        deleteImageFile(img.uri);
+      }
+    }
+
     const nextEntries = entries.filter(entry => entry.id !== entryId);
     const saved = await persistEntries(nextEntries);
     if (!saved) return;
@@ -160,8 +210,13 @@ export default function CellNoteForm({ cropId, weekDate }: CellNoteFormProps) {
     setEntries(nextEntries);
     if (editingEntryId === entryId) {
       setDraft('');
+      setPendingImages([]);
+      sessionOriginalImageIds.current = new Set();
       setEditingEntryId(null);
       setSelectedDay(defaultDayOfWeek(weekDate));
+    }
+    if (nextEntries.length === 0) {
+      setComposerOpen(true);
     }
   };
 
@@ -169,12 +224,72 @@ export default function CellNoteForm({ cropId, weekDate }: CellNoteFormProps) {
     setEditingEntryId(entry.id);
     setDraft(entry.text);
     setSelectedDay(entry.day_of_week);
+    setPendingImages(entry.images ?? []);
+    sessionOriginalImageIds.current = new Set((entry.images ?? []).map(img => img.id));
+    setComposerOpen(true);
   };
 
   const cancelEdit = () => {
+    // Clean up images that were added during this session but never saved
+    for (const img of pendingImages) {
+      if (!sessionOriginalImageIds.current.has(img.id)) {
+        deleteImageFile(img.uri);
+      }
+    }
+    setPendingImages([]);
+    sessionOriginalImageIds.current = new Set();
     setEditingEntryId(null);
     setDraft('');
     setSelectedDay(defaultDayOfWeek(weekDate));
+    if (entries.length > 0 && initialMode === 'view') {
+      setComposerOpen(false);
+    }
+  };
+
+  const openComposer = (dayOfWeek = defaultDayOfWeek(weekDate)) => {
+    setEditingEntryId(null);
+    setDraft('');
+    setSelectedDay(dayOfWeek);
+    setPendingImages([]);
+    sessionOriginalImageIds.current = new Set();
+    setComposerOpen(true);
+  };
+
+  const pickFromCamera = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Camera access', 'Camera permission is required to take photos.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({ mediaTypes: 'images', quality: 0.85 });
+    if (result.canceled || !result.assets[0]) return;
+    try {
+      const persistentUri = copyImageToAppStorage(result.assets[0].uri);
+      setPendingImages(prev => [...prev, createNoteImage(persistentUri)]);
+    } catch {
+      Alert.alert('Error', 'Could not attach photo.');
+    }
+  };
+
+  const pickFromLibrary = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', quality: 0.85 });
+    if (result.canceled || !result.assets[0]) return;
+    try {
+      const persistentUri = copyImageToAppStorage(result.assets[0].uri);
+      setPendingImages(prev => [...prev, createNoteImage(persistentUri)]);
+    } catch {
+      Alert.alert('Error', 'Could not attach photo.');
+    }
+  };
+
+  const handleRemoveImage = (imageId: string) => {
+    const img = pendingImages.find(i => i.id === imageId);
+    if (!img) return;
+    // Only delete file immediately if it's new this session (not yet in DB)
+    if (!sessionOriginalImageIds.current.has(imageId)) {
+      deleteImageFile(img.uri);
+    }
+    setPendingImages(prev => prev.filter(i => i.id !== imageId));
   };
 
   const handleSecondaryAction = () => {
@@ -215,94 +330,168 @@ export default function CellNoteForm({ cropId, weekDate }: CellNoteFormProps) {
           {/* Header — collapsed to one line in landscape to save vertical space */}
           <View style={[styles.header, isLandscape && styles.headerCompact]}>
             <Text style={styles.cropName}>{cropName}</Text>
-            <Text style={styles.weekLabel}>{formatWeekRangeLabel(weekDate)}</Text>
-            {!isLandscape && (
-              <Text style={styles.helperText}>Each entry gets its own day label so this weekly cell stays readable.</Text>
+            <Text style={[styles.weekLabel, isLandscape && styles.weekLabelCompact]}>{formatWeekRangeLabel(weekDate)}</Text>
+          </View>
+
+          <View style={styles.sectionHeader}>
+            <View>
+              <Text style={styles.sectionTitle}>This week</Text>
+              <Text style={styles.sectionSubtitle}>
+                {entries.length === 0
+                  ? 'No notes yet for this week.'
+                  : `${entries.length} ${entries.length === 1 ? 'note' : 'notes'} arranged by day.`}
+              </Text>
+            </View>
+            {entries.length > 0 && !composerOpen && (
+              <Pressable style={styles.sectionAction} onPress={() => openComposer()}>
+                <Text style={styles.sectionActionText}>Add Note</Text>
+              </Pressable>
             )}
           </View>
 
-          {/* Existing entries */}
           <View style={styles.list}>
             {entries.length === 0 ? (
               <View style={styles.emptyCard}>
                 <Text style={styles.emptyCardTitle}>No entries yet</Text>
                 {!isLandscape && (
-                  <Text style={styles.emptyCardText}>Add short daily notes here instead of mixing the whole week into one paragraph.</Text>
+                  <Text style={styles.emptyCardText}>Long press a week in the planner to jump right into adding. Once notes exist, a quick tap brings you here to read them first.</Text>
                 )}
               </View>
             ) : (
-              entries.map(entry => (
-                <View key={entry.id} style={[styles.entryCard, editingEntryId === entry.id && styles.entryCardEditing]}>
-                  <View style={styles.entryHeader}>
-                    <Text style={styles.entryLabel}>{formatWeekEntryLabel(weekDate, entry)}</Text>
-                    <View style={styles.entryActions}>
-                      <Pressable style={styles.inlineBtn} onPress={() => beginEdit(entry)}>
-                        <Text style={styles.inlineBtnText}>Edit</Text>
-                      </Pressable>
-                      <Pressable style={styles.inlineBtn} onPress={() => handleDeleteEntry(entry.id)}>
-                        <Text style={[styles.inlineBtnText, styles.deleteInlineText]}>Delete</Text>
-                      </Pressable>
-                    </View>
+              <View style={styles.weekPanel}>
+                {entriesByDay.map(group => (
+                  <View key={group.index} style={styles.daySection}>
+                    <Text style={styles.daySectionLabel}>
+                      {group.date
+                        ? group.date.toLocaleDateString('en-US', {
+                            weekday: 'long',
+                            month: 'short',
+                            day: 'numeric',
+                          })
+                        : group.day}
+                    </Text>
+
+                    {group.entries.map((entry, index) => (
+                      <View
+                        key={entry.id}
+                        style={[
+                          styles.entryRow,
+                          editingEntryId === entry.id && styles.entryRowEditing,
+                          index < group.entries.length - 1 && styles.entryRowDivider,
+                        ]}
+                      >
+                        <View style={styles.entryHeader}>
+                          <Text style={styles.entryLabel}>{formatWeekEntryLabel(weekDate, entry)}</Text>
+                          <View style={styles.entryActions}>
+                            <Pressable style={styles.inlineBtn} onPress={() => beginEdit(entry)}>
+                              <Text style={styles.inlineBtnText}>Edit</Text>
+                            </Pressable>
+                            <Pressable style={styles.inlineBtn} onPress={() => handleDeleteEntry(entry.id)}>
+                              <Text style={[styles.inlineBtnText, styles.deleteInlineText]}>Delete</Text>
+                            </Pressable>
+                          </View>
+                        </View>
+                        {entry.text.length > 0 && <Text style={styles.entryBody}>{entry.text}</Text>}
+                        <NoteImageStrip images={entry.images ?? []} />
+                      </View>
+                    ))}
                   </View>
-                  <Text style={styles.entryBody}>{entry.text}</Text>
-                </View>
-              ))
+                ))}
+              </View>
             )}
           </View>
 
-          {/* Composer */}
-          <View style={styles.composerCard}>
-            <View style={styles.composerHeader}>
-              <View style={styles.composerHeaderText}>
-                <Text style={styles.composerTitle}>{editingEntry ? 'Edit entry' : 'New entry'}</Text>
-                {!editingEntry && !keyboardOpen && !draft.trim() && !isLandscape && (
-                  <Text style={styles.composerSubtitle}>Tap below to add a dated note for this week.</Text>
+          {composerOpen ? (
+            <View style={styles.composerCard}>
+              <View style={styles.composerHeader}>
+                <View style={styles.composerHeaderText}>
+                  <Text style={styles.composerTitle}>{editingEntry ? 'Edit note' : 'Add note'}</Text>
+                  {!keyboardOpen && !draft.trim() && !isLandscape && (
+                    <Text style={styles.composerSubtitle}>
+                      {editingEntry
+                        ? 'Adjust the day or wording, then save it back into the weekly timeline.'
+                        : 'Choose the day first, then add a short note that is easy to scan later.'}
+                    </Text>
+                  )}
+                </View>
+              </View>
+
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dayPicker} keyboardShouldPersistTaps="handled">
+                {DAYS.map((day, index) => (
+                  <Pressable
+                    key={day}
+                    style={[styles.dayChip, selectedDay === index && styles.dayChipSelected]}
+                    onPress={() => setSelectedDay(index)}
+                  >
+                    <Text style={[styles.dayChipText, selectedDay === index && styles.dayChipTextSelected]}>{day}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+
+              <TextInput
+                style={[styles.input, isLandscape && styles.inputCompact]}
+                multiline
+                value={draft}
+                onChangeText={setDraft}
+                maxLength={2000}
+                placeholder="What happened, what changed, what to remember next time?"
+                placeholderTextColor="#5a5a5a"
+                textAlignVertical="top"
+                scrollEnabled
+              />
+
+              <View style={styles.imageAttachRow}>
+                <Pressable style={styles.imagePickerBtn} onPress={pickFromCamera} disabled={pendingImages.length >= 5}>
+                  <Ionicons name="camera-outline" size={18} color={pendingImages.length >= 5 ? '#444' : '#3575f0'} />
+                </Pressable>
+                <Pressable style={styles.imagePickerBtn} onPress={pickFromLibrary} disabled={pendingImages.length >= 5}>
+                  <Ionicons name="images-outline" size={18} color={pendingImages.length >= 5 ? '#444' : '#3575f0'} />
+                </Pressable>
+                {pendingImages.length > 0 && (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pendingImagesScroll} contentContainerStyle={styles.pendingImagesContent}>
+                    {pendingImages.map(img => (
+                      <View key={img.id} style={styles.pendingThumb}>
+                        <Image source={{ uri: img.uri }} style={styles.pendingThumbImage} contentFit="cover" />
+                        <Pressable style={styles.removeImageBtn} onPress={() => handleRemoveImage(img.id)} hitSlop={6}>
+                          <Text style={styles.removeImageText}>✕</Text>
+                        </Pressable>
+                      </View>
+                    ))}
+                  </ScrollView>
                 )}
               </View>
+
+              <View style={styles.actionRow}>
+                {editingEntry ? (
+                  <Pressable style={styles.secondaryBtn} onPress={cancelEdit} disabled={saving}>
+                    <Text style={styles.secondaryBtnText}>Cancel Edit</Text>
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    style={styles.secondaryBtn}
+                    onPress={entries.length > 0 ? () => setComposerOpen(false) : handleSecondaryAction}
+                    disabled={saving}
+                  >
+                    <Text style={styles.secondaryBtnText}>
+                      {entries.length > 0 ? 'Back to Notes' : keyboardOpen ? 'Done' : 'Close'}
+                    </Text>
+                  </Pressable>
+                )}
+
+                <Pressable style={styles.primaryBtn} onPress={handleSaveEntry} disabled={saving}>
+                  <Text style={styles.primaryBtnText}>
+                    {editingEntry ? 'Save Note' : 'Add Note'}
+                  </Text>
+                </Pressable>
+              </View>
             </View>
-
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dayPicker} keyboardShouldPersistTaps="handled">
-              {DAYS.map((day, index) => (
-                <Pressable
-                  key={day}
-                  style={[styles.dayChip, selectedDay === index && styles.dayChipSelected]}
-                  onPress={() => setSelectedDay(index)}
-                >
-                  <Text style={[styles.dayChipText, selectedDay === index && styles.dayChipTextSelected]}>{day}</Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-
-            <TextInput
-              style={[styles.input, isLandscape && styles.inputCompact]}
-              multiline
-              value={draft}
-              onChangeText={setDraft}
-              maxLength={2000}
-              placeholder="What happened, what changed, what to remember next time?"
-              placeholderTextColor="#5a5a5a"
-              textAlignVertical="top"
-              scrollEnabled
-            />
-
-            <View style={styles.actionRow}>
-              {editingEntry ? (
-                <Pressable style={styles.secondaryBtn} onPress={cancelEdit} disabled={saving}>
-                  <Text style={styles.secondaryBtnText}>Cancel Edit</Text>
-                </Pressable>
-              ) : (
-                <Pressable style={styles.secondaryBtn} onPress={handleSecondaryAction} disabled={saving}>
-                  <Text style={styles.secondaryBtnText}>{keyboardOpen ? 'Done' : 'Close'}</Text>
-                </Pressable>
-              )}
-
-              <Pressable style={styles.primaryBtn} onPress={handleSaveEntry} disabled={saving}>
-                <Text style={styles.primaryBtnText}>
-                  {editingEntry ? 'Save Entry' : 'Add Entry'}
-                </Text>
+          ) : (
+            <View style={styles.footer}>
+              <Pressable style={styles.footerCloseBtn} onPress={() => router.back()}>
+                <Text style={styles.footerCloseBtnText}>Close</Text>
               </Pressable>
             </View>
-          </View>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -326,42 +515,74 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 12,
+    paddingTop: 10,
+    paddingBottom: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#242424',
+    borderBottomColor: '#148a3e',
+    backgroundColor: '#1a9148',
   },
   headerCompact: {
     paddingTop: 6,
     paddingBottom: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
   },
   cropName: {
-    color: '#e7e7e7',
+    color: '#ffffff',
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   weekLabel: {
     marginTop: 4,
-    color: '#9cb2bf',
+    color: '#c8ffe0',
     fontSize: 13,
+    fontWeight: '600',
+  },
+  weekLabelCompact: {
+    marginTop: 2,
   },
   helperText: {
     marginTop: 8,
-    color: '#7d7d7d',
+    color: '#a8f0c0',
     fontSize: 12,
     lineHeight: 18,
+  },
+  sectionHeader: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+  },
+  sectionTitle: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  sectionSubtitle: {
+    marginTop: 4,
+    color: '#8c989d',
+    fontSize: 12,
+  },
+  sectionAction: {
+    borderRadius: 999,
+    borderWidth: 0,
+    backgroundColor: '#3575f0',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  sectionActionText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '800',
   },
   list: {
     padding: 16,
     gap: 12,
   },
   emptyCard: {
-    backgroundColor: '#1d1d1d',
+    backgroundColor: '#0d1628',
     borderWidth: 1,
-    borderColor: '#2a2a2a',
+    borderColor: '#1e3468',
     borderRadius: 12,
     padding: 14,
   },
@@ -376,17 +597,40 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
   },
-  entryCard: {
-    backgroundColor: '#1d1d1d',
+  weekPanel: {
+    backgroundColor: '#0d1628',
     borderWidth: 1,
-    borderColor: '#2e2e2e',
+    borderColor: '#1e3468',
     borderRadius: 12,
-    padding: 14,
-    marginBottom: 12,
+    overflow: 'hidden',
   },
-  entryCardEditing: {
-    borderColor: '#2f6b86',
-    backgroundColor: '#192127',
+  daySection: {
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1a2d58',
+  },
+  daySectionLabel: {
+    color: '#f5a623',
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 10,
+    letterSpacing: 0.3,
+  },
+  entryRow: {
+    borderRadius: 10,
+    paddingVertical: 10,
+  },
+  entryRowEditing: {
+    backgroundColor: '#131a2e',
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#3575f0',
+  },
+  entryRowDivider: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#1a2d58',
   },
   entryHeader: {
     flexDirection: 'row',
@@ -396,9 +640,9 @@ const styles = StyleSheet.create({
   },
   entryLabel: {
     flex: 1,
-    color: '#9bd1eb',
+    color: '#9a9a9a',
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   entryActions: {
     flexDirection: 'row',
@@ -417,7 +661,7 @@ const styles = StyleSheet.create({
   },
   entryBody: {
     marginTop: 10,
-    color: '#dfdfdf',
+    color: '#f2f2f2',
     fontSize: 14,
     lineHeight: 21,
   },
@@ -464,8 +708,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#1b1b1b',
   },
   dayChipSelected: {
-    backgroundColor: '#24516a',
-    borderColor: '#2f6b86',
+    backgroundColor: '#2560d8',
+    borderColor: '#3575f0',
   },
   dayChipText: {
     color: '#8a8a8a',
@@ -473,13 +717,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   dayChipTextSelected: {
-    color: '#d9f0fb',
+    color: '#ffffff',
   },
   input: {
     minHeight: 120,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#35505d',
+    borderColor: '#2d5bc8',
     backgroundColor: '#161d20',
     color: '#ededed',
     fontSize: 14,
@@ -489,6 +733,60 @@ const styles = StyleSheet.create({
   },
   inputCompact: {
     minHeight: 60,
+  },
+  imageAttachRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+    minHeight: 44,
+  },
+  imagePickerBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#2a3a44',
+    backgroundColor: '#141d22',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  pendingImagesScroll: {
+    flex: 1,
+  },
+  pendingImagesContent: {
+    gap: 6,
+    alignItems: 'center',
+  },
+  pendingThumb: {
+    width: 44,
+    height: 44,
+    borderRadius: 7,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#2a3a44',
+  },
+  pendingThumbImage: {
+    width: '100%',
+    height: '100%',
+  },
+  removeImageBtn: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: 'rgba(0,0,0,0.72)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeImageText: {
+    color: '#eee',
+    fontSize: 9,
+    fontWeight: '700',
+    lineHeight: 11,
   },
   actionRow: {
     flexDirection: 'row',
@@ -513,17 +811,34 @@ const styles = StyleSheet.create({
   primaryBtn: {
     flex: 1,
     borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#2f6b86',
-    backgroundColor: '#214a5f',
+    borderWidth: 0,
+    backgroundColor: '#3575f0',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 14,
   },
   primaryBtnText: {
-    color: '#e5f7ff',
+    color: '#ffffff',
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '800',
+  },
+  footer: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  footerCloseBtn: {
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#363636',
+    backgroundColor: '#202020',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+  },
+  footerCloseBtnText: {
+    color: '#d0d0d0',
+    fontSize: 14,
+    fontWeight: '600',
   },
   emptyState: {
     flex: 1,

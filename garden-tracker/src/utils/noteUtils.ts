@@ -1,4 +1,4 @@
-import { Note, WeeklyNoteEntry } from '@/src/types';
+import { Note, NoteImage, WeeklyNoteEntry } from '@/src/types';
 import { parseDateKey } from '@/src/utils/dateUtils';
 
 const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -14,16 +14,23 @@ function isWeeklyNotePayload(value: unknown): value is WeeklyNotePayload {
   return payload.version === 1 && Array.isArray(payload.entries);
 }
 
-function fallbackDayOfWeek(note: Pick<Note, 'week_date' | 'created_at'>): number {
-  if (note.created_at) {
-    const created = new Date(note.created_at);
-    if (!Number.isNaN(created.getTime())) {
-      return created.getDay();
+function parseWeeklyNotePayload(content: string): WeeklyNotePayload | null {
+  try {
+    const parsed = JSON.parse(content);
+    if (isWeeklyNotePayload(parsed)) {
+      return parsed;
     }
-  }
 
-  const week = note.week_date ? parseDateKey(note.week_date) : null;
-  return week?.getDay() ?? 0;
+    if (__DEV__) {
+      console.warn('Unexpected weekly note payload shape.', parsed);
+    }
+    return null;
+  } catch (error) {
+    if (__DEV__) {
+      console.warn('Failed to parse weekly note payload.', error);
+    }
+    return null;
+  }
 }
 
 export function parseWeeklyNoteEntries(note: Pick<Note, 'content' | 'week_date' | 'created_at' | 'updated_at'> | null): WeeklyNoteEntry[] {
@@ -31,31 +38,21 @@ export function parseWeeklyNoteEntries(note: Pick<Note, 'content' | 'week_date' 
     return [];
   }
 
-  try {
-    const parsed = JSON.parse(note.content);
-    if (isWeeklyNotePayload(parsed)) {
-      return parsed.entries
-        .filter(entry => typeof entry.text === 'string' && entry.text.trim().length > 0)
-        .sort(compareWeeklyNoteEntries);
-    }
-  } catch {
-    // Legacy note content was plain text. Preserve it as a single entry.
+  const payload = parseWeeklyNotePayload(note.content);
+  if (!payload) {
+    return [];
   }
 
-  return [{
-    id: `legacy-${note.created_at ?? note.updated_at ?? 'entry'}`,
-    day_of_week: fallbackDayOfWeek(note),
-    text: note.content.trim(),
-    created_at: note.created_at ?? new Date().toISOString(),
-    updated_at: note.updated_at ?? note.created_at ?? new Date().toISOString(),
-  }];
+  return payload.entries
+    .filter(entry => (typeof entry.text === 'string' && entry.text.trim().length > 0) || (entry.images?.length ?? 0) > 0)
+    .sort(compareWeeklyNoteEntries);
 }
 
 export function serializeWeeklyNoteEntries(entries: WeeklyNoteEntry[]): string {
   const payload: WeeklyNotePayload = {
     version: 1,
     entries: [...entries]
-      .filter(entry => entry.text.trim().length > 0)
+      .filter(entry => entry.text.trim().length > 0 || (entry.images?.length ?? 0) > 0)
       .sort(compareWeeklyNoteEntries),
   };
 
@@ -72,22 +69,24 @@ export function compareWeeklyNoteEntries(a: WeeklyNoteEntry, b: WeeklyNoteEntry)
   return aTime - bTime;
 }
 
-export function createWeeklyNoteEntry(dayOfWeek: number, text: string): WeeklyNoteEntry {
+export function createWeeklyNoteEntry(dayOfWeek: number, text: string, images?: NoteImage[]): WeeklyNoteEntry {
   const nowIso = new Date().toISOString();
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     day_of_week: dayOfWeek,
     text: text.trim(),
+    images,
     created_at: nowIso,
     updated_at: nowIso,
   };
 }
 
-export function updateWeeklyNoteEntry(entry: WeeklyNoteEntry, dayOfWeek: number, text: string): WeeklyNoteEntry {
+export function updateWeeklyNoteEntry(entry: WeeklyNoteEntry, dayOfWeek: number, text: string, images?: NoteImage[]): WeeklyNoteEntry {
   return {
     ...entry,
     day_of_week: dayOfWeek,
     text: text.trim(),
+    images,
     updated_at: new Date().toISOString(),
   };
 }

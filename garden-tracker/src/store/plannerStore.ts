@@ -22,7 +22,7 @@ import { defaultCalendarStart, dateToWeekIndex, parseDateKey, toSunday } from '@
 import { getRowHeight } from '../utils/rowLayout';
 import { getTaskLineOccurrences } from '@/src/utils/taskUtils';
 
-import { getAllLocations, getAllGardens, getAllSections, insertLocation, insertGarden, insertSection, deleteLocation, deleteGarden, deleteSection } from '@/src/db/queries/locationQueries';
+import { getAllLocations, getAllGardens, getAllSections, insertLocation, insertGarden, insertSection, deleteLocation, deleteGarden, deleteSection, updateLocationName, updateGardenName, updateSectionName } from '@/src/db/queries/locationQueries';
 import { archiveCrop as archiveCropQuery,  getAllCrops, getCropStagesForCrops, getStageDefs, insertCropWithStages, deleteCropInstance, replaceCropStages, updateCropInstance } from '@/src/db/queries/cropQueries';
 import { getTasksForCrops, getCompletionsForCrops, getTaskTypes, insertTask, insertCompletion, deleteCompletion, deleteTask as dbDeleteTask, updateTaskDay, getTodayAndOverdue } from '@/src/db/queries/taskQueries';
 import { deleteNote as deleteNoteQuery, getNotesForCrops, upsertNote } from '@/src/db/queries/noteQueries';
@@ -61,6 +61,9 @@ interface PlannerState {
   removeLocation: (id: number) => Promise<void>;
   removeGarden: (id: number) => Promise<void>;
   removeSection: (id: number) => Promise<void>;
+  renameLocation: (id: number, name: string) => Promise<void>;
+  renameGarden: (id: number, name: string) => Promise<void>;
+  renameSection: (id: number, name: string) => Promise<void>;
   ensureDefaultHierarchy: () => Promise<void>;
   resetAllData: () => Promise<void>;
   setSelectedCrop: (id: number | null) => void;
@@ -150,6 +153,27 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
       await deleteSection(id);
       await get().loadData();
     } catch (e) { showError('Failed to remove section', e); throw e; }
+  },
+
+  renameLocation: async (id, name) => {
+    try {
+      await updateLocationName(id, name);
+      await get().loadData();
+    } catch (e) { showError('Failed to rename location', e); throw e; }
+  },
+
+  renameGarden: async (id, name) => {
+    try {
+      await updateGardenName(id, name);
+      await get().loadData();
+    } catch (e) { showError('Failed to rename garden', e); throw e; }
+  },
+
+  renameSection: async (id, name) => {
+    try {
+      await updateSectionName(id, name);
+      await get().loadData();
+    } catch (e) { showError('Failed to rename section', e); throw e; }
   },
 
   setSelectedCrop: (id) => set({ selectedCropId: id }),

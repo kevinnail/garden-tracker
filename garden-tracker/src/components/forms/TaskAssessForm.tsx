@@ -268,12 +268,12 @@ const styles = StyleSheet.create({
   occurrenceDateOverdue: { color: '#e07070' },
   overdueBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8, backgroundColor: '#3a1a1a' },
   overdueBadgeText: { color: '#e07070', fontSize: 10, fontWeight: 'bold' },
-  dueBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8, backgroundColor: '#1a2a1a' },
-  dueBadgeText: { color: '#7dcea0', fontSize: 10 },
+  dueBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8, backgroundColor: '#0c2d36' },
+  dueBadgeText: { color: '#67e8f9', fontSize: 10 },
 
   actionRow: { marginTop: 8, flexDirection: 'row', gap: 10 },
-  addTaskBtn: { flex: 1, paddingVertical: 14, borderRadius: 8, borderWidth: 1, borderColor: '#2a5f82', backgroundColor: '#1b4058', alignItems: 'center' },
-  addTaskBtnText: { color: '#8fd0f8', fontWeight: '700', fontSize: 15 },
+  addTaskBtn: { flex: 1, paddingVertical: 14, borderRadius: 8, borderWidth: 1, borderColor: '#0891b2', backgroundColor: '#0c2d36', alignItems: 'center' },
+  addTaskBtnText: { color: '#67e8f9', fontWeight: '700', fontSize: 15 },
   doneBtn: { flex: 1, paddingVertical: 14, borderRadius: 8, borderWidth: 1, borderColor: '#4a4a4a', backgroundColor: '#262626', alignItems: 'center' },
   doneBtnText: { color: '#ddd', fontWeight: '600', fontSize: 15 },
 });

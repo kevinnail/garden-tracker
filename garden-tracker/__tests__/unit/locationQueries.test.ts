@@ -17,6 +17,9 @@ import {
   deleteSection,
   deleteGarden,
   deleteLocation,
+  updateLocationName,
+  updateGardenName,
+  updateSectionName,
 } from '@/src/db/queries/locationQueries';
 import { getDb } from '@/src/db/database';
 
@@ -204,6 +207,90 @@ describe('insertSection', () => {
     mockDb.runAsync.mockRejectedValueOnce(new Error('Database error'));
 
     await expect(insertSection(1, 'Fail')).rejects.toThrow('Database error');
+  });
+});
+
+// ── updateLocationName ─────────────────────────────────────────────────────────
+
+describe('updateLocationName', () => {
+  it('calls UPDATE locations with the new name and id', async () => {
+    mockDb.runAsync.mockResolvedValue({});
+
+    await updateLocationName(1, 'Renamed');
+
+    expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
+    expect(mockDb.runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE locations'),
+      'Renamed', 1
+    );
+  });
+
+  it('resolves without a return value', async () => {
+    mockDb.runAsync.mockResolvedValue({});
+
+    await expect(updateLocationName(1, 'x')).resolves.toBeUndefined();
+  });
+
+  it('handles database errors', async () => {
+    mockDb.runAsync.mockRejectedValueOnce(new Error('Database error'));
+
+    await expect(updateLocationName(1, 'x')).rejects.toThrow('Database error');
+  });
+});
+
+// ── updateGardenName ───────────────────────────────────────────────────────────
+
+describe('updateGardenName', () => {
+  it('calls UPDATE gardens with the new name and id', async () => {
+    mockDb.runAsync.mockResolvedValue({});
+
+    await updateGardenName(2, 'New Garden Name');
+
+    expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
+    expect(mockDb.runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE gardens'),
+      'New Garden Name', 2
+    );
+  });
+
+  it('resolves without a return value', async () => {
+    mockDb.runAsync.mockResolvedValue({});
+
+    await expect(updateGardenName(2, 'x')).resolves.toBeUndefined();
+  });
+
+  it('handles database errors', async () => {
+    mockDb.runAsync.mockRejectedValueOnce(new Error('Database error'));
+
+    await expect(updateGardenName(2, 'x')).rejects.toThrow('Database error');
+  });
+});
+
+// ── updateSectionName ──────────────────────────────────────────────────────────
+
+describe('updateSectionName', () => {
+  it('calls UPDATE sections with the new name and id', async () => {
+    mockDb.runAsync.mockResolvedValue({});
+
+    await updateSectionName(3, 'New Section Name');
+
+    expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
+    expect(mockDb.runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE sections'),
+      'New Section Name', 3
+    );
+  });
+
+  it('resolves without a return value', async () => {
+    mockDb.runAsync.mockResolvedValue({});
+
+    await expect(updateSectionName(3, 'x')).resolves.toBeUndefined();
+  });
+
+  it('handles database errors', async () => {
+    mockDb.runAsync.mockRejectedValueOnce(new Error('Database error'));
+
+    await expect(updateSectionName(3, 'x')).rejects.toThrow('Database error');
   });
 });
 

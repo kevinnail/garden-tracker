@@ -107,10 +107,17 @@ export interface Note {
   updated_at?: string;
 }
 
+export interface NoteImage {
+  id: string;
+  uri: string;
+  created_at: string;
+}
+
 export interface WeeklyNoteEntry {
   id: string;
   day_of_week: number;
   text: string;
+  images?: NoteImage[];
   created_at: string;
   updated_at: string;
 }
