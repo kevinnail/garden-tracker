@@ -1,15 +1,16 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View } from 'react-native';
 import { router } from 'expo-router';
 
 import {
-  CELL_WIDTH,
   TOTAL_WEEKS,
   BACKGROUND_COLOR,
 } from '@/src/constants/layout';
 import { formatDateKey, todayWeekIndex, weekIndexToDate } from '@/src/utils/dateUtils';
 import { GridRowItem } from '@/src/types';
 import { getRowHeight, getVisibleRowRange } from '../../utils/rowLayout';
+import { usePlannerStore } from '@/src/store/plannerStore';
+import { useCellLayout } from '@/src/hooks/useCellLayout';
 import CropCell from './CropCell';
 
 // Must match RowHeader band colors so the full-width strips feel continuous
@@ -18,8 +19,6 @@ import {
   GARDEN_BAND,
   SECTION_BAND,
 } from './RowHeader';
-
-const TOTAL_WIDTH = TOTAL_WEEKS * CELL_WIDTH;
 
 interface Props {
   rows: GridRowItem[];
@@ -40,10 +39,13 @@ export default function GridBody({
   viewWidth,
   viewHeight,
 }: Props) {
+  const { cellWidth } = useCellLayout();
+  const showNoteIndicators = usePlannerStore(s => s.showNoteIndicators);
   const todayCol = todayWeekIndex(calendarStart);
+  const totalWidth = TOTAL_WEEKS * cellWidth;
 
-  const colStart = Math.max(0, Math.floor(renderScrollX / CELL_WIDTH) - 1);
-  const colEnd   = Math.min(TOTAL_WEEKS - 1, Math.ceil((renderScrollX + viewWidth) / CELL_WIDTH) + 1);
+  const colStart = Math.max(0, Math.floor(renderScrollX / cellWidth) - 1);
+  const colEnd   = Math.min(TOTAL_WEEKS - 1, Math.ceil((renderScrollX + viewWidth) / cellWidth) + 1);
   const { rowStart, rowEnd } = getVisibleRowRange(rowOffsets, renderScrollY, viewHeight);
 
   const elements: React.ReactElement[] = [];
@@ -75,7 +77,8 @@ export default function GridBody({
             stageColor={rowItem.weekColorMap[col] ?? null}
             isPast={col < todayCol}
             hasNote={hasNote}
-            style={{ left: col * CELL_WIDTH, top }}
+            showNoteIndicators={showNoteIndicators}
+            style={{ left: col * cellWidth, top }}
             onPress={hasNote ? () => openNote('view') : undefined}
             onLongPress={() => openNote('compose')}
           />
@@ -108,7 +111,7 @@ export default function GridBody({
       elements.push(
         <View
           key={`band-${row}`}
-          style={[styles.bandStrip, { top, height, backgroundColor: bandColor }]}
+          style={{ position: 'absolute', left: 0, width: totalWidth, top, height, backgroundColor: bandColor }}
         />
       );
     }
@@ -117,10 +120,3 @@ export default function GridBody({
   return <>{elements}</>;
 }
 
-const styles = StyleSheet.create({
-  bandStrip: {
-    position: 'absolute',
-    left: 0,
-    width: TOTAL_WIDTH,
-  },
-});

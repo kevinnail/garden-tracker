@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, LayoutChangeEvent } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, View, Text, StyleSheet, LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue,
@@ -11,13 +11,12 @@ import { scheduleOnRN } from 'react-native-worklets';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 
 import {
-  CELL_WIDTH,
   TOTAL_WEEKS,
   TOTAL_HEADER_HEIGHT,
-  ROW_HEIGHT,
   ROW_HEADER_WIDTH,
   BACKGROUND_COLOR,
 } from '@/src/constants/layout';
+import { useCellLayout } from '@/src/hooks/useCellLayout';
 import { parseDateKey, todayWeekIndex, dateToWeekIndex } from '@/src/utils/dateUtils';
 import { usePlannerStore } from '@/src/store/plannerStore';
 import { useTodayTick } from '@/src/hooks/useTodayTick';
@@ -30,6 +29,7 @@ import TaskOverlay from './TaskOverlay';
 
 export default function PlannerGrid() {
   const { left: leftInset } = useSafeAreaInsets();
+  const { cellWidth, rowHeight } = useCellLayout();
   // Re-render at the next midnight so todayLabel/today cursor advance in a
   // long-running session.
   useTodayTick();
@@ -41,8 +41,9 @@ export default function PlannerGrid() {
   const plannerFocusCropId = usePlannerStore(s => s.plannerFocusCropId);
   const plannerFocusDate = usePlannerStore(s => s.plannerFocusDate);
   const clearPlannerFocus = usePlannerStore(s => s.clearPlannerFocus);
+  const resetViewState = usePlannerStore(s => s.resetViewState);
 
-  const totalWidth  = TOTAL_WEEKS * CELL_WIDTH;
+  const totalWidth  = TOTAL_WEEKS * cellWidth;
   const rowOffsets = useMemo(() => getRowOffsets(rows), [rows]);
   const totalHeight = Math.max(rowOffsets[rowOffsets.length - 1] ?? 0, 1);
 
@@ -111,7 +112,7 @@ export default function PlannerGrid() {
     if (!initialized.current) {
       initialized.current = true;
       const todayCol = todayWeekIndex(calendarStart);
-      const initialX = Math.max(0, (todayCol - 3) * CELL_WIDTH);
+      const initialX = Math.max(0, (todayCol - 3) * cellWidth);
       scrollX.value = initialX;
       setRenderScrollX(initialX);
     }
@@ -133,7 +134,7 @@ export default function PlannerGrid() {
 
     const targetTop = rowOffsets[rowIndex] ?? 0;
     const maxY = Math.max(0, totalHeight - viewDims.height);
-    const centeredY = Math.max(0, targetTop - Math.max(0, (viewDims.height - ROW_HEIGHT) / 2));
+    const centeredY = Math.max(0, targetTop - Math.max(0, (viewDims.height - rowHeight) / 2));
     const nextY = Math.min(centeredY, maxY);
 
     const parsedFocusDate = plannerFocusDate ? parseDateKey(plannerFocusDate) : null;
@@ -141,7 +142,7 @@ export default function PlannerGrid() {
       ? dateToWeekIndex(calendarStart, parsedFocusDate)
       : todayWeekIndex(calendarStart);
     const maxX = Math.max(0, totalWidth - viewDims.width);
-    const centeredX = Math.max(0, focusCol * CELL_WIDTH - Math.max(0, (viewDims.width - CELL_WIDTH) / 2));
+    const centeredX = Math.max(0, focusCol * cellWidth - Math.max(0, (viewDims.width - cellWidth) / 2));
     const nextX = Math.min(centeredX, maxX);
 
     scrollX.value = nextX;
@@ -154,6 +155,16 @@ export default function PlannerGrid() {
   const todayLabel = new Date().toLocaleDateString('en-US', {
     month: 'numeric', day: 'numeric', year: '2-digit',
   });
+
+  const handleHomePress = useCallback(() => {
+    resetViewState();
+    const todayCol = todayWeekIndex(calendarStart);
+    const newX = Math.max(0, (todayCol - 3) * cellWidth);
+    scrollX.value = newX;
+    scrollY.value = 0;
+    setRenderScrollX(newX);
+    setRenderScrollY(0);
+  }, [calendarStart, cellWidth, resetViewState, scrollX, scrollY]);
 
   if (isLoaded && rows.length === 0) {
     return (
@@ -176,9 +187,10 @@ export default function PlannerGrid() {
 
       {/* ── Top row: corner + column header ── */}
       <View style={styles.headerRow}>
-        <View style={styles.corner}>
+        <Pressable style={styles.corner} onPress={handleHomePress} accessibilityLabel="Home — reset view to today">
           <Text style={styles.cornerText}>{todayLabel}</Text>
-        </View>
+          <Text style={styles.cornerHint}>⌂ Home</Text>
+        </Pressable>
         <View style={styles.columnHeaderClip}>
           <Animated.View style={[{ position: 'absolute', width: totalWidth }, columnHeaderStyle]}>
             <ColumnHeader calendarStart={calendarStart} />
@@ -244,6 +256,7 @@ const styles = StyleSheet.create({
     borderColor: '#444',
   },
   cornerText: { color: '#888', fontSize: 11, fontWeight: 'bold' },
+  cornerHint: { color: '#555', fontSize: 9, marginTop: 2 },
   columnHeaderClip: { flex: 1, height: TOTAL_HEADER_HEIGHT, overflow: 'hidden' },
   mainRow: { flex: 1, flexDirection: 'row' },
   rowHeaderClip: { width: ROW_HEADER_WIDTH, overflow: 'hidden' },

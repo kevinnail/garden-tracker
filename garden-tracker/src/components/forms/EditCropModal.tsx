@@ -4,11 +4,29 @@ import { router } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { usePlannerStore } from '@/src/store/plannerStore';
+import { parseDateKey, weekIndexToDate } from '@/src/utils/dateUtils';
 
 import AddCropForm, { AddCropFormHandle } from './AddCropForm';
 import TaskAssessForm from './TaskAssessForm';
 
 type TabKey = 'crop' | 'tasks';
+
+function formatShortDate(date: Date | null): string {
+  if (!date) return 'Unknown';
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function getCropEndDate(startDate: string, weekColorMap: Record<number, string>, calendarStart: Date): Date | null {
+  const weekIndexes = Object.keys(weekColorMap).map(Number).filter(Number.isFinite);
+  if (weekIndexes.length === 0) {
+    return parseDateKey(startDate);
+  }
+
+  const endDate = weekIndexToDate(calendarStart, Math.max(...weekIndexes));
+  endDate.setDate(endDate.getDate() + 6);
+  endDate.setHours(0, 0, 0, 0);
+  return endDate;
+}
 
 export default function EditCropModal() {
   const insets = useSafeAreaInsets();
@@ -18,6 +36,7 @@ export default function EditCropModal() {
   const cropFormRef = useRef<AddCropFormHandle>(null);
   const selectedCropId = usePlannerStore(s => s.selectedCropId);
   const rows = usePlannerStore(s => s.rows);
+  const calendarStart = usePlannerStore(s => s.calendarStart);
 
   const cropRow = rows.find(row => row.type === 'crop_row' && row.crop.id === selectedCropId);
 
@@ -35,13 +54,18 @@ export default function EditCropModal() {
     );
   }
 
+  const cropStart = formatShortDate(parseDateKey(cropRow.crop.start_date));
+  const cropEnd = formatShortDate(getCropEndDate(cropRow.crop.start_date, cropRow.weekColorMap, calendarStart));
+  const cropSummary = `${cropRow.crop.plant_count} ${cropRow.crop.plant_count === 1 ? 'plant' : 'plants'} • ${cropStart} to ${cropEnd}`;
+
   return (
-    <SafeAreaView edges={['top', 'left', 'right', 'bottom']} style={styles.container}>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
       <View style={[styles.header, isLandscape && styles.headerCompact]}>
-        <Text style={[styles.title, isLandscape && styles.titleCompact]}>{cropRow.crop.name}</Text>
-        {!isLandscape && (
-          <Text style={styles.subtitle}>{cropRow.crop.plant_count} plants</Text>
-        )}
+        <Text style={styles.cropName}>{cropRow.crop.name}</Text>
+        <Text style={[styles.cropSummary, isLandscape && styles.cropSummaryCompact]}>{cropSummary}</Text>
+      </View>
+
+      <View style={styles.tabBarWrap}>
         <View style={[styles.tabRow, isLandscape && styles.tabRowCompact]}>
           <Pressable
             style={[styles.tabBtn, isLandscape && styles.tabBtnCompact, activeTab === 'crop' && styles.tabBtnActive]}
@@ -125,19 +149,38 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#111' },
   header: {
     paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#148a3e',
+    backgroundColor: '#1a9148',
+  },
+  headerCompact: {
     paddingTop: 6,
+    paddingBottom: 6,
+  },
+  cropName: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  cropSummary: {
+    marginTop: 4,
+    color: '#c8ffe0',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  cropSummaryCompact: {
+    marginTop: 2,
+  },
+  tabBarWrap: {
+    paddingHorizontal: 16,
     paddingBottom: 10,
+    paddingTop: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#262626',
     backgroundColor: '#111',
   },
-  headerCompact: {
-    paddingTop: 2,
-    paddingBottom: 6,
-  },
-  title: { color: '#e7e7e7', fontSize: 20, fontWeight: '700' },
-  titleCompact: { fontSize: 15 },
-  subtitle: { color: '#787878', fontSize: 12, marginTop: 2, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.6 },
   tabRow: {
     flexDirection: 'row',
     gap: 8,

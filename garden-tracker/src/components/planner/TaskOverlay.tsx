@@ -3,8 +3,10 @@ import { StyleSheet } from 'react-native';
 import Animated, { useAnimatedStyle, SharedValue } from 'react-native-reanimated';
 import Svg, { Line } from 'react-native-svg';
 
-import { CELL_WIDTH, TOTAL_WEEKS } from '@/src/constants/layout';
+import { TOTAL_WEEKS } from '@/src/constants/layout';
 import { PrecomputedTaskLine } from '@/src/types';
+import { usePlannerStore } from '@/src/store/plannerStore';
+import { useCellLayout } from '@/src/hooks/useCellLayout';
 import TodayCursor from './TodayCursor';
 
 interface Props {
@@ -17,11 +19,16 @@ interface Props {
 
 /**
  * SVG overlay covering the full virtual canvas.
- * Receives precomputed task lines from the store — no computation here.
+ * Receives precomputed task lines from the store — x computed at render time
+ * from weekIndex + dayFraction so it scales correctly with zoom level.
  * Solid line = pending. Dashed = completed.
  */
 export default function TaskOverlay({ calendarStart, totalHeight, taskLines, scrollX, scrollY }: Props) {
-  const totalWidth = TOTAL_WEEKS * CELL_WIDTH;
+  const { cellWidth } = useCellLayout();
+  const showTasks = usePlannerStore(s => s.showTasks);
+  const showCursor = usePlannerStore(s => s.showCursor);
+
+  const totalWidth = TOTAL_WEEKS * cellWidth;
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [
@@ -30,25 +37,32 @@ export default function TaskOverlay({ calendarStart, totalHeight, taskLines, scr
     ],
   }));
 
+  if (!showTasks && !showCursor) return null;
+
   return (
     <Animated.View
       style={[StyleSheet.absoluteFill, { width: totalWidth, height: totalHeight }, animatedStyle]}
       pointerEvents="none"
     >
       <Svg width={totalWidth} height={totalHeight} style={StyleSheet.absoluteFill}>
-        {taskLines.map((line) => (
-          <Line
-            key={`${line.key}-${line.dashed ? 'dashed' : 'solid'}`}
-            x1={line.x}
-            y1={line.y1}
-            x2={line.x}
-            y2={line.y2}
-            stroke={line.color}
-            strokeWidth={2}
-            strokeDasharray={line.dashed ? '3,3' : undefined}
-          />
-        ))}
-        <TodayCursor calendarStart={calendarStart} totalHeight={totalHeight} />
+        {showTasks && taskLines.map((line) => {
+          const x = (line.weekIndex + line.dayFraction) * cellWidth;
+          return (
+            <Line
+              key={`${line.key}-${line.dashed ? 'dashed' : 'solid'}`}
+              x1={x}
+              y1={line.y1}
+              x2={x}
+              y2={line.y2}
+              stroke={line.color}
+              strokeWidth={2}
+              strokeDasharray={line.dashed ? '3,3' : undefined}
+            />
+          );
+        })}
+        {showCursor && (
+          <TodayCursor calendarStart={calendarStart} totalHeight={totalHeight} />
+        )}
       </Svg>
     </Animated.View>
   );

@@ -16,7 +16,7 @@ import {
   TodayTaskItem,
   TaskType,
 } from '@/src/types';
-import { ROW_HEIGHT } from '@/src/constants/layout';
+import { ROW_HEIGHT, CELL_WIDTH, DEFAULT_ZOOM_LEVEL } from '@/src/constants/layout';
 import { defaultCalendarStart, dateToWeekIndex, parseDateKey, toSunday } from '@/src/utils/dateUtils';
 import { getRowHeight } from '../utils/rowLayout';
 import { getTaskLineOccurrences } from '@/src/utils/taskUtils';
@@ -37,6 +37,11 @@ interface PlannerState {
   todayDueTasks: TodayTaskItem[];
   todayOverdueTasks: TodayTaskItem[];
   showArchivedRows: boolean;
+  showTasks: boolean;
+  showCursor: boolean;
+  showNoteIndicators: boolean;
+  cellZoomLevel: number;
+  showViewControls: boolean;
   isLoaded: boolean;
   selectedCropId: number | null;
   plannerFocusCropId: number | null;
@@ -69,6 +74,12 @@ interface PlannerState {
   focusPlannerCrop: (id: number | null, focusDate?: string | null) => void;
   clearPlannerFocus: () => void;
   toggleArchivedRows: () => Promise<void>;
+  toggleShowTasks: () => void;
+  toggleShowCursor: () => void;
+  toggleShowNoteIndicators: () => void;
+  setCellZoomLevel: (level: number) => void;
+  toggleViewControls: () => void;
+  resetViewState: () => void;
 }
 
 function showError(action: string, e: unknown) {
@@ -86,6 +97,11 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
   todayDueTasks: [],
   todayOverdueTasks: [],
   showArchivedRows: false,
+  showTasks: true,
+  showCursor: true,
+  showNoteIndicators: true,
+  cellZoomLevel: DEFAULT_ZOOM_LEVEL,
+  showViewControls: false,
   isLoaded: false,
   selectedCropId: null,
   plannerFocusCropId: null,
@@ -277,6 +293,19 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
     } catch (e) { showError('Failed to reload after archive toggle', e); }
   },
 
+  toggleShowTasks: () => set(s => ({ showTasks: !s.showTasks })),
+  toggleShowCursor: () => set(s => ({ showCursor: !s.showCursor })),
+  toggleShowNoteIndicators: () => set(s => ({ showNoteIndicators: !s.showNoteIndicators })),
+  setCellZoomLevel: (level) => set({ cellZoomLevel: Math.min(5, Math.max(1, level)) }),
+  toggleViewControls: () => set(s => ({ showViewControls: !s.showViewControls })),
+  resetViewState: () => set({
+    showTasks: true,
+    showCursor: true,
+    showNoteIndicators: true,
+    cellZoomLevel: DEFAULT_ZOOM_LEVEL,
+    showViewControls: false,
+  }),
+
   loadData: async () => {
     try {
     const calendarStart = get().calendarStart;
@@ -417,9 +446,13 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
             for (const task of tasks) {
               const occurrences = getTaskLineOccurrences(task, cropStartWeek, cropEndWeek, calendarStart);
               for (const occ of occurrences) {
+                // Store zoom-independent position: weekIndex + dayFraction (0..1 within the week).
+                // TaskOverlay computes pixel x = (weekIndex + dayFraction) * cellWidth at render time.
+                const dayFraction = (occ.x - occ.weekIndex * CELL_WIDTH) / CELL_WIDTH;
                 allTaskLines.push({
                   key: `t${task.id}-w${occ.weekIndex}`,
-                  x: occ.x,
+                  weekIndex: occ.weekIndex,
+                  dayFraction,
                   y1,
                   y2,
                   color: task.color,
