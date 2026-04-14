@@ -211,14 +211,40 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
   completeTask: async (taskId, weekDate) => {
     try {
       await insertCompletion(taskId, weekDate);
-      await get().loadData();
+      const weekIndex = dateToWeekIndex(get().calendarStart, parseDateKey(weekDate) ?? new Date());
+      const lineKey = `t${taskId}-w${weekIndex}`;
+      const { due, overdue } = await getTodayAndOverdue();
+      set(s => ({
+        allTaskLines: s.allTaskLines.map(line =>
+          line.key === lineKey ? { ...line, dashed: true } : line
+        ),
+        rows: s.rows.map(row => {
+          if (row.type !== 'crop_row' || !row.tasks.some(t => t.id === taskId)) return row;
+          return { ...row, completions: [...row.completions, { id: 0, task_id: taskId, completed_date: weekDate }] };
+        }),
+        todayDueTasks: due,
+        todayOverdueTasks: overdue,
+      }));
     } catch (e) { showError('Failed to complete task', e); throw e; }
   },
 
   uncompleteTask: async (taskId, weekDate) => {
     try {
       await deleteCompletion(taskId, weekDate);
-      await get().loadData();
+      const weekIndex = dateToWeekIndex(get().calendarStart, parseDateKey(weekDate) ?? new Date());
+      const lineKey = `t${taskId}-w${weekIndex}`;
+      const { due, overdue } = await getTodayAndOverdue();
+      set(s => ({
+        allTaskLines: s.allTaskLines.map(line =>
+          line.key === lineKey ? { ...line, dashed: false } : line
+        ),
+        rows: s.rows.map(row => {
+          if (row.type !== 'crop_row' || !row.tasks.some(t => t.id === taskId)) return row;
+          return { ...row, completions: row.completions.filter(c => !(c.task_id === taskId && c.completed_date === weekDate)) };
+        }),
+        todayDueTasks: due,
+        todayOverdueTasks: overdue,
+      }));
     } catch (e) { showError('Failed to uncomplete task', e); throw e; }
   },
 
@@ -238,15 +264,34 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
 
   saveCellNote: async (cropInstanceId, weekDate, content) => {
     try {
-      await upsertNote(cropInstanceId, weekDate, content);
-      await get().loadData();
+      const noteId = await upsertNote(cropInstanceId, weekDate, content);
+      const newNote: Note = { id: noteId, entity_type: 'week_cell', crop_instance_id: cropInstanceId, week_date: weekDate, content };
+      set(s => {
+        const otherNotes = s.notes.filter(n => !(n.crop_instance_id === cropInstanceId && n.week_date === weekDate));
+        const newRows = s.rows.map(row => {
+          if (row.type !== 'crop_row' || row.crop.id !== cropInstanceId) return row;
+          return { ...row, notesByWeek: { ...row.notesByWeek, [weekDate]: newNote } };
+        });
+        return { notes: [...otherNotes, newNote], rows: newRows };
+      });
     } catch (e) { showError('Failed to save note', e); throw e; }
   },
 
   deleteNote: async (noteId) => {
     try {
+      const note = get().notes.find(n => n.id === noteId);
       await deleteNoteQuery(noteId);
-      await get().loadData();
+      set(s => {
+        const newNotes = s.notes.filter(n => n.id !== noteId);
+        if (!note?.crop_instance_id || !note?.week_date) return { notes: newNotes };
+        const { crop_instance_id: cropId, week_date: weekDate } = note;
+        const newRows = s.rows.map(row => {
+          if (row.type !== 'crop_row' || row.crop.id !== cropId) return row;
+          const { [weekDate]: _removed, ...rest } = row.notesByWeek;
+          return { ...row, notesByWeek: rest };
+        });
+        return { notes: newNotes, rows: newRows };
+      });
     } catch (e) { showError('Failed to delete note', e); throw e; }
   },
 
