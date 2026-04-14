@@ -222,7 +222,9 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
           return { ...row, completions: [...row.completions, { id: 0, task_id: taskId, completed_date: weekDate }] };
         }),
         todayDueTasks: s.todayDueTasks.filter(t => !(t.task_id === taskId && t.week_date === weekDate)),
-        todayOverdueTasks: s.todayOverdueTasks.filter(t => !(t.task_id === taskId && t.week_date === weekDate)),
+        todayOverdueTasks: s.todayOverdueTasks
+          .map(t => t.task_id === taskId ? { ...t, missed_count: t.missed_count - 1 } : t)
+          .filter(t => t.missed_count > 0),
       }));
     } catch (e) { showError('Failed to complete task', e); throw e; }
   },
