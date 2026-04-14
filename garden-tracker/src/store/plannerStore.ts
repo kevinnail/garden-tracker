@@ -87,6 +87,10 @@ function showError(action: string, e: unknown) {
   Toast.show({ type: 'error', text1: action, text2: detail, visibilityTime: 4000 });
 }
 
+// Cache weekColorMap per crop. Key encodes stage IDs, durations, and colors so
+// it auto-invalidates when stages are replaced after an edit.
+const weekColorMapCache = new Map<string, Record<number, string>>();
+
 export const usePlannerStore = create<PlannerState>((set, get) => ({
   rows: [],
   allTaskLines: [],
@@ -470,13 +474,22 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
             // YYYY-MM-DD as UTC and can land a day off in local time.
             const parsedStartDate = parseDateKey(crop.start_date) ?? toSunday(new Date());
             const cropStartWeek = dateToWeekIndex(calendarStart, parsedStartDate);
-            const weekColorMap: Record<number, string> = {};
+
+            const cacheKey = `${crop.id}:${cropStartWeek}:${stages.map(s => `${s.id},${s.duration_weeks},${s.color}`).join('|')}`;
+            let weekColorMap = weekColorMapCache.get(cacheKey);
             let cursor = cropStartWeek;
-            for (const stage of stages) {
-              for (let w = 0; w < stage.duration_weeks; w++) {
-                weekColorMap[cursor + w] = stage.color;
+            if (!weekColorMap) {
+              weekColorMap = {};
+              for (const stage of stages) {
+                for (let w = 0; w < stage.duration_weeks; w++) {
+                  weekColorMap[cursor + w] = stage.color;
+                }
+                cursor += stage.duration_weeks;
               }
-              cursor += stage.duration_weeks;
+              weekColorMapCache.set(cacheKey, weekColorMap);
+            } else {
+              // Advance cursor to cropEndWeek + 1 without rebuilding the map
+              for (const stage of stages) cursor += stage.duration_weeks;
             }
             const cropEndWeek = cursor - 1;
 
