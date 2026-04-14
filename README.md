@@ -17,6 +17,23 @@ The core UI is a **scrollable planner grid**: crops run horizontally across week
 - SQLite local storage — works fully offline, no account required
 - Dark-themed UI optimized for outdoor/greenhouse use
 
+## Screenshots
+
+<p>
+  <img src="docs/images/readme/planner-grid-portrait.jpeg" alt="Planner grid in portrait mode">
+  <img src="docs/images/readme/today-dashboard.jpeg" alt="Today dashboard with weather and tasks">
+</p>
+
+<p><strong>Main planner grid</strong> and <strong>Today dashboard</strong></p>
+
+<p><img src="docs/images/readme/planner-grid-landscape.jpeg" alt="Planner grid in landscape mode"></p>
+
+<p><strong>Expanded timeline view</strong></p>
+
+<p><img src="docs/images/readme/planner-navigation.jpeg" alt="Planner view with navigation panel"></p>
+
+<p><strong>Planner navigation</strong></p>
+
 ## Tech Stack
 
 | Layer | Choice |
