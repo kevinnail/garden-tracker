@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
+import { useShallow } from 'zustand/react/shallow';
 import { usePlannerStore } from '@/src/store/plannerStore';
 import { useTodayTick } from '@/src/hooks/useTodayTick';
 import { useWeatherStore } from '@/src/store/weatherStore';
@@ -55,25 +56,35 @@ export default function PlannerToolbar() {
   // Re-render at midnight so `todayLabel` flips.
   useTodayTick();
 
-  const hasSections       = usePlannerStore(s => s.rows.some(r => r.type === 'section_header'));
-  const showArchivedRows  = usePlannerStore(s => s.showArchivedRows);
-  const toggleArchivedRows = usePlannerStore(s => s.toggleArchivedRows);
-  const showTasks         = usePlannerStore(s => s.showTasks);
-  const toggleShowTasks   = usePlannerStore(s => s.toggleShowTasks);
-  const showCursor        = usePlannerStore(s => s.showCursor);
-  const toggleShowCursor  = usePlannerStore(s => s.toggleShowCursor);
-  const showNoteIndicators       = usePlannerStore(s => s.showNoteIndicators);
-  const toggleShowNoteIndicators = usePlannerStore(s => s.toggleShowNoteIndicators);
-  const cellZoomLevel     = usePlannerStore(s => s.cellZoomLevel);
-  const setCellZoomLevel  = usePlannerStore(s => s.setCellZoomLevel);
-  const showViewControls  = usePlannerStore(s => s.showViewControls);
-  const toggleViewControls = usePlannerStore(s => s.toggleViewControls);
+  const {
+    hasSections,
+    showArchivedRows, toggleArchivedRows,
+    showTasks, toggleShowTasks,
+    showCursor, toggleShowCursor,
+    showNoteIndicators, toggleShowNoteIndicators,
+    cellZoomLevel, setCellZoomLevel,
+    showViewControls, toggleViewControls,
+    dueTodayCount, overdueCount,
+  } = usePlannerStore(useShallow(s => ({
+    hasSections: s.rows.some(r => r.type === 'section_header'),
+    showArchivedRows: s.showArchivedRows,
+    toggleArchivedRows: s.toggleArchivedRows,
+    showTasks: s.showTasks,
+    toggleShowTasks: s.toggleShowTasks,
+    showCursor: s.showCursor,
+    toggleShowCursor: s.toggleShowCursor,
+    showNoteIndicators: s.showNoteIndicators,
+    toggleShowNoteIndicators: s.toggleShowNoteIndicators,
+    cellZoomLevel: s.cellZoomLevel,
+    setCellZoomLevel: s.setCellZoomLevel,
+    showViewControls: s.showViewControls,
+    toggleViewControls: s.toggleViewControls,
+    dueTodayCount: s.todayDueTasks.length,
+    overdueCount: s.todayOverdueTasks.length,
+  })));
 
   const weather = useWeatherStore(s => s.weather);
   const todayWeather = weather.status === 'ok' ? weather.days[0] : null;
-
-  const dueTodayCount = usePlannerStore(s => s.todayDueTasks.length);
-  const overdueCount  = usePlannerStore(s => s.todayOverdueTasks.length);
   const todayCount    = dueTodayCount + overdueCount;
 
   const { width, height } = useWindowDimensions();
