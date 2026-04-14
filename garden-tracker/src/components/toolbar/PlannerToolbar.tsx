@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Pressable, Text, StyleSheet, useWindowDimensions, LayoutAnimation, UIManager, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -90,9 +90,9 @@ export default function PlannerToolbar() {
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
 
-  const todayLabel = new Date().toLocaleDateString('en-US', {
+  const todayLabel = useMemo(() => new Date().toLocaleDateString('en-US', {
     weekday: 'long', month: 'long', day: 'numeric',
-  });
+  }), []);
 
   const handleViewToggle = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
