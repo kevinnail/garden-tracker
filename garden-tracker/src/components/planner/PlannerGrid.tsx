@@ -56,6 +56,9 @@ export default function PlannerGrid() {
   const startScrollY = useSharedValue(0);
   const sharedViewW  = useSharedValue(1);
   const sharedViewH  = useSharedValue(1);
+  // Track the last scroll values committed to JS-side state for threshold gating
+  const lastRenderX  = useSharedValue(0);
+  const lastRenderY  = useSharedValue(0);
 
   // ── React state (JS thread) — drives virtualization ───────────────────────
   const [renderScrollX, setRenderScrollX] = useState(0);
@@ -96,13 +99,27 @@ export default function PlannerGrid() {
     });
 
   // ── Keep virtualization in sync during drag and decay ─────────────────────
+  // Only flush to JS when scroll moves by at least half a cell/row to avoid
+  // triggering a React re-render on every animation frame.
+  const RENDER_THRESHOLD_X = 26; // CELL_WIDTH / 2
+  const RENDER_THRESHOLD_Y = 14; // ROW_HEIGHT / 2
   useAnimatedReaction(
     () => scrollX.value,
-    (val) => scheduleOnRN(setRenderScrollX, val),
+    (val) => {
+      if (Math.abs(val - lastRenderX.value) >= RENDER_THRESHOLD_X) {
+        lastRenderX.value = val;
+        scheduleOnRN(setRenderScrollX, val);
+      }
+    },
   );
   useAnimatedReaction(
     () => scrollY.value,
-    (val) => scheduleOnRN(setRenderScrollY, val),
+    (val) => {
+      if (Math.abs(val - lastRenderY.value) >= RENDER_THRESHOLD_Y) {
+        lastRenderY.value = val;
+        scheduleOnRN(setRenderScrollY, val);
+      }
+    },
   );
 
   // ── Animated styles ───────────────────────────────────────────────────────
