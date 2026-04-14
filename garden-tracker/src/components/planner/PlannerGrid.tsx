@@ -64,6 +64,18 @@ export default function PlannerGrid() {
 
   const initialized = useRef(false);
 
+  // Refs for values the focus effect reads but must not re-trigger on
+  const rowsRef       = useRef(rows);
+  const rowOffsetsRef = useRef(rowOffsets);
+  const totalHeightRef = useRef(totalHeight);
+  const totalWidthRef  = useRef(totalWidth);
+  const viewDimsRef    = useRef(viewDims);
+  rowsRef.current       = rows;
+  rowOffsetsRef.current = rowOffsets;
+  totalHeightRef.current = totalHeight;
+  totalWidthRef.current  = totalWidth;
+  viewDimsRef.current    = viewDims;
+
   // ── Pan gesture ───────────────────────────────────────────────────────────
   const panGesture = Gesture.Pan()
     .onBegin(() => {
@@ -121,11 +133,11 @@ export default function PlannerGrid() {
   };
 
   useEffect(() => {
-    if (!plannerFocusCropId || viewDims.height <= 1 || viewDims.width <= 1) {
-      return;
-    }
+    if (!plannerFocusCropId) return;
+    const vd = viewDimsRef.current;
+    if (vd.height <= 1 || vd.width <= 1) return;
 
-    const rowIndex = rows.findIndex(
+    const rowIndex = rowsRef.current.findIndex(
       row => row.type === 'crop_row' && row.crop.id === plannerFocusCropId
     );
 
@@ -134,17 +146,17 @@ export default function PlannerGrid() {
       return;
     }
 
-    const targetTop = rowOffsets[rowIndex] ?? 0;
-    const maxY = Math.max(0, totalHeight - viewDims.height);
-    const centeredY = Math.max(0, targetTop - Math.max(0, (viewDims.height - rowHeight) / 2));
+    const targetTop = rowOffsetsRef.current[rowIndex] ?? 0;
+    const maxY = Math.max(0, totalHeightRef.current - vd.height);
+    const centeredY = Math.max(0, targetTop - Math.max(0, (vd.height - rowHeight) / 2));
     const nextY = Math.min(centeredY, maxY);
 
     const parsedFocusDate = plannerFocusDate ? parseDateKey(plannerFocusDate) : null;
     const focusCol = parsedFocusDate
       ? dateToWeekIndex(calendarStart, parsedFocusDate)
       : todayWeekIndex(calendarStart);
-    const maxX = Math.max(0, totalWidth - viewDims.width);
-    const centeredX = Math.max(0, focusCol * cellWidth - Math.max(0, (viewDims.width - cellWidth) / 2));
+    const maxX = Math.max(0, totalWidthRef.current - vd.width);
+    const centeredX = Math.max(0, focusCol * cellWidth - Math.max(0, (vd.width - cellWidth) / 2));
     const nextX = Math.min(centeredX, maxX);
 
     scrollX.value = nextX;
@@ -152,7 +164,7 @@ export default function PlannerGrid() {
     setRenderScrollX(nextX);
     setRenderScrollY(nextY);
     clearPlannerFocus();
-  }, [calendarStart, clearPlannerFocus, plannerFocusCropId, plannerFocusDate, rowOffsets, rows, scrollX, scrollY, totalHeight, totalWidth, viewDims.height, viewDims.width]);
+  }, [calendarStart, cellWidth, clearPlannerFocus, plannerFocusCropId, plannerFocusDate, rowHeight, scrollX, scrollY]);
 
   const todayLabel = new Date().toLocaleDateString('en-US', {
     month: 'numeric', day: 'numeric', year: '2-digit',
