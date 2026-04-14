@@ -29,6 +29,9 @@ import { resetDatabase } from '@/src/db/database';
 
 interface PlannerState {
   rows: GridRowItem[];
+  locations: Location[];
+  gardens: Garden[];
+  sections: Section[];
   allTaskLines: PrecomputedTaskLine[];
   calendarStart: Date;
   stageDefinitions: StageDefinition[];
@@ -93,6 +96,9 @@ const weekColorMapCache = new Map<string, Record<number, string>>();
 
 export const usePlannerStore = create<PlannerState>((set, get) => ({
   rows: [],
+  locations: [],
+  gardens: [],
+  sections: [],
   allTaskLines: [],
   calendarStart: defaultCalendarStart(),
   stageDefinitions: [],
@@ -493,7 +499,7 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
             }
             const cropEndWeek = cursor - 1;
 
-            pushRow({ type: 'crop_row', crop, weekColorMap, tasks, completions, notesByWeek });
+            pushRow({ type: 'crop_row', crop, stages, weekColorMap, tasks, completions, notesByWeek });
 
             // Precompute task lines for this row — zero work at render time
             const completionSet = new Set(
@@ -535,6 +541,9 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
 
     set({
       rows,
+      locations,
+      gardens,
+      sections,
       allTaskLines,
       notes,
       todayDueTasks,
