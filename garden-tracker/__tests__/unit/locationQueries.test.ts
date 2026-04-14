@@ -133,7 +133,6 @@ describe('getAllSections', () => {
 
 describe('insertLocation', () => {
   it('inserts a location after computing order_index and returns new id', async () => {
-    mockDb.getFirstAsync.mockResolvedValueOnce({ max: 0 });
     mockDb.runAsync.mockResolvedValueOnce({ lastInsertRowId: 2, changes: 1 });
 
     const id = await insertLocation('Home');
@@ -141,17 +140,19 @@ describe('insertLocation', () => {
     expect(id).toBe(2);
     expect(mockDb.runAsync).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO locations'),
-      'Home', 1
+      'Home'
     );
   });
 
-  it('uses order_index 0 when table is empty', async () => {
-    mockDb.getFirstAsync.mockResolvedValueOnce({ max: null });
+  it('computes order_index inline in SQL for empty table path', async () => {
     mockDb.runAsync.mockResolvedValueOnce({ lastInsertRowId: 1, changes: 1 });
 
     await insertLocation('First Location');
 
-    expect(mockDb.runAsync).toHaveBeenCalledWith(expect.any(String), 'First Location', 0);
+    expect(mockDb.runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('COALESCE(MAX(order_index), -1) + 1 FROM locations'),
+      'First Location'
+    );
   });
 
   it('handles database errors', async () => {
@@ -166,7 +167,6 @@ describe('insertLocation', () => {
 
 describe('insertGarden', () => {
   it('inserts a garden with the correct locationId and returns new id', async () => {
-    mockDb.getFirstAsync.mockResolvedValueOnce({ max: null });
     mockDb.runAsync.mockResolvedValueOnce({ lastInsertRowId: 3, changes: 1 });
 
     const id = await insertGarden(1, 'Greenhouse');
@@ -174,7 +174,7 @@ describe('insertGarden', () => {
     expect(id).toBe(3);
     expect(mockDb.runAsync).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO gardens'),
-      1, 'Greenhouse', 0
+      1, 'Greenhouse', 1
     );
   });
 
@@ -190,7 +190,6 @@ describe('insertGarden', () => {
 
 describe('insertSection', () => {
   it('inserts a section with the correct gardenId and returns new id', async () => {
-    mockDb.getFirstAsync.mockResolvedValueOnce({ max: null });
     mockDb.runAsync.mockResolvedValueOnce({ lastInsertRowId: 4, changes: 1 });
 
     const id = await insertSection(2, 'Row 1');
@@ -198,7 +197,7 @@ describe('insertSection', () => {
     expect(id).toBe(4);
     expect(mockDb.runAsync).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO sections'),
-      2, 'Row 1', 0
+      2, 'Row 1', 2
     );
   });
 
