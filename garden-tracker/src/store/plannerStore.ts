@@ -453,7 +453,7 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
                   key: `t${task.id}-w${occ.weekIndex}`,
                   weekIndex: occ.weekIndex,
                   dayFraction,
-                  y1: y1 + 1,
+                  y1: y1 ,
                   y2,
                   color: task.color,
                   dashed: completionSet.has(`${task.id}:${occ.weekSunday}`),
