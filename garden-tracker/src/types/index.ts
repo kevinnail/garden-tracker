@@ -136,7 +136,7 @@ export type GridRowItem =
   | { type: 'section_header';  section: Section }
   | { type: 'section_footer' }
   | { type: 'section_spacer' }
-  | { type: 'crop_row';        crop: CropInstance; weekColorMap: Record<number, string>; tasks: Task[]; completions: TaskCompletion[]; notesByWeek: Record<string, Note> }
+  | { type: 'crop_row';        crop: CropInstance; stages: CropStage[]; weekColorMap: Record<number, string>; tasks: Task[]; completions: TaskCompletion[]; notesByWeek: Record<string, Note> }
   | { type: 'placeholder';     index: number };
 
 // Precomputed task line — positions stored as zoom-independent values.

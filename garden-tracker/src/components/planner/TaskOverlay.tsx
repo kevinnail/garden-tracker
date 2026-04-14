@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet } from 'react-native';
 import Animated, { useAnimatedStyle, SharedValue } from 'react-native-reanimated';
 import Svg, { Line } from 'react-native-svg';
@@ -37,6 +37,24 @@ export default function TaskOverlay({ calendarStart, totalHeight, taskLines, scr
     ],
   }));
 
+  const lineElements = useMemo(() =>
+    taskLines.map((line) => {
+      const x = (line.weekIndex + line.dayFraction) * cellWidth;
+      return (
+        <Line
+          key={`${line.key}-${line.dashed ? 'dashed' : 'solid'}`}
+          x1={x}
+          y1={line.y1}
+          x2={x}
+          y2={line.y2}
+          stroke={line.color}
+          strokeWidth={2}
+          strokeDasharray={line.dashed ? '3,3' : undefined}
+        />
+      );
+    }),
+  [taskLines, cellWidth]);
+
   if (!showTasks && !showCursor) return null;
 
   return (
@@ -45,21 +63,7 @@ export default function TaskOverlay({ calendarStart, totalHeight, taskLines, scr
       pointerEvents="none"
     >
       <Svg width={totalWidth} height={totalHeight} style={StyleSheet.absoluteFill}>
-        {showTasks && taskLines.map((line) => {
-          const x = (line.weekIndex + line.dayFraction) * cellWidth;
-          return (
-            <Line
-              key={`${line.key}-${line.dashed ? 'dashed' : 'solid'}`}
-              x1={x}
-              y1={line.y1}
-              x2={x}
-              y2={line.y2}
-              stroke={line.color}
-              strokeWidth={2}
-              strokeDasharray={line.dashed ? '3,3' : undefined}
-            />
-          );
-        })}
+        {showTasks && lineElements}
         {showCursor && (
           <TodayCursor calendarStart={calendarStart} totalHeight={totalHeight} />
         )}

@@ -56,6 +56,9 @@ export default function PlannerGrid() {
   const startScrollY = useSharedValue(0);
   const sharedViewW  = useSharedValue(1);
   const sharedViewH  = useSharedValue(1);
+  // Track the last scroll values committed to JS-side state for threshold gating
+  const lastRenderX  = useSharedValue(0);
+  const lastRenderY  = useSharedValue(0);
 
   // ── React state (JS thread) — drives virtualization ───────────────────────
   const [renderScrollX, setRenderScrollX] = useState(0);
@@ -63,6 +66,18 @@ export default function PlannerGrid() {
   const [viewDims, setViewDims] = useState({ width: 1, height: 1 });
 
   const initialized = useRef(false);
+
+  // Refs for values the focus effect reads but must not re-trigger on
+  const rowsRef       = useRef(rows);
+  const rowOffsetsRef = useRef(rowOffsets);
+  const totalHeightRef = useRef(totalHeight);
+  const totalWidthRef  = useRef(totalWidth);
+  const viewDimsRef    = useRef(viewDims);
+  rowsRef.current       = rows;
+  rowOffsetsRef.current = rowOffsets;
+  totalHeightRef.current = totalHeight;
+  totalWidthRef.current  = totalWidth;
+  viewDimsRef.current    = viewDims;
 
   // ── Pan gesture ───────────────────────────────────────────────────────────
   const panGesture = Gesture.Pan()
@@ -84,13 +99,27 @@ export default function PlannerGrid() {
     });
 
   // ── Keep virtualization in sync during drag and decay ─────────────────────
+  // Only flush to JS when scroll moves by at least half a cell/row to avoid
+  // triggering a React re-render on every animation frame.
+  const RENDER_THRESHOLD_X = 26; // CELL_WIDTH / 2
+  const RENDER_THRESHOLD_Y = 14; // ROW_HEIGHT / 2
   useAnimatedReaction(
     () => scrollX.value,
-    (val) => scheduleOnRN(setRenderScrollX, val),
+    (val) => {
+      if (Math.abs(val - lastRenderX.value) >= RENDER_THRESHOLD_X) {
+        lastRenderX.value = val;
+        scheduleOnRN(setRenderScrollX, val);
+      }
+    },
   );
   useAnimatedReaction(
     () => scrollY.value,
-    (val) => scheduleOnRN(setRenderScrollY, val),
+    (val) => {
+      if (Math.abs(val - lastRenderY.value) >= RENDER_THRESHOLD_Y) {
+        lastRenderY.value = val;
+        scheduleOnRN(setRenderScrollY, val);
+      }
+    },
   );
 
   // ── Animated styles ───────────────────────────────────────────────────────
@@ -121,11 +150,11 @@ export default function PlannerGrid() {
   };
 
   useEffect(() => {
-    if (!plannerFocusCropId || viewDims.height <= 1 || viewDims.width <= 1) {
-      return;
-    }
+    if (!plannerFocusCropId) return;
+    const vd = viewDimsRef.current;
+    if (vd.height <= 1 || vd.width <= 1) return;
 
-    const rowIndex = rows.findIndex(
+    const rowIndex = rowsRef.current.findIndex(
       row => row.type === 'crop_row' && row.crop.id === plannerFocusCropId
     );
 
@@ -134,17 +163,17 @@ export default function PlannerGrid() {
       return;
     }
 
-    const targetTop = rowOffsets[rowIndex] ?? 0;
-    const maxY = Math.max(0, totalHeight - viewDims.height);
-    const centeredY = Math.max(0, targetTop - Math.max(0, (viewDims.height - rowHeight) / 2));
+    const targetTop = rowOffsetsRef.current[rowIndex] ?? 0;
+    const maxY = Math.max(0, totalHeightRef.current - vd.height);
+    const centeredY = Math.max(0, targetTop - Math.max(0, (vd.height - rowHeight) / 2));
     const nextY = Math.min(centeredY, maxY);
 
     const parsedFocusDate = plannerFocusDate ? parseDateKey(plannerFocusDate) : null;
     const focusCol = parsedFocusDate
       ? dateToWeekIndex(calendarStart, parsedFocusDate)
       : todayWeekIndex(calendarStart);
-    const maxX = Math.max(0, totalWidth - viewDims.width);
-    const centeredX = Math.max(0, focusCol * cellWidth - Math.max(0, (viewDims.width - cellWidth) / 2));
+    const maxX = Math.max(0, totalWidthRef.current - vd.width);
+    const centeredX = Math.max(0, focusCol * cellWidth - Math.max(0, (vd.width - cellWidth) / 2));
     const nextX = Math.min(centeredX, maxX);
 
     scrollX.value = nextX;
@@ -152,11 +181,11 @@ export default function PlannerGrid() {
     setRenderScrollX(nextX);
     setRenderScrollY(nextY);
     clearPlannerFocus();
-  }, [calendarStart, clearPlannerFocus, plannerFocusCropId, plannerFocusDate, rowOffsets, rows, scrollX, scrollY, totalHeight, totalWidth, viewDims.height, viewDims.width]);
+  }, [calendarStart, cellWidth, clearPlannerFocus, plannerFocusCropId, plannerFocusDate, rowHeight, scrollX, scrollY]);
 
-  const todayLabel = new Date().toLocaleDateString('en-US', {
+  const todayLabel = useMemo(() => new Date().toLocaleDateString('en-US', {
     month: 'numeric', day: 'numeric', year: '2-digit',
-  });
+  }), []);
 
   const handleHomePress = useCallback(() => {
     resetViewState();
@@ -209,7 +238,7 @@ export default function PlannerGrid() {
           <Animated.View
             style={[{ position: 'absolute', width: ROW_HEADER_WIDTH, height: totalHeight }, rowHeaderStyle]}
           >
-            <RowHeader rows={rows} rowOffsets={rowOffsets} />
+            <RowHeader rows={rows} rowOffsets={rowOffsets} renderScrollY={renderScrollY} viewHeight={viewDims.height} />
           </Animated.View>
         </View>
 

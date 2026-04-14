@@ -10,9 +10,6 @@ import type { DateTimePickerEvent } from '@react-native-community/datetimepicker
 
 import { formatDateKey, parseDateKey, toSunday } from '@/src/utils/dateUtils';
 import { usePlannerStore } from '@/src/store/plannerStore';
-import { getAllSections, getAllGardens, getAllLocations } from '@/src/db/queries/locationQueries';
-import { getCropStages } from '@/src/db/queries/cropQueries';
-import { Section, Garden, Location } from '@/src/types';
 
 interface StageRow {
   stage_definition_id: number;
@@ -43,6 +40,9 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
       ? true
       : s.rows.some(row => row.type === 'crop_row' && row.crop.id === cropId)
   ));
+  const sections = usePlannerStore(s => s.sections);
+  const gardens = usePlannerStore(s => s.gardens);
+  const locations = usePlannerStore(s => s.locations);
   const isEditMode   = cropId != null;
 
   const [name, setName]             = useState('');
@@ -51,9 +51,6 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [sectionId, setSectionId]   = useState<number | null>(null);
   const [stages, setStages]         = useState<StageRow[]>([]);
-  const [sections, setSections]     = useState<Section[]>([]);
-  const [gardens, setGardens]       = useState<Garden[]>([]);
-  const [locations, setLocations]   = useState<Location[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [page, setPage] = useState<1 | 2>(1);
@@ -62,17 +59,11 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
   useEffect(() => {
     let isCancelled = false;
 
-    const loadFormData = async () => {
+    const loadFormData = () => {
       if (isEditMode && !cropRowAvailable) {
+        setLoadingInitial(false);
         return;
       }
-
-      const [secs, gds, locs, existingStages] = await Promise.all([
-        getAllSections(),
-        getAllGardens(),
-        getAllLocations(),
-        isEditMode && cropId != null ? getCropStages(cropId) : Promise.resolve([]),
-      ]);
 
       if (isCancelled) {
         return;
@@ -87,16 +78,9 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
         : null;
 
       if (currentStageDefs.length === 0) {
-        setSections(secs);
-        setGardens(gds);
-        setLocations(locs);
         setLoadingInitial(false);
         return;
       }
-
-      setSections(secs);
-      setGardens(gds);
-      setLocations(locs);
 
       if (isEditMode && cropRow?.type === 'crop_row') {
         const parsedStart = parseDateKey(cropRow.crop.start_date);
@@ -109,8 +93,8 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
         setStartDate(parsedStart ?? toSunday(new Date()));
         setSectionId(cropRow.crop.section_id);
         setStages(
-          existingStages.length > 0
-            ? existingStages.map(stage => ({
+          cropRow.stages.length > 0
+            ? cropRow.stages.map(stage => ({
                 stage_definition_id: stage.stage_definition_id,
                 duration_weeks: String(stage.duration_weeks),
               }))
@@ -120,8 +104,8 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
         return;
       }
 
-      if (secs.length > 0) {
-        setSectionId(secs[0].id);
+      if (sections.length > 0) {
+        setSectionId(sections[0].id);
       }
       setStages(
         currentStageDefs.slice(0, 3).map((def, i) => ({
@@ -132,16 +116,12 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
       setLoadingInitial(false);
     };
 
-    loadFormData().catch(() => {
-      if (!isCancelled) {
-        setLoadingInitial(false);
-      }
-    });
+    loadFormData();
 
     return () => {
       isCancelled = true;
     };
-  }, [cropId, cropRowAvailable, isEditMode, stageDefsAvailable]);
+  }, [cropId, cropRowAvailable, isEditMode, sections.length, stageDefsAvailable]);
 
   const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
     if (Platform.OS === 'android') {

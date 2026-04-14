@@ -5,6 +5,7 @@ import {
   CropStage,
   Garden,
   GridRowItem,
+  Location,
   NewCropData,
   NewTaskData,
   Note,
@@ -29,6 +30,9 @@ import { resetDatabase } from '@/src/db/database';
 
 interface PlannerState {
   rows: GridRowItem[];
+  locations: Location[];
+  gardens: Garden[];
+  sections: Section[];
   allTaskLines: PrecomputedTaskLine[];
   calendarStart: Date;
   stageDefinitions: StageDefinition[];
@@ -87,8 +91,15 @@ function showError(action: string, e: unknown) {
   Toast.show({ type: 'error', text1: action, text2: detail, visibilityTime: 4000 });
 }
 
+// Cache weekColorMap per crop. Key encodes stage IDs, durations, and colors so
+// it auto-invalidates when stages are replaced after an edit.
+const weekColorMapCache = new Map<string, Record<number, string>>();
+
 export const usePlannerStore = create<PlannerState>((set, get) => ({
   rows: [],
+  locations: [],
+  gardens: [],
+  sections: [],
   allTaskLines: [],
   calendarStart: defaultCalendarStart(),
   stageDefinitions: [],
@@ -211,14 +222,42 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
   completeTask: async (taskId, weekDate) => {
     try {
       await insertCompletion(taskId, weekDate);
-      await get().loadData();
+      const weekIndex = dateToWeekIndex(get().calendarStart, parseDateKey(weekDate) ?? new Date());
+      const lineKey = `t${taskId}-w${weekIndex}`;
+      set(s => ({
+        allTaskLines: s.allTaskLines.map(line =>
+          line.key === lineKey ? { ...line, dashed: true } : line
+        ),
+        rows: s.rows.map(row => {
+          if (row.type !== 'crop_row' || !row.tasks.some(t => t.id === taskId)) return row;
+          return { ...row, completions: [...row.completions, { id: 0, task_id: taskId, completed_date: weekDate }] };
+        }),
+        todayDueTasks: s.todayDueTasks.filter(t => !(t.task_id === taskId && t.week_date === weekDate)),
+        todayOverdueTasks: s.todayOverdueTasks
+          .map(t => t.task_id === taskId ? { ...t, missed_count: t.missed_count - 1 } : t)
+          .filter(t => t.missed_count > 0),
+      }));
     } catch (e) { showError('Failed to complete task', e); throw e; }
   },
 
   uncompleteTask: async (taskId, weekDate) => {
     try {
       await deleteCompletion(taskId, weekDate);
-      await get().loadData();
+      const weekIndex = dateToWeekIndex(get().calendarStart, parseDateKey(weekDate) ?? new Date());
+      const lineKey = `t${taskId}-w${weekIndex}`;
+      set(s => ({
+        allTaskLines: s.allTaskLines.map(line =>
+          line.key === lineKey ? { ...line, dashed: false } : line
+        ),
+        rows: s.rows.map(row => {
+          if (row.type !== 'crop_row' || !row.tasks.some(t => t.id === taskId)) return row;
+          return { ...row, completions: row.completions.filter(c => !(c.task_id === taskId && c.completed_date === weekDate)) };
+        }),
+      }));
+
+      // Keep Today badge/screen in sync when toggling a completion back to pending.
+      const { due, overdue } = await getTodayAndOverdue();
+      set({ todayDueTasks: due, todayOverdueTasks: overdue });
     } catch (e) { showError('Failed to uncomplete task', e); throw e; }
   },
 
@@ -238,15 +277,34 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
 
   saveCellNote: async (cropInstanceId, weekDate, content) => {
     try {
-      await upsertNote(cropInstanceId, weekDate, content);
-      await get().loadData();
+      const noteId = await upsertNote(cropInstanceId, weekDate, content);
+      const newNote: Note = { id: noteId, entity_type: 'week_cell', crop_instance_id: cropInstanceId, week_date: weekDate, content };
+      set(s => {
+        const otherNotes = s.notes.filter(n => !(n.crop_instance_id === cropInstanceId && n.week_date === weekDate));
+        const newRows = s.rows.map(row => {
+          if (row.type !== 'crop_row' || row.crop.id !== cropInstanceId) return row;
+          return { ...row, notesByWeek: { ...row.notesByWeek, [weekDate]: newNote } };
+        });
+        return { notes: [...otherNotes, newNote], rows: newRows };
+      });
     } catch (e) { showError('Failed to save note', e); throw e; }
   },
 
   deleteNote: async (noteId) => {
     try {
+      const note = get().notes.find(n => n.id === noteId);
       await deleteNoteQuery(noteId);
-      await get().loadData();
+      set(s => {
+        const newNotes = s.notes.filter(n => n.id !== noteId);
+        if (!note?.crop_instance_id || !note?.week_date) return { notes: newNotes };
+        const { crop_instance_id: cropId, week_date: weekDate } = note;
+        const newRows = s.rows.map(row => {
+          if (row.type !== 'crop_row' || row.crop.id !== cropId) return row;
+          const { [weekDate]: _removed, ...rest } = row.notesByWeek;
+          return { ...row, notesByWeek: rest };
+        });
+        return { notes: newNotes, rows: newRows };
+      });
     } catch (e) { showError('Failed to delete note', e); throw e; }
   },
 
@@ -425,17 +483,26 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
             // YYYY-MM-DD as UTC and can land a day off in local time.
             const parsedStartDate = parseDateKey(crop.start_date) ?? toSunday(new Date());
             const cropStartWeek = dateToWeekIndex(calendarStart, parsedStartDate);
-            const weekColorMap: Record<number, string> = {};
+
+            const cacheKey = `${crop.id}:${cropStartWeek}:${stages.map(s => `${s.id},${s.duration_weeks},${s.color}`).join('|')}`;
+            let weekColorMap = weekColorMapCache.get(cacheKey);
             let cursor = cropStartWeek;
-            for (const stage of stages) {
-              for (let w = 0; w < stage.duration_weeks; w++) {
-                weekColorMap[cursor + w] = stage.color;
+            if (!weekColorMap) {
+              weekColorMap = {};
+              for (const stage of stages) {
+                for (let w = 0; w < stage.duration_weeks; w++) {
+                  weekColorMap[cursor + w] = stage.color;
+                }
+                cursor += stage.duration_weeks;
               }
-              cursor += stage.duration_weeks;
+              weekColorMapCache.set(cacheKey, weekColorMap);
+            } else {
+              // Advance cursor to cropEndWeek + 1 without rebuilding the map
+              for (const stage of stages) cursor += stage.duration_weeks;
             }
             const cropEndWeek = cursor - 1;
 
-            pushRow({ type: 'crop_row', crop, weekColorMap, tasks, completions, notesByWeek });
+            pushRow({ type: 'crop_row', crop, stages, weekColorMap, tasks, completions, notesByWeek });
 
             // Precompute task lines for this row — zero work at render time
             const completionSet = new Set(
@@ -477,6 +544,9 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
 
     set({
       rows,
+      locations,
+      gardens,
+      sections,
       allTaskLines,
       notes,
       todayDueTasks,

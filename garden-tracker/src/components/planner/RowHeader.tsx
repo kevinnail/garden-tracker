@@ -10,11 +10,13 @@ import {
 } from '@/src/constants/layout';
 import { GridRowItem } from '@/src/types';
 import { usePlannerStore } from '@/src/store/plannerStore';
-import { getRowHeight } from '../../utils/rowLayout';
+import { getRowHeight, getVisibleRowRange } from '../../utils/rowLayout';
 
 interface Props {
   rows: GridRowItem[];
   rowOffsets: number[];
+  renderScrollY: number;
+  viewHeight: number;
 }
 
 // ── Visual hierarchy ──────────────────────────────────────────────────────────
@@ -39,14 +41,17 @@ const CONTAINER_RADIUS = 5;
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function RowHeader({ rows, rowOffsets }: Props) {
+export default function RowHeader({ rows, rowOffsets, renderScrollY, viewHeight }: Props) {
   const selectedCropId = usePlannerStore(s => s.selectedCropId);
   const setSelectedCrop = usePlannerStore(s => s.setSelectedCrop);
   const totalHeight = rowOffsets[rowOffsets.length - 1] ?? 0;
 
+  const { rowStart, rowEnd } = getVisibleRowRange(rowOffsets, renderScrollY, viewHeight);
+
   return (
     <View style={[styles.container, { height: totalHeight }] }>
-      {rows.map((item, i) => {
+      {rows.slice(rowStart, rowEnd + 1).map((item, offset) => {
+        const i = rowStart + offset;
         const rowHeight = getRowHeight(item);
         const rowStyle = [
           styles.row,
