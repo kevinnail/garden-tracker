@@ -253,9 +253,11 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
           if (row.type !== 'crop_row' || !row.tasks.some(t => t.id === taskId)) return row;
           return { ...row, completions: row.completions.filter(c => !(c.task_id === taskId && c.completed_date === weekDate)) };
         }),
-        // todayDueTasks / todayOverdueTasks are intentionally not updated here.
-        // Uncompleting from the planner is rare; the lists will refresh on next loadData.
       }));
+
+      // Keep Today badge/screen in sync when toggling a completion back to pending.
+      const { due, overdue } = await getTodayAndOverdue();
+      set({ todayDueTasks: due, todayOverdueTasks: overdue });
     } catch (e) { showError('Failed to uncomplete task', e); throw e; }
   },
 
