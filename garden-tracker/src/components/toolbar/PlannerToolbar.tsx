@@ -112,21 +112,19 @@ export default function PlannerToolbar() {
             {todayCount > 0 ? (
               <>
                 <Text style={dueTodayCount > 0 ? styles.todayBannerDueToday : undefined}>
-                  {dueTodayCount} due today
+                  {`${dueTodayCount} due today`}
                 </Text>
-                {' · '}
-                {overdueCount} overdue
+                {` · ${overdueCount} overdue`}
               </>
-            ) : `${todayLabel}`}
+            ) : todayLabel}
           </Text>
         )}
         {isLandscape && todayCount > 0 && (
           <Text style={styles.todayBannerText} numberOfLines={1}>
             <Text style={dueTodayCount > 0 ? styles.todayBannerDueToday : undefined}>
-              {dueTodayCount} due
+              {`${dueTodayCount} due`}
             </Text>
-            {' · '}
-            {overdueCount} overdue
+            {` · ${overdueCount} overdue`}
           </Text>
         )}
       </View>
