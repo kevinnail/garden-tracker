@@ -1,5 +1,6 @@
 import React from 'react';
 import { View } from 'react-native';
+import Svg, { Defs, Pattern, Circle, Rect } from 'react-native-svg';
 import { router } from 'expo-router';
 
 import {
@@ -44,11 +45,14 @@ export default function GridBody({
   const todayCol = todayWeekIndex(calendarStart);
   const totalWidth = TOTAL_WEEKS * cellWidth;
 
+  const totalHeight = rowOffsets[rowOffsets.length - 1] ?? 1;
+
   const colStart = Math.max(0, Math.floor(renderScrollX / cellWidth) - 1);
   const colEnd   = Math.min(TOTAL_WEEKS - 1, Math.ceil((renderScrollX + viewWidth) / cellWidth) + 1);
   const { rowStart, rowEnd } = getVisibleRowRange(rowOffsets, renderScrollY, viewHeight);
 
   const elements: React.ReactElement[] = [];
+  const pastRects: { x: number; y: number; w: number; h: number }[] = [];
 
   for (let row = rowStart; row <= rowEnd; row++) {
     const rowItem = rows[row];
@@ -71,11 +75,14 @@ export default function GridBody({
           });
         };
 
+        if (col < todayCol) {
+          pastRects.push({ x: col * cellWidth, y: top, w: cellWidth - 1, h: height - 1 });
+        }
+
         elements.push(
           <CropCell
             key={`${row}-${col}`}
             stageColor={rowItem.weekColorMap[col] ?? null}
-            isPast={col < todayCol}
             hasNote={hasNote}
             showNoteIndicators={showNoteIndicators}
             style={{ left: col * cellWidth, top }}
@@ -117,6 +124,24 @@ export default function GridBody({
     }
   }
 
-  return <>{elements}</>;
+  return (
+    <>
+      {elements}
+      {pastRects.length > 0 && (
+        <View style={{ position: 'absolute', left: 0, top: 0, width: totalWidth, height: totalHeight }} pointerEvents="none">
+          <Svg width={totalWidth} height={totalHeight}>
+            <Defs>
+              <Pattern id="past-dots" width="5" height="5" patternUnits="userSpaceOnUse">
+                <Circle cx="2.5" cy="2.5" r="1.5" fill="rgba(0,0,0,0.6)" />
+              </Pattern>
+            </Defs>
+            {pastRects.map(({ x, y, w, h }, i) => (
+              <Rect key={i} x={x} y={y} width={w} height={h} fill="url(#past-dots)" />
+            ))}
+          </Svg>
+        </View>
+      )}
+    </>
+  );
 }
 

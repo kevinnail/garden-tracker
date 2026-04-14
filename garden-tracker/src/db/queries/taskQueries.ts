@@ -297,16 +297,25 @@ export async function getTodayAndOverdue(referenceDate: Date = new Date()): Prom
     .map(task => buildDashboardItem(task, today))
     .sort(compareDashboardItems);
 
-  const overdueFloor = addDays(today, -7);
+  // For each task find the most recent *uncompleted* past occurrence, walking
+  // backwards through the crop span until one is found or the span is exhausted.
   const overdue = tasks
     .map(task => {
       const dayDelta = (7 + today.getDay() - task.day_of_week) % 7;
       const daysBack = dayDelta === 0 ? 7 : dayDelta;
-      return { task, dueDate: addDays(today, -daysBack) };
+      let dueDate = addDays(today, -daysBack);
+      const step = task.frequency_weeks * 7;
+
+      for (let i = 0; i < 52; i++) {
+        if (!isTaskScheduledOnDate(task, dueDate)) break; // past crop start or end
+        if (!completions.has(`${task.task_id}:${formatDateKey(toSunday(dueDate))}`)) {
+          return { task, dueDate };
+        }
+        dueDate = addDays(dueDate, -step);
+      }
+      return null;
     })
-    .filter(({ dueDate }) => utcMidnightMs(dueDate) >= utcMidnightMs(overdueFloor))
-    .filter(({ task, dueDate }) => isTaskScheduledOnDate(task, dueDate))
-    .filter(({ task, dueDate }) => !completions.has(`${task.task_id}:${formatDateKey(toSunday(dueDate))}`))
+    .filter((x): x is { task: DashboardTaskRow; dueDate: Date } => x !== null)
     .map(({ task, dueDate }) => buildDashboardItem(task, dueDate, countMissedOccurrences(task, dueDate, completions)))
     .sort(compareDashboardItems);
 

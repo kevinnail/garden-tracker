@@ -97,7 +97,7 @@ export default function EditCropModal() {
         </View>
       </View>
 
-      <View style={[styles.footer, { paddingBottom: Math.max(14, insets.bottom + 8) }]}>
+      <View style={[styles.footer, { paddingBottom: isLandscape ? 0 : Math.max(14, insets.bottom + 8) }]}>
         <View style={styles.footerMainRow}>
           <Pressable
             style={styles.closeBtn}

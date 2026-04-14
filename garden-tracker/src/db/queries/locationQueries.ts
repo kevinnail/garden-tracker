@@ -24,39 +24,30 @@ export async function getAllSections(): Promise<Section[]> {
 
 export async function insertLocation(name: string): Promise<number> {
   const db = await getDb();
-  const maxIdx = await db.getFirstAsync<{ max: number | null }>(
-    `SELECT MAX(order_index) as max FROM locations`
-  );
-  const orderIndex = (maxIdx?.max ?? -1) + 1;
   const result = await db.runAsync(
-    `INSERT INTO locations (name, order_index) VALUES (?, ?)`,
-    name, orderIndex
+    `INSERT INTO locations (name, order_index)
+     VALUES (?, (SELECT COALESCE(MAX(order_index), -1) + 1 FROM locations))`,
+    name
   );
   return result.lastInsertRowId;
 }
 
 export async function insertGarden(locationId: number, name: string): Promise<number> {
   const db = await getDb();
-  const maxIdx = await db.getFirstAsync<{ max: number | null }>(
-    `SELECT MAX(order_index) as max FROM gardens WHERE location_id = ?`, locationId
-  );
-  const orderIndex = (maxIdx?.max ?? -1) + 1;
   const result = await db.runAsync(
-    `INSERT INTO gardens (location_id, name, order_index) VALUES (?, ?, ?)`,
-    locationId, name, orderIndex
+    `INSERT INTO gardens (location_id, name, order_index)
+     VALUES (?, ?, (SELECT COALESCE(MAX(order_index), -1) + 1 FROM gardens WHERE location_id = ?))`,
+    locationId, name, locationId
   );
   return result.lastInsertRowId;
 }
 
 export async function insertSection(gardenId: number, name: string): Promise<number> {
   const db = await getDb();
-  const maxIdx = await db.getFirstAsync<{ max: number | null }>(
-    `SELECT MAX(order_index) as max FROM sections WHERE garden_id = ?`, gardenId
-  );
-  const orderIndex = (maxIdx?.max ?? -1) + 1;
   const result = await db.runAsync(
-    `INSERT INTO sections (garden_id, name, order_index) VALUES (?, ?, ?)`,
-    gardenId, name, orderIndex
+    `INSERT INTO sections (garden_id, name, order_index)
+     VALUES (?, ?, (SELECT COALESCE(MAX(order_index), -1) + 1 FROM sections WHERE garden_id = ?))`,
+    gardenId, name, gardenId
   );
   return result.lastInsertRowId;
 }
