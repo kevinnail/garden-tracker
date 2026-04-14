@@ -1,6 +1,6 @@
 import React from 'react';
 import { View } from 'react-native';
-import Svg, { Defs, Pattern, Line, Rect } from 'react-native-svg';
+import Svg, { Defs, Pattern, Circle, Rect } from 'react-native-svg';
 import { router } from 'expo-router';
 
 import {
@@ -131,13 +131,12 @@ export default function GridBody({
         <View style={{ position: 'absolute', left: 0, top: 0, width: totalWidth, height: totalHeight }} pointerEvents="none">
           <Svg width={totalWidth} height={totalHeight}>
             <Defs>
-          <Pattern id="past-hatch" width="4" height="4" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">                                                 
-          -                                                                                                                                                                         
-      135 -              <Line x1="0" y1="0" x2="0" y2="4" stroke="rgba(0,0,0,1)" strokeWidth="6" />    
+              <Pattern id="past-dots" width="5" height="5" patternUnits="userSpaceOnUse">
+                <Circle cx="2.5" cy="2.5" r="1.5" fill="rgba(0,0,0,0.6)" />
               </Pattern>
             </Defs>
             {pastRects.map(({ x, y, w, h }, i) => (
-              <Rect key={i} x={x} y={y} width={w} height={h} fill="url(#past-hatch)" />
+              <Rect key={i} x={x} y={y} width={w} height={h} fill="url(#past-dots)" />
             ))}
           </Svg>
         </View>
