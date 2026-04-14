@@ -209,7 +209,7 @@ export default function PlannerGrid() {
           <Animated.View
             style={[{ position: 'absolute', width: ROW_HEADER_WIDTH, height: totalHeight }, rowHeaderStyle]}
           >
-            <RowHeader rows={rows} rowOffsets={rowOffsets} />
+            <RowHeader rows={rows} rowOffsets={rowOffsets} renderScrollY={renderScrollY} viewHeight={viewDims.height} />
           </Animated.View>
         </View>
 
