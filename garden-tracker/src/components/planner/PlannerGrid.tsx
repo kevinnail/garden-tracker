@@ -183,9 +183,9 @@ export default function PlannerGrid() {
     clearPlannerFocus();
   }, [calendarStart, cellWidth, clearPlannerFocus, plannerFocusCropId, plannerFocusDate, rowHeight, scrollX, scrollY]);
 
-  const todayLabel = new Date().toLocaleDateString('en-US', {
+  const todayLabel = useMemo(() => new Date().toLocaleDateString('en-US', {
     month: 'numeric', day: 'numeric', year: '2-digit',
-  });
+  }), []);
 
   const handleHomePress = useCallback(() => {
     resetViewState();
