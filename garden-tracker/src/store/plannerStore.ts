@@ -213,7 +213,6 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
       await insertCompletion(taskId, weekDate);
       const weekIndex = dateToWeekIndex(get().calendarStart, parseDateKey(weekDate) ?? new Date());
       const lineKey = `t${taskId}-w${weekIndex}`;
-      const { due, overdue } = await getTodayAndOverdue();
       set(s => ({
         allTaskLines: s.allTaskLines.map(line =>
           line.key === lineKey ? { ...line, dashed: true } : line
@@ -222,8 +221,8 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
           if (row.type !== 'crop_row' || !row.tasks.some(t => t.id === taskId)) return row;
           return { ...row, completions: [...row.completions, { id: 0, task_id: taskId, completed_date: weekDate }] };
         }),
-        todayDueTasks: due,
-        todayOverdueTasks: overdue,
+        todayDueTasks: s.todayDueTasks.filter(t => !(t.task_id === taskId && t.week_date === weekDate)),
+        todayOverdueTasks: s.todayOverdueTasks.filter(t => !(t.task_id === taskId && t.week_date === weekDate)),
       }));
     } catch (e) { showError('Failed to complete task', e); throw e; }
   },
@@ -233,7 +232,6 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
       await deleteCompletion(taskId, weekDate);
       const weekIndex = dateToWeekIndex(get().calendarStart, parseDateKey(weekDate) ?? new Date());
       const lineKey = `t${taskId}-w${weekIndex}`;
-      const { due, overdue } = await getTodayAndOverdue();
       set(s => ({
         allTaskLines: s.allTaskLines.map(line =>
           line.key === lineKey ? { ...line, dashed: false } : line
@@ -242,8 +240,8 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
           if (row.type !== 'crop_row' || !row.tasks.some(t => t.id === taskId)) return row;
           return { ...row, completions: row.completions.filter(c => !(c.task_id === taskId && c.completed_date === weekDate)) };
         }),
-        todayDueTasks: due,
-        todayOverdueTasks: overdue,
+        // todayDueTasks / todayOverdueTasks are intentionally not updated here.
+        // Uncompleting from the planner is rare; the lists will refresh on next loadData.
       }));
     } catch (e) { showError('Failed to uncomplete task', e); throw e; }
   },
