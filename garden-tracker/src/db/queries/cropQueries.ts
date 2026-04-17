@@ -79,13 +79,14 @@ export async function insertCropInstance(
   sectionId: number,
   name: string,
   plantCount: number,
-  startDate: string
+  startDate: string,
+  recordType: 'plant' | 'mushroom' = 'plant'
 ): Promise<number> {
   const db = await getDb();
   const normalizedStartDate = normalizeStartDate(startDate);
   const result = await db.runAsync(
-    `INSERT INTO crop_instances (section_id, name, plant_count, start_date) VALUES (?, ?, ?, ?)`,
-    sectionId, name, plantCount, normalizedStartDate
+    `INSERT INTO crop_instances (section_id, name, plant_count, start_date, record_type) VALUES (?, ?, ?, ?, ?)`,
+    sectionId, name, plantCount, normalizedStartDate, recordType
   );
   return result.lastInsertRowId;
 }
@@ -108,15 +109,16 @@ export async function insertCropWithStages(
   name: string,
   plantCount: number,
   startDate: string,
-  stages: { stage_definition_id: number; duration_weeks: number }[]
+  stages: { stage_definition_id: number; duration_weeks: number }[],
+  recordType: 'plant' | 'mushroom' = 'plant'
 ): Promise<number> {
   const db = await getDb();
   const normalizedStartDate = normalizeStartDate(startDate);
   let cropId = 0;
   await db.withTransactionAsync(async () => {
     const result = await db.runAsync(
-      `INSERT INTO crop_instances (section_id, name, plant_count, start_date) VALUES (?, ?, ?, ?)`,
-      sectionId, name, plantCount, normalizedStartDate
+      `INSERT INTO crop_instances (section_id, name, plant_count, start_date, record_type) VALUES (?, ?, ?, ?, ?)`,
+      sectionId, name, plantCount, normalizedStartDate, recordType
     );
     cropId = result.lastInsertRowId;
     for (let i = 0; i < stages.length; i++) {
@@ -129,11 +131,11 @@ export async function insertCropWithStages(
   return cropId;
 }
 
-const CROP_INSTANCE_COLUMNS = new Set(['name', 'plant_count', 'start_date', 'notes', 'section_id']);
+const CROP_INSTANCE_COLUMNS = new Set(['name', 'plant_count', 'start_date', 'notes', 'section_id', 'record_type']);
 
 export async function updateCropInstance(
   id: number,
-  fields: Partial<Pick<CropInstance, 'name' | 'plant_count' | 'start_date' | 'notes' | 'section_id'>>
+  fields: Partial<Pick<CropInstance, 'name' | 'plant_count' | 'start_date' | 'notes' | 'section_id' | 'record_type'>>
 ): Promise<void> {
   const normalizedFields = {
     ...fields,
