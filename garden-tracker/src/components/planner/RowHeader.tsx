@@ -31,6 +31,8 @@ export const LOCATION_BAR  = '#0d0d0d';  // 10 px — same as location band
 
 export const GARDEN_BAND   = '#003e14';
 export const GARDEN_BAR    = '#003e14';  // 8 px — same as garden band
+export const MUSHROOM_BAND = '#3A2010';
+export const MUSHROOM_BAR  = '#3A2010';
 
 export const SECTION_BAND  = '#cdcdcd';
 export const SECTION_BAR   = '#cdcdcd';  // 6 px — same as section band
@@ -80,22 +82,28 @@ export default function RowHeader({ rows, rowOffsets, renderScrollY, viewHeight 
         );
 
         // ── Garden top band (location bar on left connects to location bands) ─
-        if (item.type === 'garden_header') return (
-          <View key={i} style={[rowStyle, { backgroundColor: LOCATION_BAND }]}>
-            <View style={[styles.bar, { width: 10, backgroundColor: LOCATION_BAR }]} />
-            <View style={[styles.bandContent, { backgroundColor: GARDEN_BAND, borderTopLeftRadius: CONTAINER_RADIUS }]}>
-              <Text style={styles.gardenText} numberOfLines={1}>{item.garden.name}</Text>
+        if (item.type === 'garden_header') {
+          const gBand = item.garden.record_type === 'mushroom' ? MUSHROOM_BAND : GARDEN_BAND;
+          return (
+            <View key={i} style={[rowStyle, { backgroundColor: LOCATION_BAND }]}>
+              <View style={[styles.bar, { width: 10, backgroundColor: LOCATION_BAR }]} />
+              <View style={[styles.bandContent, { backgroundColor: gBand, borderTopLeftRadius: CONTAINER_RADIUS }]}>
+                <Text style={styles.gardenText} numberOfLines={1}>{item.garden.name}</Text>
+              </View>
             </View>
-          </View>
-        );
+          );
+        }
 
         // ── Garden bottom band ─────────────────────────────────────────────
-        if (item.type === 'garden_footer') return (
-          <View key={i} style={[rowStyle, { backgroundColor: LOCATION_BAND }]}>
-            <View style={[styles.bar, { width: 10, backgroundColor: LOCATION_BAR }]} />
-            <View style={[styles.bandContent, { backgroundColor: GARDEN_BAND, borderBottomLeftRadius: CONTAINER_RADIUS }]} />
-          </View>
-        );
+        if (item.type === 'garden_footer') {
+          const gBand = item.gardenRecordType === 'mushroom' ? MUSHROOM_BAND : GARDEN_BAND;
+          return (
+            <View key={i} style={[rowStyle, { backgroundColor: LOCATION_BAND }]}>
+              <View style={[styles.bar, { width: 10, backgroundColor: LOCATION_BAR }]} />
+              <View style={[styles.bandContent, { backgroundColor: gBand, borderBottomLeftRadius: CONTAINER_RADIUS }]} />
+            </View>
+          );
+        }
 
         // ── Garden spacer (between gardens, in location band color) ────────
         if (item.type === 'garden_spacer') return (
@@ -105,35 +113,47 @@ export default function RowHeader({ rows, rowOffsets, renderScrollY, viewHeight 
         );
 
         // ── Section top band ───────────────────────────────────────────────
-        if (item.type === 'section_header') return (
-          <View key={i} style={[rowStyle, { backgroundColor: GARDEN_BAND }]}>
-            <View style={[styles.bar, { width: 10, backgroundColor: LOCATION_BAR }]} />
-            <View style={[styles.bar, { width: 8, backgroundColor: GARDEN_BAR }]} />
-            <View style={[styles.bandContent, { backgroundColor: SECTION_BAND, borderTopLeftRadius: CONTAINER_RADIUS }]}>
-              <Text style={styles.sectionText} numberOfLines={1}>{item.section.name}</Text>
+        if (item.type === 'section_header') {
+          const gBand = item.gardenRecordType === 'mushroom' ? MUSHROOM_BAND : GARDEN_BAND;
+          const gBar  = item.gardenRecordType === 'mushroom' ? MUSHROOM_BAR  : GARDEN_BAR;
+          return (
+            <View key={i} style={[rowStyle, { backgroundColor: gBand }]}>
+              <View style={[styles.bar, { width: 10, backgroundColor: LOCATION_BAR }]} />
+              <View style={[styles.bar, { width: 8, backgroundColor: gBar }]} />
+              <View style={[styles.bandContent, { backgroundColor: SECTION_BAND, borderTopLeftRadius: CONTAINER_RADIUS }]}>
+                <Text style={styles.sectionText} numberOfLines={1}>{item.section.name}</Text>
+              </View>
             </View>
-          </View>
-        );
+          );
+        }
 
         // ── Section bottom band ────────────────────────────────────────────
-        if (item.type === 'section_footer') return (
-          <View key={i} style={[rowStyle, { backgroundColor: GARDEN_BAND }]}>
-            <View style={[styles.bar, { width: 10, backgroundColor: LOCATION_BAR }]} />
-            <View style={[styles.bar, { width: 8, backgroundColor: GARDEN_BAR }]} />
-            <View style={[styles.bandContent, { backgroundColor: SECTION_BAND, borderBottomLeftRadius: CONTAINER_RADIUS }]} />
-          </View>
-        );
+        if (item.type === 'section_footer') {
+          const gBand = item.gardenRecordType === 'mushroom' ? MUSHROOM_BAND : GARDEN_BAND;
+          const gBar  = item.gardenRecordType === 'mushroom' ? MUSHROOM_BAR  : GARDEN_BAR;
+          return (
+            <View key={i} style={[rowStyle, { backgroundColor: gBand }]}>
+              <View style={[styles.bar, { width: 10, backgroundColor: LOCATION_BAR }]} />
+              <View style={[styles.bar, { width: 8, backgroundColor: gBar }]} />
+              <View style={[styles.bandContent, { backgroundColor: SECTION_BAND, borderBottomLeftRadius: CONTAINER_RADIUS }]} />
+            </View>
+          );
+        }
 
         // ── Section spacer between framed sections ────────────────────────
-        if (item.type === 'section_spacer') return (
-          <View key={i} style={[rowStyle, { backgroundColor: GARDEN_BAND }] }> 
-            <View style={[styles.bar, { width: 10, backgroundColor: LOCATION_BAR }]} />
-          </View>
-        );
+        if (item.type === 'section_spacer') {
+          const gBand = item.gardenRecordType === 'mushroom' ? MUSHROOM_BAND : GARDEN_BAND;
+          return (
+            <View key={i} style={[rowStyle, { backgroundColor: gBand }]}>
+              <View style={[styles.bar, { width: 10, backgroundColor: LOCATION_BAR }]} />
+            </View>
+          );
+        }
 
         // ── Crop row ───────────────────────────────────────────────────────
         if (item.type === 'crop_row') {
           const isSelected = selectedCropId === item.crop.id;
+          const gBar = item.gardenRecordType === 'mushroom' ? MUSHROOM_BAR : GARDEN_BAR;
           return (
             <Pressable
               key={i}
@@ -148,7 +168,7 @@ export default function RowHeader({ rows, rowOffsets, renderScrollY, viewHeight 
               }}
             >
               <View style={[styles.bar, { width: 10, backgroundColor: LOCATION_BAR }]} />
-              <View style={[styles.bar, { width: 8, backgroundColor: GARDEN_BAR }]} />
+              <View style={[styles.bar, { width: 8, backgroundColor: gBar }]} />
               <View style={[styles.bar, { width: 6, backgroundColor: SECTION_BAR }]} />
               <View style={styles.countCell}>
                 <Text style={styles.countText}>{item.crop.plant_count}</Text>
