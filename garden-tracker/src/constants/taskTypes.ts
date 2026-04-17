@@ -16,3 +16,12 @@ export const PRESET_TASK_TYPES: PresetTaskType[] = [
   { name: 'Transplant',   color: '#33FF99' }, // mint
   { name: 'Observation',  color: '#FFFFFF' }, // white
 ];
+
+export const PRESET_MUSHROOM_TASK_TYPES: PresetTaskType[] = [
+  { name: 'Cleaning/Sanitizing',   color: '#E8E8E8' }, // silver-white
+  { name: 'Misting',               color: '#64B5F6' }, // sky blue
+  { name: 'Fresh Air Exchange',    color: '#A5D6A7' }, // pale green
+  { name: 'Contamination Check',   color: '#EF5350' }, // coral red
+  { name: 'Mushroom Harvest',      color: '#FFD54F' }, // amber yellow
+  { name: 'Spawn Transfer',        color: '#CE93D8' }, // lavender
+];
