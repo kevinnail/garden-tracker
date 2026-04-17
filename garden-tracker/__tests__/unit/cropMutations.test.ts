@@ -49,7 +49,7 @@ describe('insertCropInstance', () => {
     expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
     expect(mockDb.runAsync).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO crop_instances'),
-      expect.anything(), expect.anything(), expect.anything(), expect.anything()
+      expect.anything(), expect.anything(), expect.anything(), expect.anything(), expect.anything()
     );
   });
 
