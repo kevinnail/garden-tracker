@@ -64,7 +64,7 @@ interface PlannerState {
   saveCellNote: (cropInstanceId: number, weekDate: string, content: string) => Promise<void>;
   deleteNote: (noteId: number) => Promise<void>;
   addLocation: (name: string) => Promise<number>;
-  addGarden: (locationId: number, name: string) => Promise<number>;
+  addGarden: (locationId: number, name: string, recordType?: 'plant' | 'mushroom') => Promise<number>;
   addSection: (gardenId: number, name: string) => Promise<number>;
   removeLocation: (id: number) => Promise<void>;
   removeGarden: (id: number) => Promise<void>;
@@ -126,9 +126,9 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
     } catch (e) { showError('Failed to add location', e); throw e; }
   },
 
-  addGarden: async (locationId, name) => {
+  addGarden: async (locationId, name, recordType = 'plant') => {
     try {
-      const id = await insertGarden(locationId, name);
+      const id = await insertGarden(locationId, name, recordType);
       await get().loadData();
       return id;
     } catch (e) { showError('Failed to add garden', e); throw e; }
@@ -318,7 +318,7 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
 
   addCrop: async (data: NewCropData) => {
     try {
-      await insertCropWithStages(data.section_id, data.name, data.plant_count, data.start_date, data.stages);
+      await insertCropWithStages(data.section_id, data.name, data.plant_count, data.start_date, data.stages, data.record_type ?? 'plant');
       await get().loadData();
     } catch (e) { showError('Failed to add crop', e); throw e; }
   },
@@ -330,6 +330,7 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
         plant_count: data.plant_count,
         start_date: data.start_date,
         section_id: data.section_id,
+        ...(data.record_type != null ? { record_type: data.record_type } : {}),
       });
       await replaceCropStages(cropId, data.stages);
       await get().loadData();
@@ -450,16 +451,17 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
       for (const garden of locationGardens) {
         const gardenSections = sectionsByGarden.get(garden.id) ?? [];
 
+        const gardenRecordType = garden.record_type ?? 'plant';
         pushRow({ type: 'garden_header', garden });
 
         for (const section of gardenSections) {
-          pushRow({ type: 'section_header', section });
+          pushRow({ type: 'section_header', section, gardenRecordType });
 
           const crops = cropsBySection.get(section.id) ?? [];
 
           if (crops.length === 0) {
-            pushRow({ type: 'section_footer' });
-            pushRow({ type: 'section_spacer' });
+            pushRow({ type: 'section_footer', gardenRecordType });
+            pushRow({ type: 'section_spacer', gardenRecordType });
           }
 
           for (const crop of crops) {
@@ -502,7 +504,7 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
             }
             const cropEndWeek = cursor - 1;
 
-            pushRow({ type: 'crop_row', crop, stages, weekColorMap, tasks, completions, notesByWeek });
+            pushRow({ type: 'crop_row', crop, stages, weekColorMap, tasks, completions, notesByWeek, gardenRecordType });
 
             // Precompute task lines for this row — zero work at render time
             const completionSet = new Set(
@@ -530,13 +532,13 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
           }
 
           if (crops.length > 0) {
-            pushRow({ type: 'section_footer' });
-            pushRow({ type: 'section_spacer' });
+            pushRow({ type: 'section_footer', gardenRecordType });
+            pushRow({ type: 'section_spacer', gardenRecordType });
           }
         }
 
-        pushRow({ type: 'garden_footer' });
-        pushRow({ type: 'garden_spacer' });
+        pushRow({ type: 'garden_footer', gardenRecordType });
+        pushRow({ type: 'garden_spacer', gardenRecordType });
       }
       pushRow({ type: 'location_footer' });
       pushRow({ type: 'location_spacer' });
