@@ -72,6 +72,7 @@ export default function AddLocationForm() {
   const [gardenId, setGardenId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [lastAdded, setLastAdded] = useState<string | null>(null);
+  const [gardenRecordType, setGardenRecordType] = useState<'plant' | 'mushroom'>('plant');
   const [showHelp, setShowHelp] = useState(false);
   const [page, setPage] = useState<1 | 2>(1);
   const [editingItem, setEditingItem] = useState<{ type: 'location' | 'garden' | 'section'; id: number; value: string } | null>(null);
@@ -255,10 +256,11 @@ export default function AddLocationForm() {
         await reload();
         setMode('garden');
       } else if (mode === 'garden') {
-        const createdId = await addGarden(locationId!, trimmed);
+        const createdId = await addGarden(locationId!, trimmed, gardenRecordType);
         createdGardenIds.current.add(createdId);
         syncCreatedEntityCount();
         setGardenId(createdId);
+        setGardenRecordType('plant');
         await reload();
         setMode('section');
       } else {
@@ -456,7 +458,7 @@ export default function AddLocationForm() {
                   </View>
                 )}
 
-                <Text style={styles.levelTitle}>2. Garden</Text>
+                <Text style={styles.levelTitle}>2. Garden / Zone</Text>
                 {filteredGardens.length === 0 ? (
                   <Text style={styles.emptyHint}>
                     {locationId == null ? 'Select a location first.' : 'No gardens in this location yet.'}
@@ -470,6 +472,11 @@ export default function AddLocationForm() {
                         onPress={() => setGardenId(g.id)}
                       >
                         <Text style={[styles.pickerText, gardenId === g.id && styles.pickerTextSelected]}>{g.name}</Text>
+                        {g.record_type === 'mushroom' && (
+                          <View style={styles.zoneBadge}>
+                            <Text style={styles.zoneBadgeText}>Zone</Text>
+                          </View>
+                        )}
                       </Pressable>
                     ))}
                   </View>
@@ -513,11 +520,26 @@ export default function AddLocationForm() {
               <View style={styles.editorBox} onLayout={(e) => setEditorTop(e.nativeEvent.layout.y)}>
                 <Text style={styles.boxTitle}>Add Item</Text>
 
+                <View style={styles.recordTypeToggle}>
+                  <Pressable
+                    style={[styles.recordTypeBtn, gardenRecordType === 'plant' && styles.recordTypeBtnActive]}
+                    onPress={() => setGardenRecordType('plant')}
+                  >
+                    <Text style={[styles.recordTypeBtnText, gardenRecordType === 'plant' && styles.recordTypeBtnTextActive]}>Plants</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.recordTypeBtn, gardenRecordType === 'mushroom' && styles.recordTypeBtnMushroomActive]}
+                    onPress={() => setGardenRecordType('mushroom')}
+                  >
+                    <Text style={[styles.recordTypeBtnText, gardenRecordType === 'mushroom' && styles.recordTypeBtnTextActive]}>Mushrooms</Text>
+                  </Pressable>
+                </View>
+
                 <View style={styles.tabs}>
                   {(['location', 'garden', 'section'] as Mode[]).map(m => (
                     <Pressable key={m} style={[styles.tab, mode === m && styles.tabActive]} onPress={() => switchMode(m)}>
                       <Text style={[styles.tabText, mode === m && styles.tabTextActive]}>
-                        {m === 'location' ? 'Location' : m === 'garden' ? 'Garden' : 'Section'}
+                        {m === 'location' ? 'Location' : m === 'garden' ? (gardenRecordType === 'mushroom' ? 'Zone' : 'Garden') : 'Section'}
                       </Text>
                     </Pressable>
                   ))}
@@ -526,7 +548,7 @@ export default function AddLocationForm() {
                 <Text style={styles.modeContext}>{modeContext}</Text>
 
                 <Text style={styles.label}>
-                  {mode === 'location' ? 'New Location Name' : mode === 'garden' ? 'New Garden Name' : 'New Section Name'}
+                  {mode === 'location' ? 'New Location Name' : mode === 'garden' ? (gardenRecordType === 'mushroom' ? 'New Zone Name' : 'New Garden Name') : 'New Section Name'}
                 </Text>
 
                 <View style={styles.inputRow}>
@@ -537,7 +559,7 @@ export default function AddLocationForm() {
                     onChangeText={setName}
                     placeholder={
                       mode === 'location' ? 'e.g. Home, Farm' :
-                      mode === 'garden' ? 'e.g. Backyard Beds' :
+                      mode === 'garden' ? (gardenRecordType === 'mushroom' ? 'e.g. Lab, Fruiting Chamber, Colonization Room' : 'e.g. Backyard Beds') :
                       'e.g. Bed 1'
                     }
                     placeholderTextColor="#555"
@@ -607,7 +629,7 @@ export default function AddLocationForm() {
 
               {mode === 'garden' && filteredGardens.length > 0 && (
                 <>
-                  <Text style={styles.label}>Gardens in this Location</Text>
+                  <Text style={styles.label}>{gardenRecordType === 'mushroom' ? 'Zones in this Location' : 'Gardens in this Location'}</Text>
                   {filteredGardens.map(garden => {
                     const isEditing = editingItem?.type === 'garden' && editingItem.id === garden.id;
                     return (
@@ -772,9 +794,11 @@ const styles = StyleSheet.create({
   addBtnText: { color: '#111', fontWeight: 'bold', fontSize: 14 },
   emptyHint: { color: '#7d7d7d', fontSize: 12, fontStyle: 'italic', paddingVertical: 6 },
   pickerList: { gap: 6 },
-  pickerOption: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, borderWidth: 1, borderColor: '#3a3a3a', backgroundColor: '#2a2a2a' },
+  pickerOption: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, borderWidth: 1, borderColor: '#3a3a3a', backgroundColor: '#2a2a2a' },
   pickerSelected: { borderColor: '#5a9', backgroundColor: '#1e3a2a' },
-  pickerText: { color: '#aaa', fontSize: 13 },
+  zoneBadge: { marginLeft: 8, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: '#3A2010' },
+  zoneBadgeText: { color: '#d4a882', fontSize: 10, fontWeight: '700' },
+  pickerText: { flex: 1, color: '#aaa', fontSize: 13 },
   pickerTextSelected: { color: '#7dcea0' },
   sectionBadgeList: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   sectionBadge: { borderRadius: 999, borderWidth: 1, borderColor: '#4b6a55', paddingHorizontal: 10, paddingVertical: 4, backgroundColor: '#1e3a2a' },
@@ -844,4 +868,11 @@ const styles = StyleSheet.create({
   backBtnText: { color: '#7dcea0', fontWeight: '600', fontSize: 15 },
   resetBtn: { marginTop: 32, paddingVertical: 10, alignItems: 'center' },
   resetBtnText: { color: '#5a2020', fontSize: 12, fontWeight: '600' },
+  recordTypeToggle: { flexDirection: 'row', gap: 8, marginVertical: 4 },
+  recordTypeBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 6, borderWidth: 1, borderColor: '#3a3a3a', backgroundColor: '#262626' },
+  recordTypeBtnActive: { borderColor: '#5a9', backgroundColor: '#1e3a2a' },
+  recordTypeBtnMushroomActive: { borderColor: '#8B4513', backgroundColor: '#2a1508' },
+  recordTypeBtnDimmed: { opacity: 0.45 },
+  recordTypeBtnText: { color: '#9a9a9a', fontSize: 12, fontWeight: '600' },
+  recordTypeBtnTextActive: { color: '#eee' },
 });
