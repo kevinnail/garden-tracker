@@ -18,6 +18,7 @@ import CropCell from './CropCell';
 import {
   LOCATION_BAND,
   GARDEN_BAND,
+  MUSHROOM_BAND,
   SECTION_BAND,
 } from './RowHeader';
 
@@ -100,9 +101,11 @@ export default function GridBody({
           bandColor = LOCATION_BAND;
           break;
         case 'garden_header':
+          bandColor = rowItem.garden.record_type === 'mushroom' ? MUSHROOM_BAND : GARDEN_BAND;
+          break;
         case 'garden_footer':
         case 'section_spacer':
-          bandColor = GARDEN_BAND;
+          bandColor = rowItem.gardenRecordType === 'mushroom' ? MUSHROOM_BAND : GARDEN_BAND;
           break;
         case 'garden_spacer':
           bandColor = LOCATION_BAND;
