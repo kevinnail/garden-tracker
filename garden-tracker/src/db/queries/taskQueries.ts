@@ -12,6 +12,7 @@ interface DashboardTaskRow {
   garden_name: string;
   section_name: string;
   location_name: string;
+  record_type: 'plant' | 'mushroom';
   start_date: string;
   day_of_week: number;
   frequency_weeks: number;
@@ -96,6 +97,7 @@ function buildDashboardItem(task: DashboardTaskRow, dueDate: Date, missed_count 
     garden_name: task.garden_name,
     section_name: task.section_name,
     location_name: task.location_name,
+    record_type: task.record_type,
     day_of_week: task.day_of_week,
     frequency_weeks: task.frequency_weeks,
     start_offset_weeks: task.start_offset_weeks,
@@ -141,6 +143,7 @@ async function getDashboardTasks(): Promise<DashboardTaskRow[]> {
       ci.name AS crop_name,
       ci.start_date,
       g.name AS garden_name,
+      g.record_type,
       s.name AS section_name,
       l.name AS location_name,
       t.day_of_week,
