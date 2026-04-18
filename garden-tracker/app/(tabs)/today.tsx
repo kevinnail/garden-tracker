@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,7 +8,7 @@ import { usePlannerData } from '@/src/hooks/usePlannerData';
 import { useTodayTick } from '@/src/hooks/useTodayTick';
 import { TodayTaskItem } from '@/src/types';
 import { usePlannerStore } from '@/src/store/plannerStore';
-import { useWeather, wmoEmoji, wmoLabel, type DayForecast } from '@/src/hooks/useWeather';
+import { useWeather, wmoEmoji, wmoLabel, localDateStr, type DayForecast, type CurrentWeather, type HourForecast } from '@/src/hooks/useWeather';
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -161,6 +161,75 @@ function Section({
 
 const DAY_ABBR = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+function formatHour(time: string): string {
+  const h = parseInt(time.slice(11, 13), 10);
+  if (h === 0)  return '12 AM';
+  if (h === 12) return '12 PM';
+  return h > 12 ? `${h - 12} PM` : `${h} AM`;
+}
+
+// ── Now panel ─────────────────────────────────────────────────────────────────
+
+function NowStat({ label, value, highlight = false }: { label: string; value: string; highlight?: boolean }) {
+  return (
+    <View style={wxStyles.nowStatItem}>
+      <Text style={[wxStyles.nowStatValue, highlight && wxStyles.nowStatHighlight]}>{value}</Text>
+      <Text style={wxStyles.nowStatLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function NowPanel({ current }: { current: CurrentWeather }) {
+  return (
+    <View style={wxStyles.nowCard}>
+      <View style={wxStyles.nowMain}>
+        <Text style={wxStyles.nowEmoji}>{wmoEmoji(current.code)}</Text>
+        <View style={wxStyles.nowTempBlock}>
+          <Text style={wxStyles.nowTemp}>{current.tempF}°</Text>
+          <Text style={wxStyles.nowCondition}>{wmoLabel(current.code)}</Text>
+          <Text style={wxStyles.nowFeels}>Feels like {current.feelsLikeF}°</Text>
+        </View>
+      </View>
+      <View style={wxStyles.nowStats}>
+        <NowStat label="Humidity" value={`${current.humidity}%`} highlight={current.humidity >= 85} />
+        <NowStat label="Wind" value={`${current.windMph} mph`} />
+        {current.precipIn > 0
+          ? <NowStat label="Rain" value={`${current.precipIn.toFixed(2)}"`} />
+          : <NowStat label="Rain" value="None" />
+        }
+      </View>
+    </View>
+  );
+}
+
+// ── Hourly scroll ─────────────────────────────────────────────────────────────
+
+function HourCard({ hour, isNow }: { hour: HourForecast; isNow: boolean }) {
+  return (
+    <View style={[wxStyles.hourCard, isNow && wxStyles.hourCardNow]}>
+      <Text style={[wxStyles.hourLabel, isNow && wxStyles.hourLabelNow]}>
+        {isNow ? 'Now' : formatHour(hour.time)}
+      </Text>
+      <Text style={wxStyles.hourEmoji}>{wmoEmoji(hour.code)}</Text>
+      <Text style={wxStyles.hourTemp}>{hour.tempF}°</Text>
+      {hour.precipPct > 0 && <Text style={wxStyles.hourPrecip}>💧 {hour.precipPct}%</Text>}
+      {hour.windMph >= 20 && <Text style={wxStyles.hourWind}>💨 {hour.windMph}</Text>}
+    </View>
+  );
+}
+
+function HourlyScroll({ hourly }: { hourly: HourForecast[] }) {
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={wxStyles.scrollContent}>
+      {hourly.map((hour, i) => (
+        <HourCard key={hour.time} hour={hour} isNow={i === 0} />
+      ))}
+    </ScrollView>
+  );
+}
+
+// ── 10-day scroll ─────────────────────────────────────────────────────────────
+
 function DayCard({ day, isToday }: { day: DayForecast; isToday: boolean }) {
   const date = new Date(day.date + 'T12:00:00'); // noon local avoids DST edge
   const dayName = isToday ? 'Today' : DAY_ABBR[date.getDay()];
@@ -192,53 +261,38 @@ function DayCard({ day, isToday }: { day: DayForecast; isToday: boolean }) {
   );
 }
 
+// ── Weather section ───────────────────────────────────────────────────────────
+
+type WeatherTab = 'now' | 'hourly' | '10day';
+
+const TAB_LABELS: Record<WeatherTab, string> = { now: 'Now', hourly: 'Hourly', '10day': '10 Days' };
+const TAB_ORDER: WeatherTab[] = ['now', 'hourly', '10day'];
+
 function WeatherSection() {
   const wx = useWeather();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateStr();
+  const [tab, setTab] = useState<WeatherTab>('now');
 
-  if (wx.status === 'loading') {
+  const statusContent = wx.status === 'loading' ? (
+    <View style={wxStyles.statusCard}><Text style={wxStyles.statusText}>Loading weather…</Text></View>
+  ) : wx.status === 'no_network' ? (
+    <View style={wxStyles.statusCard}><Text style={wxStyles.statusText}>Weather unavailable — no network connection.</Text></View>
+  ) : wx.status === 'no_location' ? (
+    <View style={wxStyles.statusCard}><Text style={wxStyles.statusText}>Weather unavailable — location permission denied.</Text></View>
+  ) : wx.status === 'error' ? (
+    <View style={[wxStyles.statusCard, wxStyles.statusCardError]}><Text style={wxStyles.statusTextError}>Weather error: {wx.message}</Text></View>
+  ) : null;
+
+  if (statusContent) {
     return (
       <View style={wxStyles.container}>
         <Text style={wxStyles.sectionTitle}>Weather</Text>
-        <View style={wxStyles.statusCard}>
-          <Text style={wxStyles.statusText}>Loading weather…</Text>
-        </View>
+        {statusContent}
       </View>
     );
   }
 
-  if (wx.status === 'no_network') {
-    return (
-      <View style={wxStyles.container}>
-        <Text style={wxStyles.sectionTitle}>Weather</Text>
-        <View style={wxStyles.statusCard}>
-          <Text style={wxStyles.statusText}>Weather unavailable — no network connection.</Text>
-        </View>
-      </View>
-    );
-  }
-
-  if (wx.status === 'no_location') {
-    return (
-      <View style={wxStyles.container}>
-        <Text style={wxStyles.sectionTitle}>Weather</Text>
-        <View style={wxStyles.statusCard}>
-          <Text style={wxStyles.statusText}>Weather unavailable — location permission denied.</Text>
-        </View>
-      </View>
-    );
-  }
-
-  if (wx.status === 'error') {
-    return (
-      <View style={wxStyles.container}>
-        <Text style={wxStyles.sectionTitle}>Weather</Text>
-        <View style={[wxStyles.statusCard, wxStyles.statusCardError]}>
-          <Text style={wxStyles.statusTextError}>Weather error: {wx.message}</Text>
-        </View>
-      </View>
-    );
-  }
+  if (wx.status !== 'ok') return null;
 
   return (
     <View style={wxStyles.container}>
@@ -246,15 +300,22 @@ function WeatherSection() {
         <Text style={wxStyles.sectionTitle}>Weather</Text>
         <Text style={wxStyles.locationLabel}>{wx.locationLabel}</Text>
       </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={wxStyles.scrollContent}
-      >
-        {wx.days.map(day => (
-          <DayCard key={day.date} day={day} isToday={day.date === today} />
+      <View style={wxStyles.tabBar}>
+        {TAB_ORDER.map(t => (
+          <Pressable key={t} style={[wxStyles.tab, tab === t && wxStyles.tabActive]} onPress={() => setTab(t)}>
+            <Text style={[wxStyles.tabText, tab === t && wxStyles.tabTextActive]}>{TAB_LABELS[t]}</Text>
+          </Pressable>
         ))}
-      </ScrollView>
+      </View>
+      {tab === 'now' && <NowPanel current={wx.current} />}
+      {tab === 'hourly' && <HourlyScroll hourly={wx.hourly} />}
+      {tab === '10day' && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={wxStyles.scrollContent}>
+          {wx.days.map(day => (
+            <DayCard key={day.date} day={day} isToday={day.date === today} />
+          ))}
+        </ScrollView>
+      )}
     </View>
   );
 }
@@ -510,6 +571,136 @@ const wxStyles = StyleSheet.create({
     gap: 8,
     paddingVertical: 2,
   },
+
+  // Tab bar
+  tabBar: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  tab: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: '#111820',
+    borderWidth: 1,
+    borderColor: '#1a2a38',
+  },
+  tabActive: {
+    backgroundColor: '#0f2035',
+    borderColor: '#3b7abf',
+  },
+  tabText: {
+    color: '#3a5a72',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  tabTextActive: {
+    color: '#7ecbf0',
+  },
+
+  // Now panel
+  nowCard: {
+    backgroundColor: '#0d1a27',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#1e2d3d',
+    padding: 16,
+    gap: 14,
+  },
+  nowMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  nowEmoji: {
+    fontSize: 52,
+  },
+  nowTempBlock: {
+    gap: 2,
+  },
+  nowTemp: {
+    color: '#f0c060',
+    fontSize: 40,
+    fontWeight: '700',
+    lineHeight: 44,
+  },
+  nowCondition: {
+    color: '#8daec8',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  nowFeels: {
+    color: '#4a6a85',
+    fontSize: 13,
+    marginTop: 2,
+  },
+  nowStats: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#1e2d3d',
+    paddingTop: 12,
+  },
+  nowStatItem: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 3,
+  },
+  nowStatValue: {
+    color: '#8daec8',
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  nowStatHighlight: {
+    color: '#f0c060',
+  },
+  nowStatLabel: {
+    color: '#3a5a72',
+    fontSize: 11,
+    fontWeight: '500',
+  },
+
+  // Hourly cards
+  hourCard: {
+    width: 64,
+    backgroundColor: '#0d1a27',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#1e2d3d',
+    padding: 8,
+    alignItems: 'center',
+    gap: 3,
+  },
+  hourCardNow: {
+    borderColor: '#3b7abf',
+    backgroundColor: '#0f2035',
+  },
+  hourLabel: {
+    color: '#4a6a85',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  hourLabelNow: {
+    color: '#7ecbf0',
+  },
+  hourEmoji: {
+    fontSize: 18,
+    marginVertical: 1,
+  },
+  hourTemp: {
+    color: '#f0c060',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  hourPrecip: {
+    color: '#5bb5d8',
+    fontSize: 10,
+  },
+  hourWind: {
+    color: '#a8b8c8',
+    fontSize: 10,
+  },
+
+  // 10-day cards
   card: {
     width: 88,
     backgroundColor: '#0d1a27',
@@ -578,6 +769,8 @@ const wxStyles = StyleSheet.create({
     color: '#a8b8c8',
     fontSize: 10,
   },
+
+  // Status cards
   statusCard: {
     padding: 14,
     borderRadius: 12,

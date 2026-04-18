@@ -24,15 +24,16 @@ export const useWeatherStore = create<WeatherStore>((set, get) => ({
     const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low });
 
     try {
-      const [days, geo] = await Promise.all([
+      const [wxData, geo] = await Promise.all([
         fetchWeather(loc.coords.latitude, loc.coords.longitude),
         Location.reverseGeocodeAsync({ latitude: loc.coords.latitude, longitude: loc.coords.longitude }),
       ]);
+      const { current, hourly, days } = wxData;
       const place = geo[0];
       const locationLabel = place
         ? [place.city, place.region].filter(Boolean).join(', ')
         : `${loc.coords.latitude.toFixed(2)}, ${loc.coords.longitude.toFixed(2)}`;
-      set({ weather: { status: 'ok', days, locationLabel } });
+      set({ weather: { status: 'ok', current, hourly, days, locationLabel } });
     } catch (err) {
       set({ weather: classifyWeatherError(err) });
     }

@@ -2,8 +2,8 @@ import { useEffect } from 'react';
 import { useWeatherStore } from '@/src/store/weatherStore';
 
 // Re-export types and pure helpers so existing import sites don't need to change.
-export type { DayForecast, WeatherState } from '@/src/utils/weatherUtils';
-export { wmoLabel, wmoEmoji, classifyWeatherError, fetchWeather } from '@/src/utils/weatherUtils';
+export type { DayForecast, CurrentWeather, HourForecast, WeatherState } from '@/src/utils/weatherUtils';
+export { wmoLabel, wmoEmoji, classifyWeatherError, fetchWeather, localDateStr } from '@/src/utils/weatherUtils';
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
