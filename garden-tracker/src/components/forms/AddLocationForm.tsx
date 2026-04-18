@@ -13,23 +13,6 @@ import { Location, Garden, Section } from '@/src/types';
 import { getAllLocations, getAllGardens, getAllSections } from '@/src/db/queries/locationQueries';
 import { getAllCrops } from '@/src/db/queries/cropQueries';
 
-type Mode = 'location' | 'garden' | 'section';
-
-const HELP_TEXT: Record<Mode, string[]> = {
-  location: [
-    'Location is the top level, such as Home or Farm.',
-    'Each Location can contain multiple Gardens.',
-  ],
-  garden: [
-    'Garden sits inside a Location, such as Backyard Beds.',
-    'Each Garden can contain multiple Sections.',
-  ],
-  section: [
-    'Section sits inside a Garden, such as Bed 1.',
-    'At least one Section is required before adding crops.',
-  ],
-};
-
 function locationStatus(location: Location, gardens: Garden[], sections: Section[]): 'ready' | 'needs-garden' | 'needs-section' {
   const locationGardens = gardens.filter(g => g.location_id === location.id);
   if (locationGardens.length === 0) return 'needs-garden';
@@ -49,6 +32,13 @@ const STATUS_COLOR: Record<string, string> = {
   'needs-section': '#e67e22',
 };
 
+const GUIDE_STEPS = [
+  '1. Add a Location (e.g. Home, Farm)',
+  '2. Add a Garden or Zone under it (e.g. Backyard, Lab)',
+  '3. Add a Section (e.g. Bed 1, Shelf 1)',
+  'Once you have a section, tap "Continue to Add Crop".',
+];
+
 export default function AddLocationForm() {
   const navigation = useNavigation();
 
@@ -63,17 +53,18 @@ export default function AddLocationForm() {
   const renameSection = usePlannerStore(s => s.renameSection);
   const resetAllData = usePlannerStore(s => s.resetAllData);
 
-  const [mode, setMode] = useState<Mode>('location');
-  const [name, setName] = useState('');
+  const [locationName, setLocationName] = useState('');
+  const [gardenName, setGardenName] = useState('');
+  const [sectionName, setSectionName] = useState('');
   const [locations, setLocations] = useState<Location[]>([]);
   const [gardens, setGardens] = useState<Garden[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
   const [locationId, setLocationId] = useState<number | null>(null);
   const [gardenId, setGardenId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [lastAdded, setLastAdded] = useState<string | null>(null);
-  const [showHelp, setShowHelp] = useState(false);
-  const [page, setPage] = useState<1 | 2>(1);
+  const [lastAdded, setLastAdded] = useState<{ text: string; level: 'location' | 'garden' | 'section' } | null>(null);
+  const [gardenRecordType, setGardenRecordType] = useState<'plant' | 'mushroom'>('plant');
+  const [showGuide, setShowGuide] = useState(false);
   const [editingItem, setEditingItem] = useState<{ type: 'location' | 'garden' | 'section'; id: number; value: string } | null>(null);
   const [initialCropCount, setInitialCropCount] = useState<number | null>(null);
   const [allowDismiss, setAllowDismiss] = useState(false);
@@ -84,52 +75,39 @@ export default function AddLocationForm() {
   const createdGardenIds = useRef<Set<number>>(new Set());
   const createdSectionIds = useRef<Set<number>>(new Set());
   const scrollRef = useRef<ScrollView>(null);
-  const inputRef = useRef<TextInput>(null);
-  const [editorTop, setEditorTop] = useState(0);
 
   const reload = useCallback(async () => {
     const [ls, gs, ss] = await Promise.all([getAllLocations(), getAllGardens(), getAllSections()]);
     setLocations(ls);
     setGardens(gs);
     setSections(ss);
-
     setLocationId(prev => {
       if (prev != null && ls.some(x => x.id === prev)) return prev;
       return ls[0]?.id ?? null;
     });
-
     return { ls, gs, ss };
   }, []);
 
   useEffect(() => {
     let cancelled = false;
-
     const loadInitial = async () => {
       const [, crops] = await Promise.all([reload(), getAllCrops(true)]);
-      if (!cancelled) {
-        setInitialCropCount(crops.length);
-      }
+      if (!cancelled) setInitialCropCount(crops.length);
     };
-
     void loadInitial().catch(() => {
       if (!cancelled) setInitialCropCount(0);
     });
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [reload]);
 
   useEffect(() => {
     if (prefilledTopLevel) return;
     if (initialCropCount !== 0) return;
-    if (mode !== 'location') return;
     if (locations.length > 0) return;
-    if (name.trim().length > 0) return;
-
-    setName('Home');
+    if (locationName.trim().length > 0) return;
+    setLocationName('Home');
     setPrefilledTopLevel(true);
-  }, [initialCropCount, locations.length, mode, name, prefilledTopLevel]);
+  }, [initialCropCount, locations.length, locationName, prefilledTopLevel]);
 
   useEffect(() => {
     const filtered = gardens.filter(g => g.location_id === locationId);
@@ -139,23 +117,6 @@ export default function AddLocationForm() {
       setGardenId(null);
     }
   }, [gardenId, gardens, locationId]);
-
-  const ensureEditorVisible = useCallback(() => {
-    scrollRef.current?.scrollTo({ y: Math.max(editorTop - 12, 0), animated: true });
-  }, [editorTop]);
-
-  const focusAndRevealInput = useCallback(() => {
-    setTimeout(() => {
-      inputRef.current?.focus();
-      setTimeout(ensureEditorVisible, 80);
-    }, 50);
-  }, [ensureEditorVisible]);
-
-  const switchMode = useCallback((nextMode: Mode) => {
-    setMode(nextMode);
-    setName('');
-    setLastAdded(null);
-  }, []);
 
   const syncCreatedEntityCount = useCallback(() => {
     setCreatedEntityCount(
@@ -172,17 +133,9 @@ export default function AddLocationForm() {
     const sectionIds = [...createdSectionIds.current];
     const gardenIds = [...createdGardenIds.current];
     const locationIds = [...createdLocationIds.current];
-
-    for (const id of sectionIds) {
-      await removeSection(id);
-    }
-    for (const id of gardenIds) {
-      await removeGarden(id);
-    }
-    for (const id of locationIds) {
-      await removeLocation(id);
-    }
-
+    for (const id of sectionIds) await removeSection(id);
+    for (const id of gardenIds) await removeGarden(id);
+    for (const id of locationIds) await removeLocation(id);
     createdSectionIds.current.clear();
     createdGardenIds.current.clear();
     createdLocationIds.current.clear();
@@ -191,9 +144,7 @@ export default function AddLocationForm() {
   }, [reload, removeGarden, removeLocation, removeSection, syncCreatedEntityCount]);
 
   const openAddCrop = useCallback(() => {
-    allowAndRun(() => {
-      router.replace('/(modals)/add-crop');
-    });
+    allowAndRun(() => { router.replace('/(modals)/add-crop'); });
   }, [allowAndRun]);
 
   const handleExitAttempt = useCallback((onAllowedExit: () => void) => {
@@ -201,16 +152,12 @@ export default function AddLocationForm() {
       onAllowedExit();
       return;
     }
-
     Alert.alert(
       'Finish first setup',
       'You created hierarchy items but no crop yet. To avoid partial setup, add a crop now or discard and exit.',
       [
         { text: 'Keep editing', style: 'cancel' },
-        {
-          text: 'Add crop now',
-          onPress: openAddCrop,
-        },
+        { text: 'Add crop now', onPress: openAddCrop },
         {
           text: 'Discard and exit',
           style: 'destructive',
@@ -230,46 +177,61 @@ export default function AddLocationForm() {
   }, [allowAndRun, allowDismiss, createdEntityCount, discardSessionHierarchy, initialCropCount, openAddCrop]);
 
   usePreventRemove(initialCropCount === 0 && createdEntityCount > 0 && !allowDismiss, ({ data }) => {
-    handleExitAttempt(() => {
-      navigation.dispatch(data.action);
-    });
+    handleExitAttempt(() => { navigation.dispatch(data.action); });
   });
 
-  const handleSubmit = async () => {
-    if (!name.trim()) return Alert.alert('Validation', 'Name is required.');
-    if (mode === 'garden' && locationId == null) {
-      return Alert.alert('Validation', 'Select a Location first.');
-    }
-    if (mode === 'section' && gardenId == null) {
-      return Alert.alert('Validation', 'Select a Garden first.');
-    }
-
+  const handleAddLocation = async () => {
+    const trimmed = locationName.trim();
+    if (!trimmed) return Alert.alert('Validation', 'Name is required.');
     setSubmitting(true);
     try {
-      const trimmed = name.trim();
-      if (mode === 'location') {
-        const createdId = await addLocation(trimmed);
-        createdLocationIds.current.add(createdId);
-        syncCreatedEntityCount();
-        setLocationId(createdId);
-        await reload();
-        setMode('garden');
-      } else if (mode === 'garden') {
-        const createdId = await addGarden(locationId!, trimmed);
-        createdGardenIds.current.add(createdId);
-        syncCreatedEntityCount();
-        setGardenId(createdId);
-        await reload();
-        setMode('section');
-      } else {
-        const createdId = await addSection(gardenId!, trimmed);
-        createdSectionIds.current.add(createdId);
-        syncCreatedEntityCount();
-        await reload();
-      }
-      setLastAdded(trimmed);
-      setName('');
-      focusAndRevealInput();
+      const createdId = await addLocation(trimmed);
+      createdLocationIds.current.add(createdId);
+      syncCreatedEntityCount();
+      setLocationId(createdId);
+      await reload();
+      setLastAdded({ text: trimmed, level: 'location' });
+      setLocationName('');
+    } catch {
+      Alert.alert('Error', 'Failed to save.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleAddGarden = async () => {
+    if (locationId == null) return Alert.alert('Validation', 'Select a Location first.');
+    const trimmed = gardenName.trim();
+    if (!trimmed) return Alert.alert('Validation', 'Name is required.');
+    setSubmitting(true);
+    try {
+      const createdId = await addGarden(locationId, trimmed, gardenRecordType);
+      createdGardenIds.current.add(createdId);
+      syncCreatedEntityCount();
+      setGardenId(createdId);
+      setGardenRecordType('plant');
+      await reload();
+      setLastAdded({ text: trimmed, level: 'garden' });
+      setGardenName('');
+    } catch {
+      Alert.alert('Error', 'Failed to save.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleAddSection = async () => {
+    if (gardenId == null) return Alert.alert('Validation', 'Select a Garden first.');
+    const trimmed = sectionName.trim();
+    if (!trimmed) return Alert.alert('Validation', 'Name is required.');
+    setSubmitting(true);
+    try {
+      const createdId = await addSection(gardenId, trimmed);
+      createdSectionIds.current.add(createdId);
+      syncCreatedEntityCount();
+      await reload();
+      setLastAdded({ text: trimmed, level: 'section' });
+      setSectionName('');
     } catch {
       Alert.alert('Error', 'Failed to save.');
     } finally {
@@ -282,7 +244,6 @@ export default function AddLocationForm() {
     const locationSectionIds = sections.filter(s => locationGardenIds.includes(s.garden_id)).map(s => s.id);
     const gardenCount = gardens.filter(g => g.location_id === location.id).length;
     const detail = gardenCount > 0 ? ` It contains ${gardenCount} garden(s) and all their crops.` : '';
-
     Alert.alert(
       'Delete Location',
       `Delete "${location.name}"?${detail} This cannot be undone.`,
@@ -294,17 +255,13 @@ export default function AddLocationForm() {
           onPress: async () => {
             try {
               await removeLocation(location.id);
-
               createdLocationIds.current.delete(location.id);
               for (const id of locationGardenIds) createdGardenIds.current.delete(id);
               for (const id of locationSectionIds) createdSectionIds.current.delete(id);
               syncCreatedEntityCount();
-
               if (locationId === location.id) setLocationId(null);
               await reload();
-            } catch {
-              // toast shown by store
-            }
+            } catch {}
           },
         },
       ]
@@ -315,7 +272,6 @@ export default function AddLocationForm() {
     const gardenSectionIds = sections.filter(s => s.garden_id === garden.id).map(s => s.id);
     const sectionCount = sections.filter(s => s.garden_id === garden.id).length;
     const detail = sectionCount > 0 ? ` It contains ${sectionCount} section(s) and all their crops.` : '';
-
     Alert.alert(
       'Delete Garden',
       `Delete "${garden.name}"?${detail} This cannot be undone.`,
@@ -327,16 +283,12 @@ export default function AddLocationForm() {
           onPress: async () => {
             try {
               await removeGarden(garden.id);
-
               createdGardenIds.current.delete(garden.id);
               for (const id of gardenSectionIds) createdSectionIds.current.delete(id);
               syncCreatedEntityCount();
-
               if (gardenId === garden.id) setGardenId(null);
               await reload();
-            } catch {
-              // toast shown by store
-            }
+            } catch {}
           },
         },
       ]
@@ -358,9 +310,7 @@ export default function AddLocationForm() {
               createdSectionIds.current.delete(section.id);
               syncCreatedEntityCount();
               await reload();
-            } catch {
-              // toast shown by store
-            }
+            } catch {}
           },
         },
       ]
@@ -377,9 +327,7 @@ export default function AddLocationForm() {
       else await renameSection(editingItem.id, trimmed);
       setEditingItem(null);
       await reload();
-    } catch {
-      // toast shown by store
-    }
+    } catch {}
   };
 
   const filteredGardens = gardens.filter(g => g.location_id === locationId);
@@ -388,37 +336,9 @@ export default function AddLocationForm() {
   const selectedGarden = gardens.find(g => g.id === gardenId) ?? null;
   const hasReadyLocation = locations.some(l => locationStatus(l, gardens, sections) === 'ready');
 
-  const modeContext =
-    mode === 'location'
-      ? 'Add a top-level Location.'
-      : mode === 'garden'
-        ? selectedLocation
-          ? `Parent Location: ${selectedLocation.name}`
-          : 'Select a Location above first.'
-        : selectedLocation && selectedGarden
-          ? `Parent: ${selectedLocation.name} > ${selectedGarden.name}`
-          : 'Select Location and Garden above first.';
-
   const handleDone = () => {
-    handleExitAttempt(() => {
-      router.back();
-    });
+    handleExitAttempt(() => { router.back(); });
   };
-
-  const quickGuide = (
-    <>
-      <Pressable style={styles.helpToggle} onPress={() => setShowHelp(v => !v)}>
-        <Text style={styles.helpToggleText}>{showHelp ? 'Hide quick guide' : 'Need a quick guide?'}</Text>
-      </Pressable>
-      {showHelp && (
-        <View style={styles.helpBox}>
-          {HELP_TEXT[mode].map(line => (
-            <Text key={line} style={styles.helpText}>- {line}</Text>
-          ))}
-        </View>
-      )}
-    </>
-  );
 
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
@@ -433,301 +353,279 @@ export default function AddLocationForm() {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         >
-          {page === 1 ? (
-            <>
-              <View style={styles.hierarchyBox}>
-                <Text style={styles.boxTitle}>Current Hierarchy</Text>
-                <Text style={styles.helpText}>Select Location to see gardens, select a garden to see sections.</Text>
-
-                <Text style={styles.levelTitle}>1. Location</Text>
-                {locations.length === 0 ? (
-                  <Text style={styles.emptyHint}>No locations yet.</Text>
-                ) : (
-                  <View style={styles.pickerList}>
-                    {locations.map(l => (
-                      <Pressable
-                        key={l.id}
-                        style={[styles.pickerOption, locationId === l.id && styles.pickerSelected]}
-                        onPress={() => setLocationId(l.id)}
-                      >
-                        <Text style={[styles.pickerText, locationId === l.id && styles.pickerTextSelected]}>{l.name}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                )}
-
-                <Text style={styles.levelTitle}>2. Garden</Text>
-                {filteredGardens.length === 0 ? (
-                  <Text style={styles.emptyHint}>
-                    {locationId == null ? 'Select a location first.' : 'No gardens in this location yet.'}
-                  </Text>
-                ) : (
-                  <View style={styles.pickerList}>
-                    {filteredGardens.map(g => (
-                      <Pressable
-                        key={g.id}
-                        style={[styles.pickerOption, gardenId === g.id && styles.pickerSelected]}
-                        onPress={() => setGardenId(g.id)}
-                      >
-                        <Text style={[styles.pickerText, gardenId === g.id && styles.pickerTextSelected]}>{g.name}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                )}
-
-                <View style={styles.sectionResultDivider}>
-                  <View style={styles.sectionResultLine} />
-                  <Text style={styles.sectionResultLabel}>Sections</Text>
-                  <View style={styles.sectionResultLine} />
-                </View>
-                {filteredSections.length === 0 ? (
-                  <View style={styles.sectionResultEmpty}>
-                    <Text style={styles.sectionResultEmptyText}>
-                      {gardenId == null ? 'Select a location and garden above to see sections.' : 'No sections in this garden yet.'}
-                    </Text>
-                  </View>
-                ) : (
-                  <View style={styles.sectionResultList}>
-                    {filteredSections.map(s => (
-                      <View key={s.id} style={styles.sectionResultRow}>
-                        <Text style={styles.sectionResultName}>{s.name}</Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
-              </View>
-
-              {quickGuide}
-
-              <View style={styles.actionRow}>
-                <Pressable style={styles.doneBtn} onPress={handleDone}>
-                  <Text style={styles.doneBtnText}>Done</Text>
-                </Pressable>
-                <Pressable style={styles.nextBtn} onPress={() => setPage(2)}>
-                  <Text style={styles.nextBtnText}>Add / Edit Items</Text>
-                </Pressable>
-              </View>
-            </>
-          ) : (
-            <>
-              <View style={styles.editorBox} onLayout={(e) => setEditorTop(e.nativeEvent.layout.y)}>
-                <Text style={styles.boxTitle}>Add Item</Text>
-
-                <View style={styles.tabs}>
-                  {(['location', 'garden', 'section'] as Mode[]).map(m => (
-                    <Pressable key={m} style={[styles.tab, mode === m && styles.tabActive]} onPress={() => switchMode(m)}>
-                      <Text style={[styles.tabText, mode === m && styles.tabTextActive]}>
-                        {m === 'location' ? 'Location' : m === 'garden' ? 'Garden' : 'Section'}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-
-                <Text style={styles.modeContext}>{modeContext}</Text>
-
-                <Text style={styles.label}>
-                  {mode === 'location' ? 'New Location Name' : mode === 'garden' ? 'New Garden Name' : 'New Section Name'}
-                </Text>
-
-                <View style={styles.inputRow}>
-                  <TextInput
-                    ref={inputRef}
-                    style={[styles.input, { flex: 1 }]}
-                    value={name}
-                    onChangeText={setName}
-                    placeholder={
-                      mode === 'location' ? 'e.g. Home, Farm' :
-                      mode === 'garden' ? 'e.g. Backyard Beds' :
-                      'e.g. Bed 1'
-                    }
-                    placeholderTextColor="#555"
-                    maxLength={100}
-                    onFocus={ensureEditorVisible}
-                    onSubmitEditing={handleSubmit}
-                    returnKeyType="done"
-                  />
-                  <Pressable style={styles.addBtn} onPress={handleSubmit} disabled={submitting}>
-                    {submitting ? <ActivityIndicator color="#111" size="small" /> : <Text style={styles.addBtnText}>Add</Text>}
-                  </Pressable>
-                </View>
-              </View>
-
-              {lastAdded && (
-                <View style={styles.successBox}>
-                  <Text style={styles.successText}>Saved: &quot;{lastAdded}&quot;</Text>
-                </View>
-              )}
-
-              {mode === 'location' && locations.length > 0 && (
-                <>
-                  <Text style={styles.label}>Current Locations</Text>
-                  {locations.map(location => {
-                    const status = locationStatus(location, gardens, sections);
-                    const isEditing = editingItem?.type === 'location' && editingItem.id === location.id;
-                    return (
-                      <View key={location.id} style={styles.existingRow}>
-                        {isEditing ? (
-                          <>
-                            <TextInput
-                              style={[styles.input, styles.inlineEditInput]}
-                              value={editingItem.value}
-                              onChangeText={v => setEditingItem(e => e ? { ...e, value: v } : e)}
-                              onSubmitEditing={handleSaveRename}
-                              returnKeyType="done"
-                              autoFocus
-                            />
-                            <Pressable style={styles.saveBtn} onPress={handleSaveRename}>
-                              <Text style={styles.saveBtnText}>✓</Text>
-                            </Pressable>
-                            <Pressable style={styles.deleteBtn} onPress={() => setEditingItem(null)}>
-                              <Text style={styles.deleteBtnText}>✕</Text>
-                            </Pressable>
-                          </>
-                        ) : (
-                          <>
-                            <View style={styles.existingInfo}>
-                              <Text style={styles.existingName}>{location.name}</Text>
-                              <Text style={[styles.existingStatus, { color: STATUS_COLOR[status] }]}>
-                                {STATUS_LABEL[status]}
-                              </Text>
-                            </View>
-                            <Pressable style={styles.editBtn} onPress={() => setEditingItem({ type: 'location', id: location.id, value: location.name })}>
-                              <Text style={styles.editBtnText}>✎</Text>
-                            </Pressable>
-                            <Pressable style={styles.deleteBtn} onPress={() => confirmDeleteLocation(location)}>
-                              <Text style={styles.deleteBtnText}>x</Text>
-                            </Pressable>
-                          </>
-                        )}
-                      </View>
-                    );
-                  })}
-                </>
-              )}
-
-              {mode === 'garden' && filteredGardens.length > 0 && (
-                <>
-                  <Text style={styles.label}>Gardens in this Location</Text>
-                  {filteredGardens.map(garden => {
-                    const isEditing = editingItem?.type === 'garden' && editingItem.id === garden.id;
-                    return (
-                      <View key={garden.id} style={styles.existingRow}>
-                        {isEditing ? (
-                          <>
-                            <TextInput
-                              style={[styles.input, styles.inlineEditInput]}
-                              value={editingItem.value}
-                              onChangeText={v => setEditingItem(e => e ? { ...e, value: v } : e)}
-                              onSubmitEditing={handleSaveRename}
-                              returnKeyType="done"
-                              autoFocus
-                            />
-                            <Pressable style={styles.saveBtn} onPress={handleSaveRename}>
-                              <Text style={styles.saveBtnText}>✓</Text>
-                            </Pressable>
-                            <Pressable style={styles.deleteBtn} onPress={() => setEditingItem(null)}>
-                              <Text style={styles.deleteBtnText}>✕</Text>
-                            </Pressable>
-                          </>
-                        ) : (
-                          <>
-                            <Text style={[styles.existingName, { flex: 1 }]}>{garden.name}</Text>
-                            <Pressable style={styles.editBtn} onPress={() => setEditingItem({ type: 'garden', id: garden.id, value: garden.name })}>
-                              <Text style={styles.editBtnText}>✎</Text>
-                            </Pressable>
-                            <Pressable style={styles.deleteBtn} onPress={() => confirmDeleteGarden(garden)}>
-                              <Text style={styles.deleteBtnText}>x</Text>
-                            </Pressable>
-                          </>
-                        )}
-                      </View>
-                    );
-                  })}
-                </>
-              )}
-
-              {mode === 'section' && filteredSections.length > 0 && (
-                <>
-                  <Text style={styles.label}>Sections in this Garden</Text>
-                  {filteredSections.map(section => {
-                    const isEditing = editingItem?.type === 'section' && editingItem.id === section.id;
-                    return (
-                      <View key={section.id} style={styles.existingRow}>
-                        {isEditing ? (
-                          <>
-                            <TextInput
-                              style={[styles.input, styles.inlineEditInput]}
-                              value={editingItem.value}
-                              onChangeText={v => setEditingItem(e => e ? { ...e, value: v } : e)}
-                              onSubmitEditing={handleSaveRename}
-                              returnKeyType="done"
-                              autoFocus
-                            />
-                            <Pressable style={styles.saveBtn} onPress={handleSaveRename}>
-                              <Text style={styles.saveBtnText}>✓</Text>
-                            </Pressable>
-                            <Pressable style={styles.deleteBtn} onPress={() => setEditingItem(null)}>
-                              <Text style={styles.deleteBtnText}>✕</Text>
-                            </Pressable>
-                          </>
-                        ) : (
-                          <>
-                            <Text style={[styles.existingName, { flex: 1 }]}>{section.name}</Text>
-                            <Pressable style={styles.editBtn} onPress={() => setEditingItem({ type: 'section', id: section.id, value: section.name })}>
-                              <Text style={styles.editBtnText}>✎</Text>
-                            </Pressable>
-                            <Pressable style={styles.deleteBtn} onPress={() => confirmDeleteSection(section)}>
-                              <Text style={styles.deleteBtnText}>x</Text>
-                            </Pressable>
-                          </>
-                        )}
-                      </View>
-                    );
-                  })}
-                </>
-              )}
-
-              {hasReadyLocation && (
-                <Pressable style={styles.addCropBtn} onPress={openAddCrop}>
-                  <Text style={styles.addCropBtnText}>Continue to Add Crop</Text>
-                </Pressable>
-              )}
-
-              {quickGuide}
-
-              <View style={styles.actionRow}>
-                <Pressable style={styles.backBtn} onPress={() => setPage(1)}>
-                  <Text style={styles.backBtnText}>← View Hierarchy</Text>
-                </Pressable>
-                <Pressable style={styles.doneBtn} onPress={handleDone}>
-                  <Text style={styles.doneBtnText}>Done</Text>
-                </Pressable>
-              </View>
-
-              <Pressable
-                style={styles.resetBtn}
-                onPress={() =>
-                  Alert.alert('Reset All Data', 'Delete everything and start fresh? This cannot be undone.', [
-                    { text: 'Cancel', style: 'cancel' },
-                    {
-                      text: 'Reset',
-                      style: 'destructive',
-                      onPress: async () => {
-                        try {
-                          await resetAllData();
-                          await reload();
-                        } catch {
-                          // toast shown by store
-                        }
-                      },
-                    },
-                  ])
-                }
-              >
-                <Text style={styles.resetBtnText}>Reset Database</Text>
-              </Pressable>
-            </>
+          {/* Guide */}
+          <Pressable style={styles.guideToggle} onPress={() => setShowGuide(v => !v)}>
+            <Text style={styles.guideToggleText}>{showGuide ? '? Hide guide' : '? How does this work?'}</Text>
+          </Pressable>
+          {showGuide && (
+            <View style={styles.guideBox}>
+              {GUIDE_STEPS.map((step, i) => (
+                <Text key={i} style={styles.guideText}>{step}</Text>
+              ))}
+            </View>
           )}
+
+          {/* ── LEVEL 1: LOCATION ── */}
+          <View style={styles.levelBox}>
+            <Text style={styles.levelTitle}>1. Location</Text>
+
+            {locations.map(location => {
+              const status = locationStatus(location, gardens, sections);
+              const isEditing = editingItem?.type === 'location' && editingItem.id === location.id;
+              const isSelected = locationId === location.id;
+              return (
+                <View key={location.id} style={[styles.itemRow, isSelected && styles.itemRowSelected]}>
+                  {isEditing ? (
+                    <>
+                      <TextInput
+                        style={[styles.input, styles.inlineEditInput]}
+                        value={editingItem.value}
+                        onChangeText={v => setEditingItem(e => e ? { ...e, value: v } : e)}
+                        onSubmitEditing={handleSaveRename}
+                        returnKeyType="done"
+                        autoFocus
+                      />
+                      <Pressable style={styles.saveBtn} onPress={handleSaveRename}>
+                        <Text style={styles.saveBtnText}>✓</Text>
+                      </Pressable>
+                      <Pressable style={styles.iconBtn} onPress={() => setEditingItem(null)}>
+                        <Text style={styles.deleteBtnText}>✕</Text>
+                      </Pressable>
+                    </>
+                  ) : (
+                    <>
+                      <Pressable style={styles.itemSelectArea} onPress={() => { setLocationId(location.id); setEditingItem(null); }}>
+                        <Text style={[styles.itemName, isSelected && styles.itemNameSelected]}>{location.name}</Text>
+                        <Text style={[styles.itemBadge, { color: STATUS_COLOR[status] }]}>{STATUS_LABEL[status]}</Text>
+                      </Pressable>
+                      <Pressable style={styles.iconBtn} onPress={() => setEditingItem({ type: 'location', id: location.id, value: location.name })}>
+                        <Text style={styles.editBtnText}>✎</Text>
+                      </Pressable>
+                      <Pressable style={styles.iconBtn} onPress={() => confirmDeleteLocation(location)}>
+                        <Text style={styles.deleteBtnText}>×</Text>
+                      </Pressable>
+                    </>
+                  )}
+                </View>
+              );
+            })}
+
+            <View style={styles.inputRow}>
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                value={locationName}
+                onChangeText={setLocationName}
+                placeholder="e.g. Home, Farm"
+                placeholderTextColor="#555"
+                maxLength={100}
+                onSubmitEditing={handleAddLocation}
+                returnKeyType="done"
+                onFocus={() => scrollRef.current?.scrollToEnd({ animated: true })}
+              />
+              <Pressable style={styles.addBtn} onPress={handleAddLocation} disabled={submitting}>
+                {submitting ? <ActivityIndicator color="#111" size="small" /> : <Text style={styles.addBtnText}>Add</Text>}
+              </Pressable>
+            </View>
+            {lastAdded?.level === 'location' && (
+              <View style={styles.successBox}>
+                <Text style={styles.successText}>Saved: &quot;{lastAdded.text}&quot;</Text>
+              </View>
+            )}
+          </View>
+
+          {/* ── LEVEL 2: GARDEN / ZONE ── */}
+          {locationId != null && (
+            <View style={styles.levelBox}>
+              <Text style={styles.levelTitle}>
+                {'2. Garden / Zone  '}
+                <Text style={styles.levelParent}>in: {selectedLocation?.name}</Text>
+              </Text>
+
+              <View style={styles.recordTypeToggle}>
+                <Pressable
+                  style={[styles.recordTypeBtn, gardenRecordType === 'plant' && styles.recordTypeBtnActive]}
+                  onPress={() => setGardenRecordType('plant')}
+                >
+                  <Text style={[styles.recordTypeBtnText, gardenRecordType === 'plant' && styles.recordTypeBtnTextActive]}>Plants</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.recordTypeBtn, gardenRecordType === 'mushroom' && styles.recordTypeBtnMushroomActive]}
+                  onPress={() => setGardenRecordType('mushroom')}
+                >
+                  <Text style={[styles.recordTypeBtnText, gardenRecordType === 'mushroom' && styles.recordTypeBtnTextActive]}>Mushrooms</Text>
+                </Pressable>
+              </View>
+
+              {filteredGardens.map(garden => {
+                const isEditing = editingItem?.type === 'garden' && editingItem.id === garden.id;
+                const isSelected = gardenId === garden.id;
+                return (
+                  <View key={garden.id} style={[styles.itemRow, isSelected && styles.itemRowSelected]}>
+                    {isEditing ? (
+                      <>
+                        <TextInput
+                          style={[styles.input, styles.inlineEditInput]}
+                          value={editingItem.value}
+                          onChangeText={v => setEditingItem(e => e ? { ...e, value: v } : e)}
+                          onSubmitEditing={handleSaveRename}
+                          returnKeyType="done"
+                          autoFocus
+                        />
+                        <Pressable style={styles.saveBtn} onPress={handleSaveRename}>
+                          <Text style={styles.saveBtnText}>✓</Text>
+                        </Pressable>
+                        <Pressable style={styles.iconBtn} onPress={() => setEditingItem(null)}>
+                          <Text style={styles.deleteBtnText}>✕</Text>
+                        </Pressable>
+                      </>
+                    ) : (
+                      <>
+                        <Pressable style={styles.itemSelectArea} onPress={() => { setGardenId(garden.id); setEditingItem(null); }}>
+                          <View style={styles.gardenNameRow}>
+                            <Text style={[styles.itemName, isSelected && styles.itemNameSelected]}>{garden.name}</Text>
+                            {garden.record_type === 'mushroom' && (
+                              <View style={styles.zoneBadge}>
+                                <Text style={styles.zoneBadgeText}>Zone</Text>
+                              </View>
+                            )}
+                          </View>
+                        </Pressable>
+                        <Pressable style={styles.iconBtn} onPress={() => setEditingItem({ type: 'garden', id: garden.id, value: garden.name })}>
+                          <Text style={styles.editBtnText}>✎</Text>
+                        </Pressable>
+                        <Pressable style={styles.iconBtn} onPress={() => confirmDeleteGarden(garden)}>
+                          <Text style={styles.deleteBtnText}>×</Text>
+                        </Pressable>
+                      </>
+                    )}
+                  </View>
+                );
+              })}
+
+              <View style={styles.inputRow}>
+                <TextInput
+                  style={[styles.input, { flex: 1 }]}
+                  value={gardenName}
+                  onChangeText={setGardenName}
+                  placeholder={gardenRecordType === 'mushroom' ? 'e.g. Lab, Fruiting Chamber' : 'e.g. Backyard Beds'}
+                  placeholderTextColor="#555"
+                  maxLength={100}
+                  onSubmitEditing={handleAddGarden}
+                  returnKeyType="done"
+                  onFocus={() => scrollRef.current?.scrollToEnd({ animated: true })}
+                />
+                <Pressable style={styles.addBtn} onPress={handleAddGarden} disabled={submitting}>
+                  {submitting ? <ActivityIndicator color="#111" size="small" /> : <Text style={styles.addBtnText}>Add</Text>}
+                </Pressable>
+              </View>
+              {lastAdded?.level === 'garden' && (
+                <View style={styles.successBox}>
+                  <Text style={styles.successText}>Saved: &quot;{lastAdded.text}&quot;</Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* ── LEVEL 3: SECTION ── */}
+          {gardenId != null && (
+            <View style={styles.levelBox}>
+              <Text style={styles.levelTitle}>
+                {'3. Section  '}
+                <Text style={styles.levelParent}>{selectedLocation?.name} {'>'} {selectedGarden?.name}</Text>
+              </Text>
+
+              {filteredSections.map(section => {
+                const isEditing = editingItem?.type === 'section' && editingItem.id === section.id;
+                return (
+                  <View key={section.id} style={styles.itemRow}>
+                    {isEditing ? (
+                      <>
+                        <TextInput
+                          style={[styles.input, styles.inlineEditInput]}
+                          value={editingItem.value}
+                          onChangeText={v => setEditingItem(e => e ? { ...e, value: v } : e)}
+                          onSubmitEditing={handleSaveRename}
+                          returnKeyType="done"
+                          autoFocus
+                        />
+                        <Pressable style={styles.saveBtn} onPress={handleSaveRename}>
+                          <Text style={styles.saveBtnText}>✓</Text>
+                        </Pressable>
+                        <Pressable style={styles.iconBtn} onPress={() => setEditingItem(null)}>
+                          <Text style={styles.deleteBtnText}>✕</Text>
+                        </Pressable>
+                      </>
+                    ) : (
+                      <>
+                        <Text style={[styles.itemName, { flex: 1 }]}>{section.name}</Text>
+                        <Pressable style={styles.iconBtn} onPress={() => setEditingItem({ type: 'section', id: section.id, value: section.name })}>
+                          <Text style={styles.editBtnText}>✎</Text>
+                        </Pressable>
+                        <Pressable style={styles.iconBtn} onPress={() => confirmDeleteSection(section)}>
+                          <Text style={styles.deleteBtnText}>×</Text>
+                        </Pressable>
+                      </>
+                    )}
+                  </View>
+                );
+              })}
+
+              <View style={styles.inputRow}>
+                <TextInput
+                  style={[styles.input, { flex: 1 }]}
+                  value={sectionName}
+                  onChangeText={setSectionName}
+                  placeholder="e.g. Bed 1, Shelf 1"
+                  placeholderTextColor="#555"
+                  maxLength={100}
+                  onSubmitEditing={handleAddSection}
+                  returnKeyType="done"
+                  onFocus={() => scrollRef.current?.scrollToEnd({ animated: true })}
+                />
+                <Pressable style={styles.addBtn} onPress={handleAddSection} disabled={submitting}>
+                  {submitting ? <ActivityIndicator color="#111" size="small" /> : <Text style={styles.addBtnText}>Add</Text>}
+                </Pressable>
+              </View>
+              {lastAdded?.level === 'section' && (
+                <View style={styles.successBox}>
+                  <Text style={styles.successText}>Saved: &quot;{lastAdded.text}&quot;</Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {hasReadyLocation && (
+            <Pressable style={styles.addCropBtn} onPress={openAddCrop}>
+              <Text style={styles.addCropBtnText}>Continue to Add Crop</Text>
+            </Pressable>
+          )}
+
+          <View style={styles.actionRow}>
+            <Pressable style={styles.doneBtn} onPress={handleDone}>
+              <Text style={styles.doneBtnText}>Done</Text>
+            </Pressable>
+          </View>
+
+          <Pressable
+            style={styles.resetBtn}
+            onPress={() =>
+              Alert.alert('Reset All Data', 'Delete everything and start fresh? This cannot be undone.', [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Reset',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      await resetAllData();
+                      await reload();
+                    } catch {}
+                  },
+                },
+              ])
+            }
+          >
+            <Text style={styles.resetBtnText}>Reset Database</Text>
+          </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -738,110 +636,105 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#1a1a1a' },
   keyboardAvoider: { flex: 1 },
   content: { padding: 16, paddingBottom: 40 },
-  hierarchyBox: {
+
+  guideToggle: { alignSelf: 'flex-end', marginBottom: 8 },
+  guideToggleText: { color: '#7dcea0', fontSize: 12, fontWeight: '600' },
+  guideBox: {
     borderWidth: 1,
-    borderColor: '#343434',
-    borderRadius: 10,
-    backgroundColor: '#202020',
-    padding: 12,
-    gap: 8,
-  },
-  editorBox: {
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: '#343434',
-    borderRadius: 10,
-    backgroundColor: '#202020',
-    padding: 12,
-    gap: 8,
-  },
-  boxTitle: { color: '#ddd', fontSize: 14, fontWeight: '700' },
-  levelTitle: { color: '#8f8f8f', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 8 },
-  tabs: { flexDirection: 'row', gap: 8 },
-  tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8, borderWidth: 1, borderColor: '#3a3a3a', backgroundColor: '#262626' },
-  tabActive: { borderColor: '#5a9', backgroundColor: '#1e3a2a' },
-  tabText: { color: '#9a9a9a', fontSize: 12, fontWeight: '600' },
-  tabTextActive: { color: '#7dcea0' },
-  modeContext: { color: '#9b9b9b', fontSize: 12 },
-  successBox: { backgroundColor: '#1a3a2a', borderRadius: 6, padding: 8, marginTop: 8 },
-  successText: { color: '#2ecc71', fontSize: 12, fontWeight: '600' },
-  label: { color: '#888', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 8, marginBottom: 6 },
-  inputRow: { flexDirection: 'row', gap: 8 },
-  input: { backgroundColor: '#2a2a2a', color: '#eee', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14, borderWidth: 1, borderColor: '#3a3a3a' },
-  addBtn: { backgroundColor: '#2ecc71', borderRadius: 6, paddingHorizontal: 18, justifyContent: 'center' },
-  addBtnText: { color: '#111', fontWeight: 'bold', fontSize: 14 },
-  emptyHint: { color: '#7d7d7d', fontSize: 12, fontStyle: 'italic', paddingVertical: 6 },
-  pickerList: { gap: 6 },
-  pickerOption: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, borderWidth: 1, borderColor: '#3a3a3a', backgroundColor: '#2a2a2a' },
-  pickerSelected: { borderColor: '#5a9', backgroundColor: '#1e3a2a' },
-  pickerText: { color: '#aaa', fontSize: 13 },
-  pickerTextSelected: { color: '#7dcea0' },
-  sectionBadgeList: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  sectionBadge: { borderRadius: 999, borderWidth: 1, borderColor: '#4b6a55', paddingHorizontal: 10, paddingVertical: 4, backgroundColor: '#1e3a2a' },
-  sectionBadgeText: { color: '#7dcea0', fontSize: 12, fontWeight: '600' },
-  sectionResultDivider: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 14, marginBottom: 8 },
-  sectionResultLine: { flex: 1, height: 1, backgroundColor: '#3a5a45' },
-  sectionResultLabel: { color: '#7dcea0', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
-  sectionResultList: { gap: 6 },
-  sectionResultRow: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    borderColor: '#2a4a35',
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#3a5a45',
-    backgroundColor: '#182e20',
-  },
-  sectionResultName: { color: '#a8e6c0', fontSize: 14, fontWeight: '600' },
-  sectionResultEmpty: {
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#2a3a2e',
-    backgroundColor: '#161e18',
-    alignItems: 'center',
-  },
-  sectionResultEmptyText: { color: '#4a7a5a', fontSize: 13, textAlign: 'center', fontStyle: 'italic' },
-  helpToggle: {
-    marginTop: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#3a3a3a',
-    backgroundColor: '#232323',
-    paddingVertical: 8,
-    alignItems: 'center',
-  },
-  helpToggleText: { color: '#a5a5a5', fontSize: 12, fontWeight: '600' },
-  helpBox: {
-    marginTop: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#343434',
-    backgroundColor: '#1f1f1f',
+    backgroundColor: '#1a2e22',
     padding: 10,
+    marginBottom: 12,
     gap: 4,
   },
-  helpText: { color: '#949494', fontSize: 12, lineHeight: 18 },
-  existingRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 10, backgroundColor: '#222', borderRadius: 6, marginBottom: 6 },
-  existingInfo: { flex: 1 },
-  existingName: { color: '#ccc', fontSize: 13 },
-  existingStatus: { fontSize: 11, marginTop: 2 },
-  editBtn: { padding: 6 },
-  editBtnText: {marginRight:10, color: '#7dcea0', fontSize: 15 },
-  saveBtn: { padding: 6 },
-  saveBtnText: {marginRight:10, color: '#2ecc71', fontSize: 16, fontWeight: '700' },
-  deleteBtn: { padding: 6 },
-  deleteBtnText: { color: '#664444', fontSize: 14 },
+  guideText: { color: '#7dcea0', fontSize: 12, lineHeight: 18 },
+
+  levelBox: {
+    borderWidth: 1,
+    borderColor: '#343434',
+    borderRadius: 10,
+    backgroundColor: '#202020',
+    padding: 12,
+    gap: 8,
+    marginBottom: 12,
+  },
+  levelTitle: { color: '#ddd', fontSize: 14, fontWeight: '700' },
+  levelParent: { color: '#666', fontSize: 12, fontWeight: '400' },
+
+  itemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    backgroundColor: '#1c2920',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#2e4a38',
+  },
+  itemRowSelected: { borderColor: '#5a9', backgroundColor: '#1e3a2a' },
+  itemSelectArea: { flex: 1 },
+  gardenNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  itemName: { color: '#ccc', fontSize: 13 },
+  itemNameSelected: { color: '#7dcea0' },
+  itemBadge: { fontSize: 11, marginTop: 1 },
+
+  zoneBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: '#3A2010' },
+  zoneBadgeText: { color: '#d4a882', fontSize: 10, fontWeight: '700' },
+
+  inputRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  input: {
+    backgroundColor: '#2a2a2a',
+    color: '#eee',
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 14,
+    borderWidth: 1,
+    borderColor: '#3a3a3a',
+  },
   inlineEditInput: { flex: 1, paddingVertical: 4, marginRight: 4 },
-  addCropBtn: { marginTop: 24, paddingVertical: 14, borderRadius: 8, backgroundColor: '#2ecc71', alignItems: 'center' },
+  addBtn: { backgroundColor: '#2ecc71', borderRadius: 6, paddingHorizontal: 18, justifyContent: 'center' },
+  addBtnText: { color: '#111', fontWeight: 'bold', fontSize: 14 },
+
+  successBox: { backgroundColor: '#1a3a2a', borderRadius: 6, padding: 8 },
+  successText: { color: '#2ecc71', fontSize: 12, fontWeight: '600' },
+
+  iconBtn: { padding: 6 },
+  editBtnText: { marginRight: 10, color: '#7dcea0', fontSize: 15 },
+  saveBtn: { padding: 6 },
+  saveBtnText: { marginRight: 10, color: '#2ecc71', fontSize: 16, fontWeight: '700' },
+  deleteBtnText: { color: '#664444', fontSize: 14 },
+
+  recordTypeToggle: { flexDirection: 'row', gap: 8, marginVertical: 4 },
+  recordTypeBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#3a3a3a',
+    backgroundColor: '#262626',
+  },
+  recordTypeBtnActive: { borderColor: '#5a9', backgroundColor: '#1e3a2a' },
+  recordTypeBtnMushroomActive: { borderColor: '#8B4513', backgroundColor: '#2a1508' },
+  recordTypeBtnText: { color: '#9a9a9a', fontSize: 12, fontWeight: '600' },
+  recordTypeBtnTextActive: { color: '#eee' },
+
+  addCropBtn: { marginBottom: 4, paddingVertical: 14, borderRadius: 8, backgroundColor: '#2ecc71', alignItems: 'center' },
   addCropBtnText: { color: '#111', fontWeight: '700', fontSize: 15 },
-  actionRow: { marginTop: 10, flexDirection: 'row', gap: 10 },
-  doneBtn: { flex: 1, paddingVertical: 14, borderRadius: 8, borderWidth: 1, borderColor: '#4a4a4a', backgroundColor: '#262626', alignItems: 'center' },
+
+  actionRow: { marginTop: 6 },
+  doneBtn: {
+    paddingVertical: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#4a4a4a',
+    backgroundColor: '#262626',
+    alignItems: 'center',
+  },
   doneBtnText: { color: '#ddd', fontWeight: '600', fontSize: 15 },
-  nextBtn: { flex: 1, paddingVertical: 14, borderRadius: 8, backgroundColor: '#2ecc71', alignItems: 'center' },
-  nextBtnText: { color: '#111', fontWeight: 'bold', fontSize: 15 },
-  backBtn: { flex: 1, paddingVertical: 14, borderRadius: 8, borderWidth: 1, borderColor: '#4a6a55', backgroundColor: '#1e3a2a', alignItems: 'center' },
-  backBtnText: { color: '#7dcea0', fontWeight: '600', fontSize: 15 },
+
   resetBtn: { marginTop: 32, paddingVertical: 10, alignItems: 'center' },
   resetBtnText: { color: '#5a2020', fontSize: 12, fontWeight: '600' },
 });

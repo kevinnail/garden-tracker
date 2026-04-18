@@ -33,6 +33,7 @@ import {
 } from '@/src/utils/noteUtils';
 import { copyImageToAppStorage, createNoteImage, deleteImageFile } from '@/src/utils/imageStorage';
 import NoteImageStrip from '@/src/components/notes/NoteImageStrip';
+import { useNavigation } from '@react-navigation/native';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -63,12 +64,20 @@ export default function CellNoteForm({ cropId, weekDate, initialMode = 'view' }:
   const headerHeight = useHeaderHeight();
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
+  const navigation = useNavigation();
 
   const rows = usePlannerStore(s => s.rows);
   const saveCellNote = usePlannerStore(s => s.saveCellNote);
   const deleteNote = usePlannerStore(s => s.deleteNote);
 
   const cropRow = rows.find(row => row.type === 'crop_row' && row.crop.id === cropId);
+  const isMushroomCrop = cropRow?.type === 'crop_row' && cropRow.crop.record_type === 'mushroom';
+
+  React.useEffect(() => {
+    if (isMushroomCrop) {
+      navigation.setOptions({ headerStyle: { backgroundColor: '#3A2010' } });
+    }
+  }, [isMushroomCrop, navigation]);
   const note = cropRow?.type === 'crop_row' ? cropRow.notesByWeek[weekDate] ?? null : null;
 
   const [entries, setEntries] = useState<WeeklyNoteEntry[]>([]);

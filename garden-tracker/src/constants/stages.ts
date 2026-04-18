@@ -17,3 +17,13 @@ export const PRESET_STAGES: PresetStage[] = [
   { name: 'Curing',     color: '#DAA520', order_index: 5 }, // gold
   { name: 'Prepare',    color: '#4169E1', order_index: 6 }, // blue         (VBA ColorIndex 5)
 ];
+
+export const PRESET_MUSHROOM_STAGES: PresetStage[] = [
+  { name: 'Inoculation',  color: '#E8C99A', order_index: 7  }, // light golden beige
+  { name: 'Colonization', color: '#C8A87A', order_index: 8  }, // medium tan
+  { name: 'Pinning',      color: '#A07040', order_index: 9  }, // earthy brown
+  { name: 'Fruiting',     color: '#805030', order_index: 10 }, // medium brown
+  { name: 'Harvest',      color: '#DD8833', order_index: 11 }, // amber
+  { name: 'Rest',         color: '#8A7060', order_index: 12 }, // taupe
+  { name: 'Drying',       color: '#604030', order_index: 13 }, // dark sienna
+];

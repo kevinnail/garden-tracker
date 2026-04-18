@@ -174,7 +174,7 @@ describe('insertGarden', () => {
     expect(id).toBe(3);
     expect(mockDb.runAsync).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO gardens'),
-      1, 'Greenhouse', 1
+      1, 'Greenhouse', 'plant', 1
     );
   });
 

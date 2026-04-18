@@ -32,14 +32,19 @@ export async function insertLocation(name: string): Promise<number> {
   return result.lastInsertRowId;
 }
 
-export async function insertGarden(locationId: number, name: string): Promise<number> {
+export async function insertGarden(locationId: number, name: string, recordType: 'plant' | 'mushroom' = 'plant'): Promise<number> {
   const db = await getDb();
   const result = await db.runAsync(
-    `INSERT INTO gardens (location_id, name, order_index)
-     VALUES (?, ?, (SELECT COALESCE(MAX(order_index), -1) + 1 FROM gardens WHERE location_id = ?))`,
-    locationId, name, locationId
+    `INSERT INTO gardens (location_id, name, record_type, order_index)
+     VALUES (?, ?, ?, (SELECT COALESCE(MAX(order_index), -1) + 1 FROM gardens WHERE location_id = ?))`,
+    locationId, name, recordType, locationId
   );
   return result.lastInsertRowId;
+}
+
+export async function updateGardenRecordType(id: number, recordType: 'plant' | 'mushroom'): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(`UPDATE gardens SET record_type = ? WHERE id = ?`, recordType, id);
 }
 
 export async function insertSection(gardenId: number, name: string): Promise<number> {

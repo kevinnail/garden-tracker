@@ -206,7 +206,7 @@ export default function PlannerGrid() {
         <View style={styles.emptyState}>
           <Text style={styles.emptyTitle}>Welcome to Garden Tracker</Text>
           <Text style={styles.emptyBody}>
-            Tap <Text style={styles.emptyHighlight}>+ Crop</Text> to add your first crop and it will appear here on the planner timeline.
+            Tap <Text style={styles.emptyHighlight}>+ Crop</Text> to get started. You&apos;ll set up your locations first, then add crops.
           </Text>
           <Text style={styles.emptyHint}>
             Each row shows a crop&apos;s growing stages across the calendar.

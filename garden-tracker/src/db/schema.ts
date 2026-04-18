@@ -27,6 +27,7 @@ export const SCHEMA_SQL = `
     id                INTEGER PRIMARY KEY AUTOINCREMENT,
     location_id       INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
     name              TEXT NOT NULL,
+    record_type       TEXT NOT NULL DEFAULT 'plant',
     order_index       INTEGER NOT NULL DEFAULT 0
   );
 
@@ -43,6 +44,7 @@ export const SCHEMA_SQL = `
     name        TEXT NOT NULL,
     plant_count INTEGER NOT NULL DEFAULT 1 CHECK (plant_count > 0),
     start_date  TEXT NOT NULL,
+    record_type TEXT NOT NULL DEFAULT 'plant',
     archived    INTEGER NOT NULL DEFAULT 0,
     notes       TEXT,
     created_at  TEXT NOT NULL DEFAULT (datetime('now')),

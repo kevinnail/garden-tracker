@@ -16,6 +16,7 @@ export interface Garden {
   id: number;
   location_id: number;
   name: string;
+  record_type: 'plant' | 'mushroom';
   order_index: number;
 }
 
@@ -45,6 +46,7 @@ export interface CropInstance {
   plant_count: number;
   start_date: string; // ISO date string, always a Sunday
   section_id: number;
+  record_type: 'plant' | 'mushroom';
   archived: boolean;
   notes?: string;
 }
@@ -131,12 +133,12 @@ export type GridRowItem =
   | { type: 'location_footer' }
   | { type: 'location_spacer' }
   | { type: 'garden_header';   garden: Garden }
-  | { type: 'garden_footer' }
-  | { type: 'garden_spacer' }
-  | { type: 'section_header';  section: Section }
-  | { type: 'section_footer' }
-  | { type: 'section_spacer' }
-  | { type: 'crop_row';        crop: CropInstance; stages: CropStage[]; weekColorMap: Record<number, string>; tasks: Task[]; completions: TaskCompletion[]; notesByWeek: Record<string, Note> }
+  | { type: 'garden_footer';   gardenRecordType: 'plant' | 'mushroom' }
+  | { type: 'garden_spacer';   gardenRecordType: 'plant' | 'mushroom' }
+  | { type: 'section_header';  section: Section; gardenRecordType: 'plant' | 'mushroom' }
+  | { type: 'section_footer';  gardenRecordType: 'plant' | 'mushroom' }
+  | { type: 'section_spacer';  gardenRecordType: 'plant' | 'mushroom' }
+  | { type: 'crop_row';        crop: CropInstance; stages: CropStage[]; weekColorMap: Record<number, string>; tasks: Task[]; completions: TaskCompletion[]; notesByWeek: Record<string, Note>; gardenRecordType: 'plant' | 'mushroom' }
   | { type: 'placeholder';     index: number };
 
 // Precomputed task line — positions stored as zoom-independent values.
@@ -160,6 +162,7 @@ export interface NewCropData {
   plant_count: number;
   start_date: string; // ISO Sunday
   section_id: number;
+  record_type?: 'plant' | 'mushroom';
   stages: { stage_definition_id: number; duration_weeks: number }[];
 }
 

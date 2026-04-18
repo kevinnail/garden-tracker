@@ -336,3 +336,23 @@ describe('deleteLocation', () => {
     await expect(deleteLocation(999)).resolves.toBeUndefined();
   });
 });
+
+// ── record_type (mushroom mode) ────────────────────────────────────────────────
+
+describe('garden record_type', () => {
+  it('defaults to "plant" when no record_type is provided', async () => {
+    const locationId = await insertLocation('Home');
+    await insertGarden(locationId, 'My Garden');
+    const gardens = await getAllGardens();
+    const garden = gardens.find(g => g.name === 'My Garden');
+    expect(garden?.record_type).toBe('plant');
+  });
+
+  it('persists "mushroom" record_type and reads back correctly', async () => {
+    const locationId = await insertLocation('Lab');
+    const gardenId = await insertGarden(locationId, 'Fruiting Chamber', 'mushroom');
+    const gardens = await getAllGardens();
+    const garden = gardens.find(g => g.id === gardenId);
+    expect(garden?.record_type).toBe('mushroom');
+  });
+});

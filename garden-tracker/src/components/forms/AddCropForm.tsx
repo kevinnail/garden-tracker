@@ -4,6 +4,7 @@ import {
   Pressable, Alert, ActivityIndicator, Platform, KeyboardAvoidingView,
 } from 'react-native';
 import { router } from 'expo-router';
+import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import type { DateTimePickerEvent } from '@react-native-community/datetimepicker';
@@ -13,9 +14,8 @@ import { usePlannerStore } from '@/src/store/plannerStore';
 
 interface StageRow {
   stage_definition_id: number;
-  duration_weeks: string; // string for TextInput, parsed on submit
+  duration_weeks: string;
 }
-
 
 interface AddCropFormProps {
   cropId?: number;
@@ -29,21 +29,21 @@ export interface AddCropFormHandle {
 }
 
 const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function AddCropForm({ cropId, embedded = false }: AddCropFormProps, ref) {
-  const stageDefs    = usePlannerStore(s => s.stageDefinitions);
+  const stageDefs          = usePlannerStore(s => s.stageDefinitions);
   const stageDefsAvailable = usePlannerStore(s => s.stageDefinitions.length > 0);
-  const addCrop      = usePlannerStore(s => s.addCrop);
-  const editCrop     = usePlannerStore(s => s.editCrop);
-  const archiveCrop  = usePlannerStore(s => s.archiveCrop);
-  const deleteCrop   = usePlannerStore(s => s.deleteCrop);
-  const cropRowAvailable = usePlannerStore(s => (
-    cropId == null
-      ? true
-      : s.rows.some(row => row.type === 'crop_row' && row.crop.id === cropId)
+  const addCrop            = usePlannerStore(s => s.addCrop);
+  const editCrop           = usePlannerStore(s => s.editCrop);
+  const archiveCrop        = usePlannerStore(s => s.archiveCrop);
+  const deleteCrop         = usePlannerStore(s => s.deleteCrop);
+  const cropRowAvailable   = usePlannerStore(s => (
+    cropId == null ? true : s.rows.some(row => row.type === 'crop_row' && row.crop.id === cropId)
   ));
-  const sections = usePlannerStore(s => s.sections);
-  const gardens = usePlannerStore(s => s.gardens);
+  const sections  = usePlannerStore(s => s.sections);
+  const gardens   = usePlannerStore(s => s.gardens);
   const locations = usePlannerStore(s => s.locations);
-  const isEditMode   = cropId != null;
+  const isEditMode = cropId != null;
+
+  const navigation = useNavigation();
 
   const [name, setName]             = useState('');
   const [plantCount, setPlantCount] = useState('1');
@@ -51,10 +51,51 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [sectionId, setSectionId]   = useState<number | null>(null);
   const [stages, setStages]         = useState<StageRow[]>([]);
+  const [recordType, setRecordType] = useState<'plant' | 'mushroom'>('plant');
   const [submitting, setSubmitting] = useState(false);
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [page, setPage] = useState<1 | 2>(1);
   const scrollRef = useRef<ScrollView>(null);
+
+  // Tint the nav header when in mushroom mode
+  useEffect(() => {
+    if (!embedded) {
+      navigation.setOptions({
+        headerStyle: { backgroundColor: recordType === 'mushroom' ? '#3A2010' : '#003e14' },
+      });
+    }
+  }, [embedded, navigation, recordType]);
+
+  const mushroomDefaultStages = useCallback((): StageRow[] => {
+    const inoculation  = stageDefs.find(d => d.name === 'Inoculation');
+    const colonization = stageDefs.find(d => d.name === 'Colonization');
+    const fruiting     = stageDefs.find(d => d.name === 'Fruiting' && d.order_index >= 7);
+    if (inoculation && colonization && fruiting) {
+      return [
+        { stage_definition_id: inoculation.id,  duration_weeks: '4' },
+        { stage_definition_id: colonization.id, duration_weeks: '4' },
+        { stage_definition_id: fruiting.id,     duration_weeks: '3' },
+      ];
+    }
+    return stageDefs.slice(0, 3).map((def, i) => ({
+      stage_definition_id: def.id,
+      duration_weeks: ['4', '4', '3'][i] ?? '4',
+    }));
+  }, [stageDefs]);
+
+  const plantDefaultStages = useCallback((): StageRow[] =>
+    stageDefs.slice(0, 3).map((def, i) => ({
+      stage_definition_id: def.id,
+      duration_weeks: ['2', '4', '8'][i] ?? '4',
+    }))
+  , [stageDefs]);
+
+  // Toggle handler — also resets stages to matching defaults
+  const handleToggleRecordType = useCallback((next: 'plant' | 'mushroom') => {
+    setRecordType(next);
+    if (next === 'mushroom') setStages(mushroomDefaultStages());
+    else setStages(plantDefaultStages());
+  }, [mushroomDefaultStages, plantDefaultStages]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -64,14 +105,9 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
         setLoadingInitial(false);
         return;
       }
+      if (isCancelled) return;
 
-      if (isCancelled) {
-        return;
-      }
-
-      // Read store snapshots inline instead of subscribing — avoids retriggering
-      // this effect (and resetting form state) every time loadData fires.
-      const storeState = usePlannerStore.getState();
+      const storeState       = usePlannerStore.getState();
       const currentStageDefs = storeState.stageDefinitions;
       const cropRow = isEditMode && cropId != null
         ? storeState.rows.find(row => row.type === 'crop_row' && row.crop.id === cropId)
@@ -86,10 +122,7 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
         const parsedStart = parseDateKey(cropRow.crop.start_date);
         setName(cropRow.crop.name);
         setPlantCount(String(cropRow.crop.plant_count));
-        // parseDateKey is the strict local-midnight path. If it can't parse the
-        // stored string, treat the row as corrupted and fall back to today —
-        // never `new Date(string)`, which interprets YYYY-MM-DD as UTC and
-        // can land on the wrong local day.
+        setRecordType(cropRow.crop.record_type ?? 'plant');
         setStartDate(parsedStart ?? toSunday(new Date()));
         setSectionId(cropRow.crop.section_id);
         setStages(
@@ -104,32 +137,51 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
         return;
       }
 
-      if (sections.length > 0) {
-        setSectionId(sections[0].id);
+      // New crop — cascade record_type from the first section's parent garden
+      const firstSection = storeState.sections[0] ?? null;
+      let initialRecordType: 'plant' | 'mushroom' = 'plant';
+      if (firstSection) {
+        setSectionId(firstSection.id);
+        const parentGarden = storeState.gardens.find(g => g.id === firstSection.garden_id);
+        initialRecordType = parentGarden?.record_type ?? 'plant';
+        setRecordType(initialRecordType);
       }
-      setStages(
-        currentStageDefs.slice(0, 3).map((def, i) => ({
-          stage_definition_id: def.id,
-          duration_weeks: ['2', '4', '8'][i] ?? '4',
-        }))
-      );
+
+      if (initialRecordType === 'mushroom') {
+        const inoculation  = currentStageDefs.find(d => d.name === 'Inoculation');
+        const colonization = currentStageDefs.find(d => d.name === 'Colonization');
+        const fruiting     = currentStageDefs.find(d => d.name === 'Fruiting' && d.order_index >= 7);
+        if (inoculation && colonization && fruiting) {
+          setStages([
+            { stage_definition_id: inoculation.id,  duration_weeks: '4' },
+            { stage_definition_id: colonization.id, duration_weeks: '4' },
+            { stage_definition_id: fruiting.id,     duration_weeks: '3' },
+          ]);
+        } else {
+          const mushroomDefs = currentStageDefs.filter(d => d.order_index >= 7);
+          setStages(mushroomDefs.slice(0, 3).map((def, i) => ({
+            stage_definition_id: def.id,
+            duration_weeks: ['4', '4', '3'][i] ?? '4',
+          })));
+        }
+      } else {
+        setStages(
+          currentStageDefs.filter(d => d.order_index < 7).slice(0, 3).map((def, i) => ({
+            stage_definition_id: def.id,
+            duration_weeks: ['2', '4', '8'][i] ?? '4',
+          }))
+        );
+      }
       setLoadingInitial(false);
     };
 
     loadFormData();
-
-    return () => {
-      isCancelled = true;
-    };
+    return () => { isCancelled = true; };
   }, [cropId, cropRowAvailable, isEditMode, sections.length, stageDefsAvailable]);
 
   const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
-    if (Platform.OS === 'android') {
-      setShowDatePicker(false);
-    }
-    if (event.type === 'dismissed' || !selectedDate) {
-      return;
-    }
+    if (Platform.OS === 'android') setShowDatePicker(false);
+    if (event.type === 'dismissed' || !selectedDate) return;
     setStartDate(selectedDate);
   };
 
@@ -158,7 +210,6 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
     if (sectionId == null) return Alert.alert('Validation', 'Select a section.');
 
     const snappedDate = formatDateKey(toSunday(startDate));
-
     const stageData = stages.map(s => {
       const duration = parseInt(s.duration_weeks, 10);
       return {
@@ -175,10 +226,18 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
           plant_count: count,
           start_date: snappedDate,
           section_id: sectionId,
+          record_type: recordType,
           stages: stageData,
         });
       } else {
-        await addCrop({ name: name.trim(), plant_count: count, start_date: snappedDate, section_id: sectionId, stages: stageData });
+        await addCrop({
+          name: name.trim(),
+          plant_count: count,
+          start_date: snappedDate,
+          section_id: sectionId,
+          record_type: recordType,
+          stages: stageData,
+        });
       }
       router.back();
     } catch {
@@ -186,15 +245,12 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
     } finally {
       setSubmitting(false);
     }
-  }, [addCrop, cropId, editCrop, isEditMode, name, plantCount, sectionId, stages, startDate]);
+  }, [addCrop, cropId, editCrop, isEditMode, name, plantCount, recordType, sectionId, stages, startDate]);
 
-  const handleSubmit = async () => {
-    await submitCrop();
-  };
+  const handleSubmit = async () => { await submitCrop(); };
 
   const handleArchive = useCallback(() => {
     if (!isEditMode || cropId == null) return;
-
     Alert.alert(
       'Archive Crop',
       `Archive "${name.trim() || 'this crop'}"? You can show archived rows again from the toolbar.`,
@@ -204,10 +260,8 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
           text: 'Archive',
           style: 'destructive',
           onPress: async () => {
-            try {
-              await archiveCrop(cropId);
-              router.back();
-            } catch { /* toast shown by store */ }
+            try { await archiveCrop(cropId); router.back(); }
+            catch { /* toast shown by store */ }
           },
         },
       ]
@@ -216,7 +270,6 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
 
   const handleDelete = useCallback(() => {
     if (!isEditMode || cropId == null) return;
-
     Alert.alert(
       'Delete Crop',
       `Permanently delete "${name.trim() || 'this crop'}" and all its tasks and completions? This cannot be undone.`,
@@ -226,10 +279,8 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            try {
-              await deleteCrop(cropId);
-              router.back();
-            } catch { /* toast shown by store */ }
+            try { await deleteCrop(cropId); router.back(); }
+            catch { /* toast shown by store */ }
           },
         },
       ]
@@ -244,12 +295,11 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
 
   if (loadingInitial) {
     const loadingContent = (
-        <View style={styles.loadingState}>
-          <ActivityIndicator color="#7dcea0" />
-          <Text style={styles.loadingText}>Loading crop details...</Text>
-        </View>
+      <View style={styles.loadingState}>
+        <ActivityIndicator color="#7dcea0" />
+        <Text style={styles.loadingText}>Loading crop details...</Text>
+      </View>
     );
-
     return embedded ? loadingContent : (
       <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
         {loadingContent}
@@ -257,9 +307,31 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
     );
   }
 
+  const isMushroom = recordType === 'mushroom';
+
   const page1Content = (
     <>
-      <Text style={styles.label}>Choose garden/ section for new crop</Text>
+      {/* Plants / Mushrooms toggle */}
+      <View style={styles.recordTypeToggle}>
+        <Pressable
+          style={[styles.recordTypeBtn, !isMushroom && styles.recordTypeBtnPlantActive]}
+          onPress={() => handleToggleRecordType('plant')}
+        >
+          <Text style={[styles.recordTypeBtnText, !isMushroom && styles.recordTypeBtnTextActive]}>
+            Plants
+          </Text>
+        </Pressable>
+        <Pressable
+          style={[styles.recordTypeBtn, isMushroom && styles.recordTypeBtnMushroomActive]}
+          onPress={() => handleToggleRecordType('mushroom')}
+        >
+          <Text style={[styles.recordTypeBtnText, isMushroom && styles.recordTypeBtnTextActive]}>
+            Mushrooms
+          </Text>
+        </Pressable>
+      </View>
+
+      <Text style={styles.label}>Choose garden / section for new crop</Text>
       <View style={styles.sectionList}>
         {locations.map(location => {
           const locationGardens = gardens
@@ -270,17 +342,23 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
               .filter(s => s.garden_id === garden.id)
               .sort((a, b) => a.order_index - b.order_index);
             if (gardenSections.length === 0) return [];
+            const isMshrm = garden.record_type === 'mushroom';
             return [(
-              <View key={garden.id} style={styles.gardenGroup}>
-                <View style={styles.gardenHeader}>
-                  <Text style={styles.gardenGroupLabel}>{garden.name}</Text>
+              <View key={garden.id} style={[styles.gardenGroup, isMshrm && styles.gardenGroupMushroom]}>
+                <View style={[styles.gardenHeader, isMshrm && styles.gardenHeaderMushroom]}>
+                  <Text style={[styles.gardenGroupLabel, isMshrm && styles.gardenGroupLabelMushroom]}>
+                    {garden.name}
+                  </Text>
                 </View>
                 <View style={styles.sectionItems}>
                   {gardenSections.map(sec => (
                     <Pressable
                       key={sec.id}
-                      style={[styles.sectionOption, sectionId === sec.id && styles.sectionSelected]}
-                      onPress={() => setSectionId(sec.id)}
+                      style={[styles.sectionOption, sectionId === sec.id && (isMshrm ? styles.sectionSelectedMushroom : styles.sectionSelected)]}
+                      onPress={() => {
+                        setSectionId(sec.id);
+                        handleToggleRecordType(garden.record_type ?? 'plant');
+                      }}
                     >
                       <Text style={[styles.sectionText, sectionId === sec.id && styles.sectionTextSelected]}>
                         {sec.name}
@@ -297,9 +375,7 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
               <View style={styles.locationHeader}>
                 <Text style={styles.locationGroupLabel}>{location.name}</Text>
               </View>
-              <View style={styles.locationBody}>
-                {gardenRows}
-              </View>
+              <View style={styles.locationBody}>{gardenRows}</View>
             </View>
           );
         })}
@@ -319,14 +395,13 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
         style={styles.input}
         value={name}
         onChangeText={setName}
-        placeholder="e.g. Tomato"
+        placeholder={isMushroom ? 'e.g. Oyster, Shiitake' : 'e.g. Tomato, Basil'}
         placeholderTextColor="#555"
         maxLength={100}
         onFocus={() => scrollRef.current?.scrollToEnd({ animated: true })}
-        // autoFocus={!isEditMode}
       />
 
-      <Text style={styles.label}>Plant Count</Text>
+      <Text style={styles.label}>{isMushroom ? 'Block / Jar Count' : 'Plant Count'}</Text>
       <TextInput
         style={[styles.input, styles.inputSmall]}
         value={plantCount}
@@ -382,13 +457,20 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
       {stages.map((stage, i) => (
         <View key={i} style={styles.stageRow}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.stagePicker}>
-            {stageDefs.map(def => (
+            {stageDefs.filter(def => isMushroom ? def.order_index >= 7 : def.order_index < 7).map(def => (
               <Pressable
                 key={def.id}
-                style={[styles.stageChip, { borderColor: def.color }, stage.stage_definition_id === def.id && { backgroundColor: def.color }]}
+                style={[
+                  styles.stageChip,
+                  { borderColor: def.color },
+                  stage.stage_definition_id === def.id && { backgroundColor: def.color },
+                ]}
                 onPress={() => updateStageDefinition(i, def.id)}
               >
-                <Text style={[styles.stageChipText, stage.stage_definition_id === def.id && styles.stageChipTextSelected]}>
+                <Text style={[
+                  styles.stageChipText,
+                  stage.stage_definition_id === def.id && styles.stageChipTextSelected,
+                ]}>
                   {def.name}
                 </Text>
               </Pressable>
@@ -452,10 +534,7 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
       keyboardShouldPersistTaps="handled"
     >
       {embedded ? (
-        <>
-          {page1Content}
-          {page2Content}
-        </>
+        <>{page1Content}{page2Content}</>
       ) : (
         page === 1 ? page1Content : page2Content
       )}
@@ -484,86 +563,59 @@ const styles = StyleSheet.create({
   embeddedContent: { paddingBottom: 16 },
   loadingState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 },
   loadingText: { color: '#999', fontSize: 13 },
+
+  // ── Plants / Mushrooms toggle ─────────────────────────────────────────────
+  recordTypeToggle: { flexDirection: 'row', gap: 8, marginBottom: 16 },
+  recordTypeBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#3a3a3a',
+    backgroundColor: '#262626',
+  },
+  recordTypeBtnPlantActive:    { borderColor: '#2ecc71', backgroundColor: '#1a3a2a' },
+  recordTypeBtnMushroomActive: { borderColor: '#8B4513', backgroundColor: '#2a1508' },
+  recordTypeBtnText:           { color: '#888', fontSize: 13, fontWeight: '600' },
+  recordTypeBtnTextActive:     { color: '#eee' },
+
   label: { color: '#888', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 16, marginBottom: 4 },
   input: { backgroundColor: '#2a2a2a', color: '#eee', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14, borderWidth: 1, borderColor: '#3a3a3a' },
   inputSmall: { width: 140 },
-  dateButton: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#3a3a3a',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
+  dateButton: { backgroundColor: '#2a2a2a', borderRadius: 6, borderWidth: 1, borderColor: '#3a3a3a', paddingHorizontal: 12, paddingVertical: 10 },
   dateButtonMain: { color: '#eee', fontSize: 14, fontWeight: '600' },
   dateButtonSub: { color: '#999', fontSize: 12, marginTop: 2 },
-  datePickerCard: {
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: '#3a3a3a',
-    borderRadius: 8,
-    backgroundColor: '#202020',
-    overflow: 'hidden',
-  },
-  dateDoneBtn: {
-    borderTopWidth: 1,
-    borderTopColor: '#3a3a3a',
-    alignItems: 'center',
-    paddingVertical: 10,
-    backgroundColor: '#272727',
-  },
+  datePickerCard: { marginTop: 8, borderWidth: 1, borderColor: '#3a3a3a', borderRadius: 8, backgroundColor: '#202020', overflow: 'hidden' },
+  dateDoneBtn: { borderTopWidth: 1, borderTopColor: '#3a3a3a', alignItems: 'center', paddingVertical: 10, backgroundColor: '#272727' },
   dateDoneText: { color: '#7dcea0', fontWeight: '600', fontSize: 14 },
+
   sectionList: { gap: 8 },
-  // Location card — near-black, like the planner location band
-  locationGroup: {
-    borderRadius: 8,
-    overflow: 'hidden',
-    backgroundColor: '#0d0d0d',
-  },
-  locationHeader: {
-    backgroundColor: '#0d0d0d',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
+  locationGroup: { borderRadius: 8, overflow: 'hidden', backgroundColor: '#0d0d0d' },
+  locationHeader: { backgroundColor: '#0d0d0d', paddingHorizontal: 12, paddingVertical: 8 },
   locationGroupLabel: { color: '#ccc', fontSize: 13, fontWeight: '700', letterSpacing: 0.4 },
   locationBody: { padding: 8, gap: 6 },
-  // Garden card — dark green, nested inside location
-  gardenGroup: {
-    borderRadius: 6,
-    overflow: 'hidden',
-    backgroundColor: '#003e14',
-  },
-  gardenHeader: {
-    backgroundColor: '#003e14',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
+
+  gardenGroup: { borderRadius: 6, overflow: 'hidden', backgroundColor: '#003e14' },
+  gardenGroupMushroom: { backgroundColor: '#3A2010' },
+  gardenHeader: { backgroundColor: '#003e14', paddingHorizontal: 10, paddingVertical: 6 },
+  gardenHeaderMushroom: { backgroundColor: '#3A2010' },
   gardenGroupLabel: { color: '#a8e6b8', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
+  gardenGroupLabelMushroom: { color: '#d4a882' },
+
   sectionItems: { paddingHorizontal: 8, paddingBottom: 8, gap: 5 },
   sectionOption: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 5, borderWidth: 2, borderColor: 'transparent', backgroundColor: '#cdcdcd' },
   sectionSelected: { borderColor: 'transparent', backgroundColor: '#1a9148' },
+  sectionSelectedMushroom: { borderColor: 'transparent', backgroundColor: '#8B4513' },
   sectionText: { color: '#1a1a1a', fontSize: 13, fontWeight: '600' },
   sectionTextSelected: { color: '#fff', fontWeight: '700' },
-  emptyStateBox: {
-    borderWidth: 1,
-    borderColor: '#3a3a3a',
-    borderRadius: 8,
-    backgroundColor: '#232323',
-    padding: 10,
-    gap: 8,
-  },
+
+  emptyStateBox: { borderWidth: 1, borderColor: '#3a3a3a', borderRadius: 8, backgroundColor: '#232323', padding: 10, gap: 8 },
   emptyStateText: { color: '#bbb', fontSize: 13, fontWeight: '600' },
   emptyStateSubtext: { color: '#8a8a8a', fontSize: 12 },
-  emptyStateBtn: {
-    alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderColor: '#4b6a55',
-    borderRadius: 6,
-    backgroundColor: '#1e3a2a',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
+  emptyStateBtn: { alignSelf: 'flex-start', borderWidth: 1, borderColor: '#4b6a55', borderRadius: 6, backgroundColor: '#1e3a2a', paddingHorizontal: 10, paddingVertical: 6 },
   emptyStateBtnText: { color: '#7dcea0', fontSize: 12, fontWeight: '700' },
+
   stageRow: { marginBottom: 8, gap: 6 },
   stagePicker: { flexGrow: 0 },
   stageChip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1, marginRight: 6 },
@@ -576,28 +628,13 @@ const styles = StyleSheet.create({
   removeBtnText: { color: '#e74c3c', fontSize: 14 },
   addStageBtn: { marginTop: 4, paddingVertical: 8, alignItems: 'center', borderWidth: 1, borderColor: '#3a3a3a', borderRadius: 6, borderStyle: 'dashed' },
   addStageBtnText: { color: '#7dcea0', fontSize: 13 },
+
   actionRow: { marginTop: 28, flexDirection: 'row', gap: 10 },
-  cancelBtn: {
-    flex: 1,
-    borderRadius: 8,
-    paddingVertical: 14,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#4a4a4a',
-    backgroundColor: '#262626',
-  },
+  cancelBtn: { flex: 1, borderRadius: 8, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: '#4a4a4a', backgroundColor: '#262626' },
   cancelBtnText: { color: '#ddd', fontWeight: '600', fontSize: 15 },
   submitBtn: { flex: 1, backgroundColor: '#2ecc71', borderRadius: 8, paddingVertical: 14, alignItems: 'center' },
   submitBtnText: { color: '#111', fontWeight: 'bold', fontSize: 15 },
-  archiveBtn: {
-    marginTop: 12,
-    borderRadius: 8,
-    paddingVertical: 14,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#7b5b16',
-    backgroundColor: '#2f2611',
-  },
+  archiveBtn: { marginTop: 12, borderRadius: 8, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: '#7b5b16', backgroundColor: '#2f2611' },
   archiveBtnText: { color: '#e7c46a', fontWeight: '700', fontSize: 14 },
   deleteBtn: { marginTop: 8, paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
   deleteBtnText: { color: '#7a5454', fontSize: 13 },

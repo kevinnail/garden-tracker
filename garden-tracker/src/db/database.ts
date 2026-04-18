@@ -1,6 +1,6 @@
 import * as SQLite from 'expo-sqlite';
-import { PRESET_STAGES } from '@/src/constants/stages';
-import { PRESET_TASK_TYPES } from '@/src/constants/taskTypes';
+import { PRESET_STAGES, PRESET_MUSHROOM_STAGES } from '@/src/constants/stages';
+import { PRESET_TASK_TYPES, PRESET_MUSHROOM_TASK_TYPES } from '@/src/constants/taskTypes';
 import { SCHEMA_SQL } from '@/src/db/schema';
 
 let _db: SQLite.SQLiteDatabase | null = null;
@@ -64,6 +64,22 @@ async function seedIfNeeded(db: SQLite.SQLiteDatabase) {
 
     // Task types
     for (const tt of PRESET_TASK_TYPES) {
+      await db.runAsync(
+        `INSERT INTO task_types (name, color) VALUES (?, ?)`,
+        tt.name, tt.color
+      );
+    }
+
+    // Mushroom stage definitions
+    for (const s of PRESET_MUSHROOM_STAGES) {
+      await db.runAsync(
+        `INSERT INTO stage_definitions (name, color, order_index) VALUES (?, ?, ?)`,
+        s.name, s.color, s.order_index
+      );
+    }
+
+    // Mushroom task types
+    for (const tt of PRESET_MUSHROOM_TASK_TYPES) {
       await db.runAsync(
         `INSERT INTO task_types (name, color) VALUES (?, ?)`,
         tt.name, tt.color

@@ -49,6 +49,7 @@ describe('getCropsForSection', () => {
       plant_count: SEED.PLANT_COUNT,
       start_date: SEED.START_DATE,
       section_id: SEED.SECTION_ID,
+      record_type: 'plant',
       archived: false,
       notes: null,
       created_at: expect.any(String),
@@ -311,3 +312,28 @@ describe('archiveCrop', () => {
   });
 });
 
+
+// ── record_type (mushroom mode) ────────────────────────────────────────────────
+
+describe('crop record_type', () => {
+  it('defaults to "plant" when no record_type is provided', async () => {
+    const id = await insertCropInstance(SEED.SECTION_ID, 'Tomato', 4, '2025-04-06');
+    const crops = await getCropsForSection(SEED.SECTION_ID);
+    const crop = crops.find(c => c.id === id);
+    expect(crop?.record_type).toBe('plant');
+  });
+
+  it('persists "mushroom" record_type and reads back correctly', async () => {
+    const id = await insertCropInstance(SEED.SECTION_ID, 'Oyster Flush', 2, '2025-04-06', 'mushroom');
+    const crops = await getCropsForSection(SEED.SECTION_ID);
+    const crop = crops.find(c => c.id === id);
+    expect(crop?.record_type).toBe('mushroom');
+  });
+
+  it('can update record_type via updateCropInstance', async () => {
+    await updateCropInstance(SEED.CROP_ID, { record_type: 'mushroom' });
+    const crops = await getCropsForSection(SEED.SECTION_ID);
+    const crop = crops.find(c => c.id === SEED.CROP_ID);
+    expect(crop?.record_type).toBe('mushroom');
+  });
+});
