@@ -10,7 +10,19 @@
 // *
 // * ==================================================
 
-import { wmoLabel, wmoEmoji, classifyWeatherError, fetchWeather } from '@/src/utils/weatherUtils';
+import { wmoLabel, wmoEmoji, classifyWeatherError, fetchWeather, localDateStr } from '@/src/utils/weatherUtils';
+
+// ── localDateStr ──────────────────────────────────────────────────────────────
+
+describe('localDateStr', () => {
+  it('returns YYYY-MM-DD using local time, not UTC', () => {
+    const result = localDateStr();
+    expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    const now = new Date();
+    const expected = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    expect(result).toBe(expected);
+  });
+});
 
 // ── wmoLabel ──────────────────────────────────────────────────────────────────
 
@@ -145,6 +157,24 @@ describe('classifyWeatherError', () => {
 // ── fetchWeather response parsing ─────────────────────────────────────────────
 
 const MOCK_RESPONSE = {
+  current: {
+    time:                   '2026-04-13T12:00',
+    temperature_2m:         68.5,
+    relative_humidity_2m:   65,
+    apparent_temperature:   66.2,
+    weather_code:           0,
+    wind_speed_10m:         10.5,
+    precipitation:          0.0,
+  },
+  hourly: {
+    time:                     ['2026-04-13T12:00', '2026-04-13T13:00', '2026-04-13T14:00'],
+    temperature_2m:           [68.5,               70.1,               71.3              ],
+    relative_humidity_2m:     [65,                 62,                 60                ],
+    precipitation_probability:[0,                  10,                 20                ],
+    precipitation:            [0.0,                0.0,                0.01              ],
+    weather_code:             [0,                  0,                  1                 ],
+    wind_speed_10m:           [10.5,               11.0,               12.3              ],
+  },
   daily: {
     time:                         ['2026-04-13', '2026-04-14', '2026-04-15'],
     weather_code:                 [0,            61,           95           ],
@@ -171,7 +201,7 @@ describe('fetchWeather', () => {
 
   it('zips daily arrays into DayForecast objects', async () => {
     mockFetch(MOCK_RESPONSE);
-    const days = await fetchWeather(45.0, -93.0);
+    const { days } = await fetchWeather(45.0, -93.0);
 
     expect(days).toHaveLength(3);
 
@@ -198,7 +228,7 @@ describe('fetchWeather', () => {
 
   it('rounds temperatures, UV, and wind', async () => {
     mockFetch(MOCK_RESPONSE);
-    const days = await fetchWeather(45.0, -93.0);
+    const { days } = await fetchWeather(45.0, -93.0);
     expect(days[0].tempMax).toBe(72);   // Math.round(72.4)
     expect(days[0].tempMin).toBe(52);   // Math.round(52.3)
     expect(days[0].uvIndex).toBe(8);    // Math.round(8.2)
@@ -207,6 +237,8 @@ describe('fetchWeather', () => {
 
   it('defaults precipIn and precipPct to 0 when null in response', async () => {
     const sparse = {
+      current: MOCK_RESPONSE.current,
+      hourly:  MOCK_RESPONSE.hourly,
       daily: {
         ...MOCK_RESPONSE.daily,
         precipitation_sum:            [null, null, null],
@@ -216,7 +248,7 @@ describe('fetchWeather', () => {
       },
     };
     mockFetch(sparse);
-    const days = await fetchWeather(45.0, -93.0);
+    const { days } = await fetchWeather(45.0, -93.0);
     expect(days[0].precipIn).toBe(0);
     expect(days[0].precipPct).toBe(0);
     expect(days[0].uvIndex).toBe(0);
@@ -242,5 +274,35 @@ describe('fetchWeather', () => {
     await fetchWeather(45.0, -93.0);
     const url = (global.fetch as jest.Mock).mock.calls[0][0] as string;
     expect(url).toContain('forecast_days=10');
+  });
+
+  it('parses current conditions correctly', async () => {
+    mockFetch(MOCK_RESPONSE);
+    const { current } = await fetchWeather(45.0, -93.0);
+    expect(current).toMatchObject({
+      code:       0,
+      tempF:      69,   // Math.round(68.5)
+      feelsLikeF: 66,   // Math.round(66.2)
+      humidity:   65,
+      windMph:    11,   // Math.round(10.5)
+      precipIn:   0.0,
+    });
+  });
+
+  it('slices hourly to next 24 entries starting from current.time', async () => {
+    mockFetch(MOCK_RESPONSE);
+    const { hourly } = await fetchWeather(45.0, -93.0);
+    expect(hourly).toHaveLength(3); // mock only has 3 hourly entries
+    expect(hourly[0].time).toBe('2026-04-13T12:00');
+    expect(hourly[0]).toMatchObject({ code: 0, tempF: 69, humidity: 65, precipPct: 0, windMph: 11 });
+    expect(hourly[2]).toMatchObject({ code: 1, tempF: 71, precipPct: 20 });
+  });
+
+  it('requests current and hourly params in the URL', async () => {
+    mockFetch(MOCK_RESPONSE);
+    await fetchWeather(45.0, -93.0);
+    const url = (global.fetch as jest.Mock).mock.calls[0][0] as string;
+    expect(url).toContain('current=');
+    expect(url).toContain('hourly=');
   });
 });
