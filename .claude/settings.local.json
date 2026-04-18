@@ -28,7 +28,8 @@
       "mcp__whimsical-desktop__board_create",
       "mcp__whimsical-desktop__flowchart_create",
       "Skill(project-code-review)",
-      "Bash(eas build *)"
+      "Bash(eas build *)",
+      "Bash(tasklist)"
     ]
   }
 }
