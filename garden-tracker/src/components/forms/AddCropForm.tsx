@@ -354,7 +354,7 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
                   {gardenSections.map(sec => (
                     <Pressable
                       key={sec.id}
-                      style={[styles.sectionOption, sectionId === sec.id && styles.sectionSelected]}
+                      style={[styles.sectionOption, sectionId === sec.id && (isMshrm ? styles.sectionSelectedMushroom : styles.sectionSelected)]}
                       onPress={() => {
                         setSectionId(sec.id);
                         handleToggleRecordType(garden.record_type ?? 'plant');
@@ -395,7 +395,7 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
         style={styles.input}
         value={name}
         onChangeText={setName}
-        placeholder="e.g. Tomato"
+        placeholder={isMushroom ? 'e.g. Oyster, Shiitake' : 'e.g. Tomato, Basil'}
         placeholderTextColor="#555"
         maxLength={100}
         onFocus={() => scrollRef.current?.scrollToEnd({ animated: true })}
@@ -606,6 +606,7 @@ const styles = StyleSheet.create({
   sectionItems: { paddingHorizontal: 8, paddingBottom: 8, gap: 5 },
   sectionOption: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 5, borderWidth: 2, borderColor: 'transparent', backgroundColor: '#cdcdcd' },
   sectionSelected: { borderColor: 'transparent', backgroundColor: '#1a9148' },
+  sectionSelectedMushroom: { borderColor: 'transparent', backgroundColor: '#8B4513' },
   sectionText: { color: '#1a1a1a', fontSize: 13, fontWeight: '600' },
   sectionTextSelected: { color: '#fff', fontWeight: '700' },
 
