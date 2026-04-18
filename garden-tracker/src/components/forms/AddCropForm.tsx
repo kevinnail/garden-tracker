@@ -139,17 +139,39 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
 
       // New crop — cascade record_type from the first section's parent garden
       const firstSection = storeState.sections[0] ?? null;
+      let initialRecordType: 'plant' | 'mushroom' = 'plant';
       if (firstSection) {
         setSectionId(firstSection.id);
         const parentGarden = storeState.gardens.find(g => g.id === firstSection.garden_id);
-        setRecordType(parentGarden?.record_type ?? 'plant');
+        initialRecordType = parentGarden?.record_type ?? 'plant';
+        setRecordType(initialRecordType);
       }
-      setStages(
-        currentStageDefs.slice(0, 3).map((def, i) => ({
-          stage_definition_id: def.id,
-          duration_weeks: ['2', '4', '8'][i] ?? '4',
-        }))
-      );
+
+      if (initialRecordType === 'mushroom') {
+        const inoculation  = currentStageDefs.find(d => d.name === 'Inoculation');
+        const colonization = currentStageDefs.find(d => d.name === 'Colonization');
+        const fruiting     = currentStageDefs.find(d => d.name === 'Fruiting' && d.order_index >= 7);
+        if (inoculation && colonization && fruiting) {
+          setStages([
+            { stage_definition_id: inoculation.id,  duration_weeks: '4' },
+            { stage_definition_id: colonization.id, duration_weeks: '4' },
+            { stage_definition_id: fruiting.id,     duration_weeks: '3' },
+          ]);
+        } else {
+          const mushroomDefs = currentStageDefs.filter(d => d.order_index >= 7);
+          setStages(mushroomDefs.slice(0, 3).map((def, i) => ({
+            stage_definition_id: def.id,
+            duration_weeks: ['4', '4', '3'][i] ?? '4',
+          })));
+        }
+      } else {
+        setStages(
+          currentStageDefs.filter(d => d.order_index < 7).slice(0, 3).map((def, i) => ({
+            stage_definition_id: def.id,
+            duration_weeks: ['2', '4', '8'][i] ?? '4',
+          }))
+        );
+      }
       setLoadingInitial(false);
     };
 
@@ -335,7 +357,7 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
                       style={[styles.sectionOption, sectionId === sec.id && styles.sectionSelected]}
                       onPress={() => {
                         setSectionId(sec.id);
-                        setRecordType(garden.record_type ?? 'plant');
+                        handleToggleRecordType(garden.record_type ?? 'plant');
                       }}
                     >
                       <Text style={[styles.sectionText, sectionId === sec.id && styles.sectionTextSelected]}>
