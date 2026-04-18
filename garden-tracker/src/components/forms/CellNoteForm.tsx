@@ -33,7 +33,6 @@ import {
 } from '@/src/utils/noteUtils';
 import { copyImageToAppStorage, createNoteImage, deleteImageFile } from '@/src/utils/imageStorage';
 import NoteImageStrip from '@/src/components/notes/NoteImageStrip';
-import { useNavigation } from '@react-navigation/native';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -64,7 +63,6 @@ export default function CellNoteForm({ cropId, weekDate, initialMode = 'view' }:
   const headerHeight = useHeaderHeight();
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
-  const navigation = useNavigation();
 
   const rows = usePlannerStore(s => s.rows);
   const saveCellNote = usePlannerStore(s => s.saveCellNote);
@@ -73,11 +71,6 @@ export default function CellNoteForm({ cropId, weekDate, initialMode = 'view' }:
   const cropRow = rows.find(row => row.type === 'crop_row' && row.crop.id === cropId);
   const isMushroomCrop = cropRow?.type === 'crop_row' && cropRow.crop.record_type === 'mushroom';
 
-  React.useEffect(() => {
-    if (isMushroomCrop) {
-      navigation.setOptions({ headerStyle: { backgroundColor: '#3A2010' } });
-    }
-  }, [isMushroomCrop, navigation]);
   const note = cropRow?.type === 'crop_row' ? cropRow.notesByWeek[weekDate] ?? null : null;
 
   const [entries, setEntries] = useState<WeeklyNoteEntry[]>([]);
@@ -337,9 +330,9 @@ export default function CellNoteForm({ cropId, weekDate, initialMode = 'view' }:
           keyboardDismissMode="interactive"
         >
           {/* Header — collapsed to one line in landscape to save vertical space */}
-          <View style={[styles.header, isLandscape && styles.headerCompact]}>
+          <View style={[styles.header, isMushroomCrop && styles.headerMushroom, isLandscape && styles.headerCompact]}>
             <Text style={styles.cropName}>{cropName}</Text>
-            <Text style={[styles.weekLabel, isLandscape && styles.weekLabelCompact]}>{formatWeekRangeLabel(weekDate)}</Text>
+            <Text style={[styles.weekLabel, isMushroomCrop && styles.weekLabelMushroom, isLandscape && styles.weekLabelCompact]}>{formatWeekRangeLabel(weekDate)}</Text>
           </View>
 
           <View style={styles.sectionHeader}>
@@ -530,6 +523,10 @@ const styles = StyleSheet.create({
     borderBottomColor: '#148a3e',
     backgroundColor: '#1a9148',
   },
+  headerMushroom: {
+    backgroundColor: '#3A2010',
+    borderBottomColor: '#5c2e08',
+  },
   headerCompact: {
     paddingTop: 6,
     paddingBottom: 6,
@@ -545,6 +542,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  weekLabelMushroom: { color: '#d4a882' },
   weekLabelCompact: {
     marginTop: 2,
   },
