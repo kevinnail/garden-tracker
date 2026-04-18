@@ -70,6 +70,7 @@ export default function TaskAssessForm({ embedded = false }: TaskAssessFormProps
 
   const { tasks, completions, crop, weekColorMap } = cropRow;
   const completionSet = new Set(completions.map(c => `${c.task_id}:${c.completed_date}`));
+  const isMushroom = crop.record_type === 'mushroom';
 
   const colorKeys = Object.keys(weekColorMap).map(Number);
   const cropStartWeek = colorKeys.length > 0 ? colorKeys.reduce((a, b) => a < b ? a : b) : dateToWeekIndex(calendarStart, (() => {
@@ -86,7 +87,8 @@ export default function TaskAssessForm({ embedded = false }: TaskAssessFormProps
     endDate.setHours(0, 0, 0, 0);
     return endDate;
   })();
-  const cropSummary = `${crop.plant_count} ${crop.plant_count === 1 ? 'plant' : 'plants'} • ${formatShortDate(parseDateKey(crop.start_date))} to ${formatShortDate(cropEndDate)}`;
+  const unitLabel = isMushroom ? (crop.plant_count === 1 ? 'unit' : 'units') : (crop.plant_count === 1 ? 'plant' : 'plants');
+  const cropSummary = `${crop.plant_count} ${unitLabel} • ${formatShortDate(parseDateKey(crop.start_date))} to ${formatShortDate(cropEndDate)}`;
 
   const todayDate = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; })();
   const todayWeek = dateToWeekIndex(calendarStart, toSunday(new Date()));
@@ -127,9 +129,9 @@ export default function TaskAssessForm({ embedded = false }: TaskAssessFormProps
     return wrapInSafeArea(
       <View style={styles.container}>
         {!embedded && (
-          <View style={[styles.header, isLandscape && styles.headerCompact]}>
+          <View style={[styles.header, isMushroom && styles.headerMushroom, isLandscape && styles.headerCompact]}>
             <Text style={styles.cropName}>{crop.name}</Text>
-            <Text style={[styles.cropSummary, isLandscape && styles.cropSummaryCompact]}>{cropSummary}</Text>
+            <Text style={[styles.cropSummary, isMushroom && styles.cropSummaryMushroom, isLandscape && styles.cropSummaryCompact]}>{cropSummary}</Text>
           </View>
         )}
         <Text style={styles.empty}>
@@ -152,9 +154,9 @@ export default function TaskAssessForm({ embedded = false }: TaskAssessFormProps
   return wrapInSafeArea(
     <View style={styles.container}>
       {!embedded && (
-        <View style={[styles.header, isLandscape && styles.headerCompact]}>
+        <View style={[styles.header, isMushroom && styles.headerMushroom, isLandscape && styles.headerCompact]}>
           <Text style={styles.cropName}>{crop.name}</Text>
-          <Text style={[styles.cropSummary, isLandscape && styles.cropSummaryCompact]}>{cropSummary}</Text>
+          <Text style={[styles.cropSummary, isMushroom && styles.cropSummaryMushroom, isLandscape && styles.cropSummaryCompact]}>{cropSummary}</Text>
         </View>
       )}
       <ScrollView contentContainerStyle={[styles.content, embedded && styles.embeddedContent]}>
@@ -255,6 +257,10 @@ const styles = StyleSheet.create({
     borderBottomColor: '#148a3e',
     backgroundColor: '#1a9148',
   },
+  headerMushroom: {
+    backgroundColor: '#3A2010',
+    borderBottomColor: '#5c2e08',
+  },
   headerCompact: {
     paddingTop: 6,
     paddingBottom: 6,
@@ -270,6 +276,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  cropSummaryMushroom: { color: '#d4a882' },
   cropSummaryCompact: {
     marginTop: 2,
   },
