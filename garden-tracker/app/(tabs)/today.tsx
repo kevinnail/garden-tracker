@@ -219,7 +219,7 @@ function NowPanel({ current }: { current: CurrentWeather }) {
   );
 }
 
-// ── Hourly scroll ─────────────────────────────────────────────────────────────
+// ── Hourly list ───────────────────────────────────────────────────────────────
 
 function HourCard({ hour, isNow }: { hour: HourForecast; isNow: boolean }) {
   return (
@@ -229,23 +229,25 @@ function HourCard({ hour, isNow }: { hour: HourForecast; isNow: boolean }) {
       </Text>
       <Text style={wxStyles.hourEmoji}>{wmoEmoji(hour.code)}</Text>
       <Text style={wxStyles.hourTemp}>{hour.tempF}°</Text>
-      {hour.precipPct > 0 && <Text style={wxStyles.hourPrecip}>💧 {hour.precipPct}%</Text>}
-      {hour.windMph >= 20 && <Text style={wxStyles.hourWind}>💨 {hour.windMph}</Text>}
+      <View style={wxStyles.hourDetails}>
+        {hour.precipPct > 0 && <Text style={wxStyles.hourPrecip}>💧 {hour.precipPct}%</Text>}
+        {hour.windMph >= 20 && <Text style={wxStyles.hourWind}>💨 {hour.windMph}</Text>}
+      </View>
     </View>
   );
 }
 
 function HourlyScroll({ hourly }: { hourly: HourForecast[] }) {
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={wxStyles.scrollContent}>
+    <View style={wxStyles.verticalList}>
       {hourly.map((hour, i) => (
         <HourCard key={hour.time} hour={hour} isNow={i === 0} />
       ))}
-    </ScrollView>
+    </View>
   );
 }
 
-// ── 10-day scroll ─────────────────────────────────────────────────────────────
+// ── 10-day list ───────────────────────────────────────────────────────────────
 
 function DayCard({ day, isToday }: { day: DayForecast; isToday: boolean }) {
   const date = new Date(day.date + 'T12:00:00'); // noon local avoids DST edge
@@ -254,26 +256,23 @@ function DayCard({ day, isToday }: { day: DayForecast; isToday: boolean }) {
 
   return (
     <View style={[wxStyles.card, isToday && wxStyles.cardToday]}>
-      <Text style={[wxStyles.cardDay, isToday && wxStyles.cardDayToday]}>{dayName}</Text>
-      <Text style={wxStyles.cardDate}>{monthDay}</Text>
-      <Text style={wxStyles.cardEmoji}>{wmoEmoji(day.code)}</Text>
-      <Text style={wxStyles.cardCondition} numberOfLines={1}>{wmoLabel(day.code)}</Text>
+      <View style={wxStyles.cardDayCol}>
+        <Text style={[wxStyles.cardDay, isToday && wxStyles.cardDayToday]}>{dayName}</Text>
+        <Text style={wxStyles.cardDate}>{monthDay}</Text>
+      </View>
+      <View style={wxStyles.cardConditionCol}>
+        <Text style={wxStyles.cardEmoji}>{wmoEmoji(day.code)}</Text>
+        <Text style={wxStyles.cardCondition} numberOfLines={1}>{wmoLabel(day.code)}</Text>
+      </View>
       <View style={wxStyles.cardTemps}>
         <Text style={wxStyles.tempHigh}>{day.tempMax}°</Text>
         <Text style={wxStyles.tempLow}>{day.tempMin}°</Text>
       </View>
-      {day.precipPct > 0 && (
-        <Text style={wxStyles.cardPrecip}>💧 {day.precipPct}%</Text>
-      )}
-      {day.precipIn > 0 && (
-        <Text style={wxStyles.cardPrecipAmt}>{day.precipIn.toFixed(2)}&quot;</Text>
-      )}
-      {day.uvIndex >= 6 && (
-        <Text style={wxStyles.cardUv}>UV {day.uvIndex}</Text>
-      )}
-      {day.windMph >= 15 && (
-        <Text style={wxStyles.cardWind}>💨 {day.windMph} mph</Text>
-      )}
+      <View style={wxStyles.cardDetails}>
+        {day.precipPct > 0 && <Text style={wxStyles.cardPrecip}>💧 {day.precipPct}%</Text>}
+        {day.uvIndex >= 6 && <Text style={wxStyles.cardUv}>UV {day.uvIndex}</Text>}
+        {day.windMph >= 15 && <Text style={wxStyles.cardWind}>💨 {day.windMph}</Text>}
+      </View>
     </View>
   );
 }
@@ -327,11 +326,11 @@ function WeatherSection() {
       {tab === 'now' && <NowPanel current={wx.current} />}
       {tab === 'hourly' && <HourlyScroll hourly={wx.hourly} />}
       {tab === '10day' && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={wxStyles.scrollContent}>
+        <View style={wxStyles.verticalList}>
           {wx.days.map(day => (
             <DayCard key={day.date} day={day} isToday={day.date === today} />
           ))}
-        </ScrollView>
+        </View>
       )}
     </View>
   );
@@ -575,9 +574,8 @@ const wxStyles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
-  scrollContent: {
-    gap: 8,
-    paddingVertical: 2,
+  verticalList: {
+    gap: 6,
   },
 
   // Tab bar
@@ -667,16 +665,17 @@ const wxStyles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // Hourly cards
+  // Hourly rows
   hourCard: {
-    width: 64,
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#0d1a27',
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#1e2d3d',
-    padding: 8,
-    alignItems: 'center',
-    gap: 3,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    gap: 10,
   },
   hourCardNow: {
     borderColor: '#3b7abf',
@@ -684,44 +683,56 @@ const wxStyles = StyleSheet.create({
   },
   hourLabel: {
     color: '#4a6a85',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
+    width: 46,
   },
   hourLabelNow: {
     color: '#7ecbf0',
   },
   hourEmoji: {
-    fontSize: 18,
-    marginVertical: 1,
+    fontSize: 20,
   },
   hourTemp: {
     color: '#f0c060',
     fontSize: 14,
     fontWeight: '700',
+    width: 36,
+    textAlign: 'right',
+  },
+  hourDetails: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
   },
   hourPrecip: {
     color: '#5bb5d8',
-    fontSize: 10,
+    fontSize: 12,
   },
   hourWind: {
     color: '#a8b8c8',
-    fontSize: 10,
+    fontSize: 12,
   },
 
-  // 10-day cards
+  // 10-day rows
   card: {
-    width: 88,
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#0d1a27',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#1e2d3d',
-    padding: 10,
-    alignItems: 'center',
-    gap: 3,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 10,
   },
   cardToday: {
     borderColor: '#3b7abf',
     backgroundColor: '#0f2035',
+  },
+  cardDayCol: {
+    width: 52,
   },
   cardDay: {
     color: '#8daec8',
@@ -734,48 +745,53 @@ const wxStyles = StyleSheet.create({
   cardDate: {
     color: '#4a6a85',
     fontSize: 10,
+    marginTop: 1,
+  },
+  cardConditionCol: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   cardEmoji: {
-    fontSize: 22,
-    marginVertical: 2,
+    fontSize: 20,
   },
   cardCondition: {
+    flex: 1,
     color: '#7a9db8',
-    fontSize: 10,
-    textAlign: 'center',
+    fontSize: 12,
   },
   cardTemps: {
     flexDirection: 'row',
     gap: 6,
-    marginTop: 2,
+    width: 68,
+    justifyContent: 'flex-end',
   },
   tempHigh: {
     color: '#f0c060',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
   },
   tempLow: {
     color: '#6898b8',
-    fontSize: 14,
-    fontWeight: '400',
+    fontSize: 13,
+  },
+  cardDetails: {
+    width: 58,
+    alignItems: 'flex-end',
+    gap: 2,
   },
   cardPrecip: {
     color: '#5bb5d8',
-    fontSize: 10,
-    marginTop: 2,
-  },
-  cardPrecipAmt: {
-    color: '#4a8faa',
-    fontSize: 10,
+    fontSize: 11,
   },
   cardUv: {
     color: '#e8a040',
-    fontSize: 10,
-    marginTop: 1,
+    fontSize: 11,
   },
   cardWind: {
     color: '#a8b8c8',
-    fontSize: 10,
+    fontSize: 11,
   },
 
   // Status cards
