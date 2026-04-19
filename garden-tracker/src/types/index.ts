@@ -90,6 +90,7 @@ export interface TodayTaskItem {
   garden_name: string;
   section_name: string;
   location_name: string;
+  record_type: 'plant' | 'mushroom';
   day_of_week: number;
   frequency_weeks: number;
   start_offset_weeks: number;

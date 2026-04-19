@@ -20,6 +20,7 @@ interface CropTaskGroup {
   gardenName: string;
   sectionName: string;
   locationName: string;
+  record_type: 'plant' | 'mushroom';
   tasks: TodayTaskItem[];
 }
 
@@ -33,6 +34,7 @@ function groupByCrop(items: TodayTaskItem[]): CropTaskGroup[] {
         gardenName: item.garden_name,
         sectionName: item.section_name,
         locationName: item.location_name,
+        record_type: item.record_type,
         tasks: [],
       });
     }
@@ -60,6 +62,8 @@ function overdueBadgeLabel(missed_count: number): string {
 
 function TaskSwipeRow({ item, overdue, onPress }: { item: TodayTaskItem; overdue: boolean; onPress: () => void }) {
   const completeTask = usePlannerStore(s => s.completeTask);
+  const taskBg = overdue ? '#180808' : '#121008';
+  const taskBorderColor = overdue ? '#2e1010' : '#241e08';
 
   return (
     <ReanimatedSwipeable
@@ -68,7 +72,7 @@ function TaskSwipeRow({ item, overdue, onPress }: { item: TodayTaskItem; overdue
       renderLeftActions={() => <DoneAction />}
       onSwipeableOpen={() => { completeTask(item.task_id, item.week_date).catch(() => {}); }}
     >
-      <View style={styles.taskRow}>
+      <View style={[styles.taskRow, { backgroundColor: taskBg, borderTopColor: taskBorderColor }]}>
         <Pressable style={styles.taskBody} onPress={onPress}>
           <View style={styles.taskTopRow}>
             <Text style={styles.taskTitle}>{item.task_type_name}</Text>
@@ -89,6 +93,14 @@ function CropGroup({ group, overdue }: { group: CropTaskGroup; overdue: boolean 
   const focusPlannerCrop = usePlannerStore(s => s.focusPlannerCrop);
   const setSelectedCrop = usePlannerStore(s => s.setSelectedCrop);
 
+  const isMushroom = group.record_type === 'mushroom';
+  const headerBg    = isMushroom ? '#231008' : '#0a2010';
+  const cardBorder  = isMushroom ? '#4a2e14' : '#1e3d28';
+  const taskListBg  = overdue ? '#180808' : '#121008';
+  const cropNameColor  = isMushroom ? '#d8c0a0' : '#a8d8b0';
+  const cropMetaColor  = isMushroom ? '#6a4530' : '#3a6048';
+  const cropArrowColor = isMushroom ? '#c07840' : '#48a860';
+
   const handleHeaderPress = () => {
     const firstTask = group.tasks[0];
     setSelectedCrop(group.cropId);
@@ -98,17 +110,22 @@ function CropGroup({ group, overdue }: { group: CropTaskGroup; overdue: boolean 
   };
 
   return (
-    <View style={styles.cropGroup}>
-      <Pressable style={styles.cropHeader} onPress={handleHeaderPress}>
+    <View style={[styles.cropGroup, { borderColor: cardBorder }]}>
+      <Pressable
+        style={[styles.cropHeader, { backgroundColor: headerBg, borderBottomColor: cardBorder }]}
+        onPress={handleHeaderPress}
+      >
         <View style={styles.cropHeaderLeft}>
-          <Text style={styles.cropName}>{group.cropName}</Text>
-          <Text style={styles.cropMeta}>{group.locationName} · {group.gardenName} · {group.sectionName}</Text>
+          <Text style={[styles.cropName, { color: cropNameColor }]}>{group.cropName}</Text>
+          <Text style={[styles.cropMeta, { color: cropMetaColor }]}>
+            {group.locationName} · {group.gardenName} · {group.sectionName}
+          </Text>
         </View>
-        <Text style={styles.cropArrow}>
+        <Text style={[styles.cropArrow, { color: cropArrowColor }]}>
           {group.tasks.length} task{group.tasks.length !== 1 ? 's' : ''} ›
         </Text>
       </Pressable>
-      <View style={styles.taskList}>
+      <View style={[styles.taskList, { backgroundColor: taskListBg }]}>
         {group.tasks.map(task => (
           <TaskSwipeRow
             key={`${task.task_id}:${task.week_date}`}
@@ -202,7 +219,7 @@ function NowPanel({ current }: { current: CurrentWeather }) {
   );
 }
 
-// ── Hourly scroll ─────────────────────────────────────────────────────────────
+// ── Hourly list ───────────────────────────────────────────────────────────────
 
 function HourCard({ hour, isNow }: { hour: HourForecast; isNow: boolean }) {
   return (
@@ -212,23 +229,25 @@ function HourCard({ hour, isNow }: { hour: HourForecast; isNow: boolean }) {
       </Text>
       <Text style={wxStyles.hourEmoji}>{wmoEmoji(hour.code)}</Text>
       <Text style={wxStyles.hourTemp}>{hour.tempF}°</Text>
-      {hour.precipPct > 0 && <Text style={wxStyles.hourPrecip}>💧 {hour.precipPct}%</Text>}
-      {hour.windMph >= 20 && <Text style={wxStyles.hourWind}>💨 {hour.windMph}</Text>}
+      <View style={wxStyles.hourDetails}>
+        {hour.precipPct > 0 && <Text style={wxStyles.hourPrecip}>💧 {hour.precipPct}%</Text>}
+        {hour.windMph >= 20 && <Text style={wxStyles.hourWind}>💨 {hour.windMph}</Text>}
+      </View>
     </View>
   );
 }
 
 function HourlyScroll({ hourly }: { hourly: HourForecast[] }) {
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={wxStyles.scrollContent}>
+    <View style={wxStyles.verticalList}>
       {hourly.map((hour, i) => (
         <HourCard key={hour.time} hour={hour} isNow={i === 0} />
       ))}
-    </ScrollView>
+    </View>
   );
 }
 
-// ── 10-day scroll ─────────────────────────────────────────────────────────────
+// ── 10-day list ───────────────────────────────────────────────────────────────
 
 function DayCard({ day, isToday }: { day: DayForecast; isToday: boolean }) {
   const date = new Date(day.date + 'T12:00:00'); // noon local avoids DST edge
@@ -237,26 +256,23 @@ function DayCard({ day, isToday }: { day: DayForecast; isToday: boolean }) {
 
   return (
     <View style={[wxStyles.card, isToday && wxStyles.cardToday]}>
-      <Text style={[wxStyles.cardDay, isToday && wxStyles.cardDayToday]}>{dayName}</Text>
-      <Text style={wxStyles.cardDate}>{monthDay}</Text>
-      <Text style={wxStyles.cardEmoji}>{wmoEmoji(day.code)}</Text>
-      <Text style={wxStyles.cardCondition} numberOfLines={1}>{wmoLabel(day.code)}</Text>
+      <View style={wxStyles.cardDayCol}>
+        <Text style={[wxStyles.cardDay, isToday && wxStyles.cardDayToday]}>{dayName}</Text>
+        <Text style={wxStyles.cardDate}>{monthDay}</Text>
+      </View>
+      <View style={wxStyles.cardConditionCol}>
+        <Text style={wxStyles.cardEmoji}>{wmoEmoji(day.code)}</Text>
+        <Text style={wxStyles.cardCondition} numberOfLines={1}>{wmoLabel(day.code)}</Text>
+      </View>
       <View style={wxStyles.cardTemps}>
         <Text style={wxStyles.tempHigh}>{day.tempMax}°</Text>
         <Text style={wxStyles.tempLow}>{day.tempMin}°</Text>
       </View>
-      {day.precipPct > 0 && (
-        <Text style={wxStyles.cardPrecip}>💧 {day.precipPct}%</Text>
-      )}
-      {day.precipIn > 0 && (
-        <Text style={wxStyles.cardPrecipAmt}>{day.precipIn.toFixed(2)}&quot;</Text>
-      )}
-      {day.uvIndex >= 6 && (
-        <Text style={wxStyles.cardUv}>UV {day.uvIndex}</Text>
-      )}
-      {day.windMph >= 15 && (
-        <Text style={wxStyles.cardWind}>💨 {day.windMph} mph</Text>
-      )}
+      <View style={wxStyles.cardDetails}>
+        {day.precipPct > 0 && <Text style={wxStyles.cardPrecip}>💧 {day.precipPct}%</Text>}
+        {day.uvIndex >= 6 && <Text style={wxStyles.cardUv}>UV {day.uvIndex}</Text>}
+        {day.windMph >= 15 && <Text style={wxStyles.cardWind}>💨 {day.windMph}</Text>}
+      </View>
     </View>
   );
 }
@@ -310,11 +326,11 @@ function WeatherSection() {
       {tab === 'now' && <NowPanel current={wx.current} />}
       {tab === 'hourly' && <HourlyScroll hourly={wx.hourly} />}
       {tab === '10day' && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={wxStyles.scrollContent}>
+        <View style={wxStyles.verticalList}>
           {wx.days.map(day => (
             <DayCard key={day.date} day={day} isToday={day.date === today} />
           ))}
-        </ScrollView>
+        </View>
       )}
     </View>
   );
@@ -350,7 +366,6 @@ export default function TodayScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <WeatherSection />
         <Section
           title="Up Today"
           groups={dueGroups}
@@ -362,6 +377,7 @@ export default function TodayScreen() {
           overdue
           emptyText="No overdue tasks from the last 7 days."
         />
+        <WeatherSection />
       </ScrollView>
     </SafeAreaView>
   );
@@ -448,7 +464,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#1e2d3d',
   },
   cropHeader: {
     flexDirection: 'row',
@@ -457,26 +472,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingTop: 12,
     paddingBottom: 12,
-    backgroundColor: '#0d1a27',
     borderBottomWidth: 1,
-    borderBottomColor: '#1e2d3d',
   },
   cropHeaderLeft: {
     flex: 1,
     gap: 3,
   },
   cropName: {
-    color: '#cde0f0',
     fontSize: 17,
     fontWeight: '700',
     letterSpacing: 0.1,
   },
   cropMeta: {
-    color: '#3d5a72',
     fontSize: 12,
   },
   cropArrow: {
-    color: '#0891b2',
     fontSize: 12,
     fontWeight: '600',
     paddingLeft: 12,
@@ -485,12 +495,9 @@ const styles = StyleSheet.create({
   // Task list inside the group
   taskList: {
     gap: 0,
-    backgroundColor: '#081820',
   },
   taskRow: {
-    backgroundColor: '#081820',
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#0e3040',
   },
   taskBody: {
     flex: 1,
@@ -506,7 +513,7 @@ const styles = StyleSheet.create({
   },
   taskTitle: {
     flex: 1,
-    color: '#a0d4e0',
+    color: '#c8cec8',
     fontSize: 13,
     fontWeight: '500',
   },
@@ -519,15 +526,15 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   dueBadge: {
-    color: '#67e8f9',
-    backgroundColor: '#0c2d36',
+    color: '#f0c840',
+    backgroundColor: '#3a2e00',
   },
   overdueBadge: {
-    color: '#ffd7d7',
-    backgroundColor: '#4a2020',
+    color: '#ff7878',
+    backgroundColor: '#5c1818',
   },
   taskMeta: {
-    color: '#1e5a6a',
+    color: '#4a5248',
     fontSize: 11,
   },
 
@@ -567,9 +574,8 @@ const wxStyles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
-  scrollContent: {
-    gap: 8,
-    paddingVertical: 2,
+  verticalList: {
+    gap: 6,
   },
 
   // Tab bar
@@ -659,16 +665,17 @@ const wxStyles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // Hourly cards
+  // Hourly rows
   hourCard: {
-    width: 64,
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#0d1a27',
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#1e2d3d',
-    padding: 8,
-    alignItems: 'center',
-    gap: 3,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    gap: 10,
   },
   hourCardNow: {
     borderColor: '#3b7abf',
@@ -676,44 +683,56 @@ const wxStyles = StyleSheet.create({
   },
   hourLabel: {
     color: '#4a6a85',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
+    width: 46,
   },
   hourLabelNow: {
     color: '#7ecbf0',
   },
   hourEmoji: {
-    fontSize: 18,
-    marginVertical: 1,
+    fontSize: 20,
   },
   hourTemp: {
     color: '#f0c060',
     fontSize: 14,
     fontWeight: '700',
+    width: 36,
+    textAlign: 'right',
+  },
+  hourDetails: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
   },
   hourPrecip: {
     color: '#5bb5d8',
-    fontSize: 10,
+    fontSize: 12,
   },
   hourWind: {
     color: '#a8b8c8',
-    fontSize: 10,
+    fontSize: 12,
   },
 
-  // 10-day cards
+  // 10-day rows
   card: {
-    width: 88,
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#0d1a27',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#1e2d3d',
-    padding: 10,
-    alignItems: 'center',
-    gap: 3,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 10,
   },
   cardToday: {
     borderColor: '#3b7abf',
     backgroundColor: '#0f2035',
+  },
+  cardDayCol: {
+    width: 52,
   },
   cardDay: {
     color: '#8daec8',
@@ -726,48 +745,53 @@ const wxStyles = StyleSheet.create({
   cardDate: {
     color: '#4a6a85',
     fontSize: 10,
+    marginTop: 1,
+  },
+  cardConditionCol: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   cardEmoji: {
-    fontSize: 22,
-    marginVertical: 2,
+    fontSize: 20,
   },
   cardCondition: {
+    flex: 1,
     color: '#7a9db8',
-    fontSize: 10,
-    textAlign: 'center',
+    fontSize: 12,
   },
   cardTemps: {
     flexDirection: 'row',
     gap: 6,
-    marginTop: 2,
+    width: 68,
+    justifyContent: 'flex-end',
   },
   tempHigh: {
     color: '#f0c060',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
   },
   tempLow: {
     color: '#6898b8',
-    fontSize: 14,
-    fontWeight: '400',
+    fontSize: 13,
+  },
+  cardDetails: {
+    width: 58,
+    alignItems: 'flex-end',
+    gap: 2,
   },
   cardPrecip: {
     color: '#5bb5d8',
-    fontSize: 10,
-    marginTop: 2,
-  },
-  cardPrecipAmt: {
-    color: '#4a8faa',
-    fontSize: 10,
+    fontSize: 11,
   },
   cardUv: {
     color: '#e8a040',
-    fontSize: 10,
-    marginTop: 1,
+    fontSize: 11,
   },
   cardWind: {
     color: '#a8b8c8',
-    fontSize: 10,
+    fontSize: 11,
   },
 
   // Status cards
