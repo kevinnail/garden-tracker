@@ -77,9 +77,9 @@ If there are no commits since the last retro timestamp, tell the user and stop -
 Use the Bash tool to POST the retro to the Apps Script web app:
 
 ```bash
-curl -s -X POST "https://script.google.com/macros/s/AKfycbxYExf4CdPqrzCpxu1v5cpeA3gc8DkpajWbUQt28CsEhzQFUoTY1fxvzWPM0U1p0csgfg/exec" \
+curl -s -X POST "$RETRO_WEBHOOK_URL" \
   -H "Content-Type: application/json" \
-  -d '{"date":"MM/DD/YY or MM/DD/YY - MM/DD/YY","branch":"BRANCH description","notes":"narrative summary","client":["item1","item2"],"server":["item1","item2"]}'
+  -d '{"token":"'"$RETRO_WEBHOOK_TOKEN"'","date":"MM/DD/YY or MM/DD/YY - MM/DD/YY","branch":"BRANCH description","notes":"narrative summary","client":["item1","item2"],"server":["item1","item2"]}'
 ```
 
 Requirements:
