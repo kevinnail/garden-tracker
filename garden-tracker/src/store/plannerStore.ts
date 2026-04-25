@@ -26,7 +26,7 @@ import { getAllLocations, getAllGardens, getAllSections, insertLocation, insertG
 import { archiveCrop as archiveCropQuery,  getAllCrops, getCropStagesForCrops, getStageDefs, insertCropWithStages, deleteCropInstance, replaceCropStages, updateCropInstance } from '@/src/db/queries/cropQueries';
 import { getTasksForCrops, getCompletionsForCrops, getTaskTypes, insertTask, insertCompletion, deleteCompletion, deleteTask as dbDeleteTask, updateTaskDay, getTodayAndOverdue } from '@/src/db/queries/taskQueries';
 import { deleteNote as deleteNoteQuery, getNotesForCrops, upsertNote } from '@/src/db/queries/noteQueries';
-import { resetDatabase } from '@/src/db/database';
+import { resetDatabase, getCalendarStart, getDb } from '@/src/db/database';
 
 interface PlannerState {
   rows: GridRowItem[];
@@ -367,7 +367,8 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
 
   loadData: async () => {
     try {
-    const calendarStart = get().calendarStart;
+    const db = await getDb();
+    const calendarStart = await getCalendarStart(db);
     const showArchived  = get().showArchivedRows;
 
     const [locations, gardens, sections, allCrops, stageDefs, taskTypeList, { due: todayDueTasks, overdue: todayOverdueTasks }] = await Promise.all([
@@ -555,6 +556,7 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
       todayOverdueTasks,
       stageDefinitions: stageDefs,
       taskTypes: taskTypeList,
+      calendarStart,
       isLoaded: true,
     });
     } catch (e) { showError('Failed to load data', e); throw e; }
