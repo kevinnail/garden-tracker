@@ -132,6 +132,6 @@ export function defaultCalendarStart(): Date {
   // Day-based arithmetic: setDate honors local calendar, so this can't drift
   // across DST boundaries the way subtracting a fixed number of milliseconds would.
   const d = new Date();
-  d.setDate(d.getDate() - 56);
+  d.setDate(d.getDate() - 365);
   return toSunday(d);
 }
