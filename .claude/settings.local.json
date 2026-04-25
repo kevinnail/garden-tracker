@@ -29,7 +29,8 @@
       "mcp__whimsical-desktop__flowchart_create",
       "Skill(project-code-review)",
       "Bash(eas build *)",
-      "Bash(tasklist)"
+      "Bash(tasklist)",
+      "Bash(curl *)"
     ]
   }
 }
