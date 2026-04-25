@@ -3,3 +3,4 @@
 /.claude/reports
 garden-tracker/coverage
 /docs
+.claude/settings.local.json
