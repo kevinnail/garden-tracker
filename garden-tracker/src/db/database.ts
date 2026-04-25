@@ -22,7 +22,7 @@ export async function getDb(): Promise<SQLite.SQLiteDatabase> {
   _dbPromise = (async () => {
     const db = await SQLite.openDatabaseAsync('garden_tracker.db');
     await initSchema(db);
-    await seedIfNeeded(db);
+    await insertPresetsIfNeeded(db);
     _db = db;
     return db;
   })();
@@ -47,7 +47,7 @@ async function initSchema(db: SQLite.SQLiteDatabase) {
   await db.execAsync(SCHEMA_SQL);
 }
 
-async function seedIfNeeded(db: SQLite.SQLiteDatabase) {
+async function insertPresetsIfNeeded(db: SQLite.SQLiteDatabase) {
   const seeded = await db.getFirstAsync<{ value: string }>(
     `SELECT value FROM settings WHERE key = 'seeded'`
   );
@@ -87,5 +87,28 @@ async function seedIfNeeded(db: SQLite.SQLiteDatabase) {
     }
 
     await db.runAsync(`INSERT INTO settings (key, value) VALUES ('seeded', '1')`);
+
+    // Record the fixed calendar origin — computed once, never recalculated
+    const origin = new Date();
+    origin.setDate(origin.getDate() - 365);
+    const day = origin.getDay();
+    if (day !== 0) origin.setDate(origin.getDate() - day); // snap to Sunday
+    const dateStr = origin.toISOString().slice(0, 10);
+    await db.runAsync(`INSERT INTO settings (key, value) VALUES ('calendar_start', ?)`, dateStr);
   });
+}
+
+export async function getCalendarStart(db: SQLite.SQLiteDatabase): Promise<Date> {
+  const row = await db.getFirstAsync<{ value: string }>(
+    `SELECT value FROM settings WHERE key = 'calendar_start'`
+  );
+  if (row) return new Date(row.value + 'T00:00:00');
+
+  const origin = new Date();
+  origin.setDate(origin.getDate() - 365);
+  const day = origin.getDay();
+  if (day !== 0) origin.setDate(origin.getDate() - day);
+  const dateStr = origin.toISOString().slice(0, 10);
+  await db.runAsync(`INSERT INTO settings (key, value) VALUES ('calendar_start', ?)`, dateStr);
+  return new Date(dateStr + 'T00:00:00');
 }
