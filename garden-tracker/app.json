@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "garden-tracker",
+    "name": "Crop Planner",
     "slug": "garden-tracker",
     "version": "1.0.0",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
-    "scheme": "gardentracker",
+    "scheme": "cropplanner",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -62,8 +62,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Garden Tracker to access your photos for note attachments.",
-          "cameraPermission": "Allow Garden Tracker to take photos for note attachments."
+          "photosPermission": "Allow Crop Planner to access your photos for note attachments.",
+          "cameraPermission": "Allow Crop Planner to take photos for note attachments."
         }
       ]
     ],

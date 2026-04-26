@@ -1,4 +1,4 @@
-# Garden Tracker — Bugs Report
+# Crop Planner— Bugs Report
 
 **Date:** 2026-04-11
 **Mode:** BUGS

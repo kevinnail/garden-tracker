@@ -355,7 +355,7 @@ export default function AddLocationForm() {
         >
           {/* Guide */}
           <Pressable style={styles.guideToggle} onPress={() => setShowGuide(v => !v)}>
-            <Text style={styles.guideToggleText}>{showGuide ? '? Hide guide' : '? How does this work?'}</Text>
+            <Text style={styles.guideToggleText}>{showGuide ? 'Hide guide' : 'How does this work?'}</Text>
           </Pressable>
           {showGuide && (
             <View style={styles.guideBox}>

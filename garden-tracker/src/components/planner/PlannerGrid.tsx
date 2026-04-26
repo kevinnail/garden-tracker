@@ -204,7 +204,7 @@ export default function PlannerGrid() {
     return (
       <View style={[styles.root, styles.emptyRoot, { paddingLeft: leftInset }]}>
         <View style={styles.emptyState}>
-          <Text style={styles.emptyTitle}>Welcome to Garden Tracker</Text>
+          <Text style={styles.emptyTitle}>Welcome to Crop Planner</Text>
           <Text style={styles.emptyBody}>
             Tap <Text style={styles.emptyHighlight}>+ Crop</Text> to get started. You&apos;ll set up your locations first, then add crops.
           </Text>
