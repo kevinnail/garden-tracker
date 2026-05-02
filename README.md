@@ -1,4 +1,4 @@
-# Garden Tracker
+# Crop Planner
 
 A mobile crop-planning app for small-scale growers — built with React Native, Expo, and TypeScript.
 
