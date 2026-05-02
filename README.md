@@ -29,11 +29,11 @@ The core UI is a **scrollable planner grid**: crops run horizontally across week
 
 <p><strong>Main planner grid</strong> and <strong>Today dashboard</strong></p>
 
-<p><img src="docs/images/readme/planner-grid-landscapeJPEG" alt="Planner grid in landscape mode"></p>
+<p><img src="docs/images/readme/planner-grid-landscape.JPEG" alt="Planner grid in landscape mode"></p>
 
 <p><strong>Expanded timeline view</strong></p>
 
-<p><img src="docs/images/readme/planner-navigationJPEG" alt="Planner view with navigation panel"></p>
+<p><img src="docs/images/readme/planner-navigation.JPEG" alt="Planner view with navigation panel"></p>
 
 <p><strong>Planner navigation</strong></p>
 
