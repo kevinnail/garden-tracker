@@ -4,7 +4,7 @@ A mobile crop-planning app for small-scale growers — built with React Native, 
 
 ## What It Does
 
-Garden Tracker replaces a working Excel/VBA crop planner I built from scratch with a mobile-first app that gives growers an at-a-glance view of everything in the ground across a rolling 3-year timeline. It supports both **plant crops** and **mushroom cultivation**, each with their own stage lifecycles and task types.
+Crop Planner replaces a working Excel/VBA crop planner I built from scratch with a mobile-first app that gives growers an at-a-glance view of everything in the ground across a rolling 3-year timeline. It supports both **plant crops** and **mushroom cultivation**, each with their own stage lifecycles and task types.
 
 The core UI is a **scrollable planner grid**: crops run horizontally across weekly columns, color-coded by growth stage. Task lines are drawn as vertical SVG overlays on the grid — solid for pending, dashed for complete. A red cursor marks today. The whole thing is designed to let you manage hundreds of plants (or fruiting blocks) without losing your place.
 
