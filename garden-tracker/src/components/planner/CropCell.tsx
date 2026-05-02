@@ -21,7 +21,6 @@ interface Props {
  * - Has stage → colored background
  * - hasNote   → small red triangle in top-right corner
  *
- * Past hatch is rendered by GridBody as a single shared SVG overlay.
  */
 export default function CropCell({ stageColor, hasNote = false, showNoteIndicators = true, style, onPress, onLongPress }: Props) {
   const { cellWidth, rowHeight } = useCellLayout();

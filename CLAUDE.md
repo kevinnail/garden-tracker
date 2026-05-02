@@ -4,6 +4,8 @@ We're building the app described in @SPEC.MD. Read that file for general archite
 
 Keep your replies extremely concise and focus on conveying the key information. No unnecessary fluff, no long code snippets.
 
+**Always choose the simplest possible implementation.** Before suggesting a solution, ask: does this require new files, new abstractions, flags, or infrastructure that wouldn't otherwise exist? If not, don't suggest them. A problem solved by adding data to an existing file is always better than one solved by adding a new file, flag, env variable, or wrapper. Never layer on complexity that the problem doesn't require.
+
 Whenever working with any third-party library or something similar, you MUST look up the official documentation to ensure that you're working with up-to-date information.
 
 Use the DocsExplorer subagent for efficient documentation lookup.

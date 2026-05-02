@@ -98,6 +98,24 @@ export default function PlannerGrid() {
       scrollY.value = withDecay({ velocity: -e.velocityY, clamp: [0, maxY] });
     });
 
+  // Vertical-only pan over the row header column. activeOffsetY/failOffsetX
+  // let taps on crop rows (Pressable) still fire while still allowing
+  // up/down scroll-drag in this side strip.
+  const rowHeaderPanGesture = Gesture.Pan()
+    .activeOffsetY([-10, 10])
+    .failOffsetX([-15, 15])
+    .onBegin(() => {
+      startScrollY.value = scrollY.value;
+    })
+    .onUpdate((e) => {
+      const maxY = Math.max(0, totalHeight - sharedViewH.value);
+      scrollY.value = Math.min(Math.max(startScrollY.value - e.translationY, 0), maxY);
+    })
+    .onEnd((e) => {
+      const maxY = Math.max(0, totalHeight - sharedViewH.value);
+      scrollY.value = withDecay({ velocity: -e.velocityY, clamp: [0, maxY] });
+    });
+
   // ── Keep virtualization in sync during drag and decay ─────────────────────
   // Only flush to JS when scroll moves by at least half a cell/row to avoid
   // triggering a React re-render on every animation frame.
@@ -204,7 +222,7 @@ export default function PlannerGrid() {
     return (
       <View style={[styles.root, styles.emptyRoot, { paddingLeft: leftInset }]}>
         <View style={styles.emptyState}>
-          <Text style={styles.emptyTitle}>Welcome to Garden Tracker</Text>
+          <Text style={styles.emptyTitle}>Welcome to Crop Planner</Text>
           <Text style={styles.emptyBody}>
             Tap <Text style={styles.emptyHighlight}>+ Crop</Text> to get started. You&apos;ll set up your locations first, then add crops.
           </Text>
@@ -234,13 +252,15 @@ export default function PlannerGrid() {
 
       {/* ── Main row: row header + grid body ── */}
       <View style={styles.mainRow}>
-        <View style={styles.rowHeaderClip}>
-          <Animated.View
-            style={[{ position: 'absolute', width: ROW_HEADER_WIDTH, height: totalHeight }, rowHeaderStyle]}
-          >
-            <RowHeader rows={rows} rowOffsets={rowOffsets} renderScrollY={renderScrollY} viewHeight={viewDims.height} />
-          </Animated.View>
-        </View>
+        <GestureDetector gesture={rowHeaderPanGesture}>
+          <View style={styles.rowHeaderClip}>
+            <Animated.View
+              style={[{ position: 'absolute', width: ROW_HEADER_WIDTH, height: totalHeight }, rowHeaderStyle]}
+            >
+              <RowHeader rows={rows} rowOffsets={rowOffsets} renderScrollY={renderScrollY} viewHeight={viewDims.height} />
+            </Animated.View>
+          </View>
+        </GestureDetector>
 
         <View style={styles.bodyClip} onLayout={handleBodyLayout}>
           <GestureDetector gesture={panGesture}>

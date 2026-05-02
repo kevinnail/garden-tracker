@@ -2,6 +2,7 @@ import * as SQLite from 'expo-sqlite';
 import { PRESET_STAGES, PRESET_MUSHROOM_STAGES } from '@/src/constants/stages';
 import { PRESET_TASK_TYPES, PRESET_MUSHROOM_TASK_TYPES } from '@/src/constants/taskTypes';
 import { SCHEMA_SQL } from '@/src/db/schema';
+import { formatDateKey, parseDateKey, toSunday } from '@/src/utils/dateUtils';
 
 let _db: SQLite.SQLiteDatabase | null = null;
 let _dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
@@ -22,7 +23,7 @@ export async function getDb(): Promise<SQLite.SQLiteDatabase> {
   _dbPromise = (async () => {
     const db = await SQLite.openDatabaseAsync('garden_tracker.db');
     await initSchema(db);
-    await seedIfNeeded(db);
+    await insertPresetsIfNeeded(db);
     _db = db;
     return db;
   })();
@@ -47,7 +48,7 @@ async function initSchema(db: SQLite.SQLiteDatabase) {
   await db.execAsync(SCHEMA_SQL);
 }
 
-async function seedIfNeeded(db: SQLite.SQLiteDatabase) {
+async function insertPresetsIfNeeded(db: SQLite.SQLiteDatabase) {
   const seeded = await db.getFirstAsync<{ value: string }>(
     `SELECT value FROM settings WHERE key = 'seeded'`
   );
@@ -87,5 +88,31 @@ async function seedIfNeeded(db: SQLite.SQLiteDatabase) {
     }
 
     await db.runAsync(`INSERT INTO settings (key, value) VALUES ('seeded', '1')`);
+
+    // Record the fixed calendar origin — computed once, never recalculated.
+    // formatDateKey is the local YYYY-MM-DD; toISOString would shift to UTC
+    // and could land a day off, breaking the Sunday alignment that
+    // task-completion keys depend on.
+    const origin = new Date();
+    origin.setDate(origin.getDate() - 365);
+    await db.runAsync(`INSERT INTO settings (key, value) VALUES ('calendar_start', ?)`, formatDateKey(toSunday(origin)));
   });
+}
+
+export async function getCalendarStart(db: SQLite.SQLiteDatabase): Promise<Date> {
+  const row = await db.getFirstAsync<{ value: string }>(
+    `SELECT value FROM settings WHERE key = 'calendar_start'`
+  );
+  if (row) {
+    const parsed = parseDateKey(row.value);
+    // Defensive snap: an older seed may have written a non-Sunday date via the
+    // toISOString bug — re-snap on read so existing DBs self-correct.
+    if (parsed) return toSunday(parsed);
+  }
+
+  const origin = new Date();
+  origin.setDate(origin.getDate() - 365);
+  const sunday = toSunday(origin);
+  await db.runAsync(`INSERT INTO settings (key, value) VALUES ('calendar_start', ?)`, formatDateKey(sunday));
+  return sunday;
 }

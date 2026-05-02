@@ -26,7 +26,7 @@ import { getAllLocations, getAllGardens, getAllSections, insertLocation, insertG
 import { archiveCrop as archiveCropQuery,  getAllCrops, getCropStagesForCrops, getStageDefs, insertCropWithStages, deleteCropInstance, replaceCropStages, updateCropInstance } from '@/src/db/queries/cropQueries';
 import { getTasksForCrops, getCompletionsForCrops, getTaskTypes, insertTask, insertCompletion, deleteCompletion, deleteTask as dbDeleteTask, updateTaskDay, getTodayAndOverdue } from '@/src/db/queries/taskQueries';
 import { deleteNote as deleteNoteQuery, getNotesForCrops, upsertNote } from '@/src/db/queries/noteQueries';
-import { resetDatabase } from '@/src/db/database';
+import { resetDatabase, getCalendarStart, getDb } from '@/src/db/database';
 
 interface PlannerState {
   rows: GridRowItem[];
@@ -233,10 +233,9 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
           return { ...row, completions: [...row.completions, { id: 0, task_id: taskId, completed_date: weekDate }] };
         }),
         todayDueTasks: s.todayDueTasks.filter(t => !(t.task_id === taskId && t.week_date === weekDate)),
-        todayOverdueTasks: s.todayOverdueTasks
-          .map(t => t.task_id === taskId ? { ...t, missed_count: t.missed_count - 1 } : t)
-          .filter(t => t.missed_count > 0),
       }));
+      const { overdue } = await getTodayAndOverdue();
+      set({ todayOverdueTasks: overdue });
     } catch (e) { showError('Failed to complete task', e); throw e; }
   },
 
@@ -367,7 +366,8 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
 
   loadData: async () => {
     try {
-    const calendarStart = get().calendarStart;
+    const db = await getDb();
+    const calendarStart = await getCalendarStart(db);
     const showArchived  = get().showArchivedRows;
 
     const [locations, gardens, sections, allCrops, stageDefs, taskTypeList, { due: todayDueTasks, overdue: todayOverdueTasks }] = await Promise.all([
@@ -555,6 +555,7 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
       todayOverdueTasks,
       stageDefinitions: stageDefs,
       taskTypes: taskTypeList,
+      calendarStart,
       isLoaded: true,
     });
     } catch (e) { showError('Failed to load data', e); throw e; }
