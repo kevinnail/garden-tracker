@@ -161,13 +161,13 @@ describe('defaultCalendarStart', () => {
     expect(defaultCalendarStart().getDay()).toBe(0);
   });
 
-  it('is approximately 8 weeks before today', () => {
+  it('is approximately 1 year before today', () => {
     const start = defaultCalendarStart();
-    const eightWeeksMs = 8 * 7 * 24 * 60 * 60 * 1000;
+    const oneYearMs = 365 * 24 * 60 * 60 * 1000;
     const diff = Date.now() - start.getTime();
-    // Within one week of 8 weeks ago (accounts for Sunday-snapping)
-    expect(diff).toBeGreaterThan(eightWeeksMs - 7 * 24 * 60 * 60 * 1000);
-    expect(diff).toBeLessThan(eightWeeksMs + 7 * 24 * 60 * 60 * 1000);
+    // Within one week of a year ago (accounts for Sunday-snapping)
+    expect(diff).toBeGreaterThan(oneYearMs - 7 * 24 * 60 * 60 * 1000);
+    expect(diff).toBeLessThan(oneYearMs + 7 * 24 * 60 * 60 * 1000);
   });
 });
 
