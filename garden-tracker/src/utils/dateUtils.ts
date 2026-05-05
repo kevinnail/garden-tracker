@@ -125,8 +125,8 @@ export function dayXOffset(dayOfWeek: number): number {
 // ---------------------------------------------------------------------------
 
 /**
- * Default calendar start: the Sunday that is 8 weeks before today.
- * This gives a bit of historical context to the left of today on first load.
+ * Default calendar start: the Sunday that is about 1 year before today.
+ * This gives broader historical context to the left of today on first load.
  */
 export function defaultCalendarStart(): Date {
   // Day-based arithmetic: setDate honors local calendar, so this can't drift
