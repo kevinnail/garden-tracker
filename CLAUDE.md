@@ -21,6 +21,14 @@ This repo contains the design artifacts for a **React Native / Expo crop plannin
 - `VBA Files/` — the working Excel/VBA source that defines correct behavior for all features
 - `Screenshots/` — reference screenshots
 
+## Cross-repo build process (cloud backup / sync)
+
+The cloud backup feature spans two repos: this iOS app (**garden-tracker**) and the backend (**crop-planner-server**). They are built in coordinated vertical slices.
+
+- `design/PROGRESS.md` is the **shared source of truth** for cross-repo status. It tracks both halves of every slice and travels between the two repos — it is carried over manually when switching sides.
+- `design/HANDOFF-TO-IOS.md` is the iOS-side spec (Slices A–F); the backend spec is the server repo's `PLAN.md` (Slices 1–10).
+- **At the end of every slice, update `design/PROGRESS.md`** (the *At a glance* table + the slice's *Per-feature detail* markers) before wrapping up, so the file is current when it shuttles to the other repo. Flip "Wired up?" to ✅ only after an end-to-end test across both repos passes.
+
 ## Development Commands
 
 The Expo app will be scaffolded under `garden-tracker/` (or similar). Once that directory exists:
