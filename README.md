@@ -62,6 +62,21 @@ The Today tab gives a quick operational view for the day:
 | Location | expo-location |
 | Images | expo-image-picker + expo-file-system |
 
+## Backend Env Variables (Expo)
+
+The app reads these public Expo env vars in runtime config:
+
+- `EXPO_PUBLIC_BACKEND_TARGET` (`local` or `railway`)
+- `EXPO_PUBLIC_API_BASE_URL_LOCAL`
+- `EXPO_PUBLIC_API_BASE_URL_RAILWAY`
+
+Create one of these files in `garden-tracker/` based on your workflow:
+
+- `.env.development` for local development
+- `.env.production` for production builds/updates
+
+If env vars are missing, runtime falls back to values in `app.json` (`expo.extra`) and then local defaults.
+
 ## Status
 
 In active development. Core planner grid, crop management (plants and mushrooms), task tracking, assessment form, cell notes, and weather are all functional. Publishing to iOS App Store and Google Play as a free app — premium features planned post-launch based on user feedback.
