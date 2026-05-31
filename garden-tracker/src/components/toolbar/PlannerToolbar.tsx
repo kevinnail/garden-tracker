@@ -9,6 +9,9 @@ import { usePlannerStore } from '@/src/store/plannerStore';
 import { useTodayTick } from '@/src/hooks/useTodayTick';
 import { useWeatherStore } from '@/src/store/weatherStore';
 import { wmoEmoji } from '@/src/hooks/useWeather';
+import Toast from 'react-native-toast-message';
+import { ApiClientError, fetchBackendHealth } from '@/src/services/apiClient';
+import { getBackendBaseUrl, getBackendTarget } from '@/src/constants/runtime';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android') {
@@ -97,6 +100,36 @@ export default function PlannerToolbar() {
   const handleViewToggle = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     toggleViewControls();
+  };
+
+  const handleHealthCheck = async () => {
+    try {
+      const health = await fetchBackendHealth();
+      Toast.show({
+        type: 'success',
+        text1: `Backend OK (${getBackendTarget()})`,
+        text2: `${health.status} at ${new Date(health.timestamp).toLocaleString()}`,
+        visibilityTime: 3500,
+      });
+    } catch (error) {
+      if (error instanceof ApiClientError) {
+        Toast.show({
+          type: 'error',
+          text1: `Backend Check Failed (${error.kind})`,
+          text2: `${error.message} | ${getBackendBaseUrl()}`,
+          visibilityTime: 4500,
+        });
+        return;
+      }
+
+      const message = error instanceof Error ? error.message : String(error);
+      Toast.show({
+        type: 'error',
+        text1: 'Backend Check Failed',
+        text2: message,
+        visibilityTime: 4500,
+      });
+    }
   };
 
   // ── Today banner ──────────────────────────────────────────────────────────
@@ -192,6 +225,19 @@ export default function PlannerToolbar() {
           View {showViewControls ? '▲' : '▾'}
         </Text>
       </Pressable>
+      {__DEV__ && (
+        <Pressable
+          style={styles.debugBtn}
+          onPress={() => {
+            void handleHealthCheck();
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Check backend health"
+          accessibilityHint="Calls the backend health endpoint and shows the result"
+        >
+          <Text style={styles.debugBtnText}>API</Text>
+        </Pressable>
+      )}
     </View>
   );
 
@@ -379,6 +425,15 @@ const styles = StyleSheet.create({
   },
   viewBtnText: { color: '#777', fontWeight: '700', fontSize: 13 },
   viewBtnTextActive: { color: '#fff' },
+  debugBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#1f2732',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#35506a',
+  },
+  debugBtnText: { color: '#9ec3ea', fontWeight: '700', fontSize: 13 },
 
   // ── View panel ─────────────────────────────────────────────────────────────
   viewPanel: {
