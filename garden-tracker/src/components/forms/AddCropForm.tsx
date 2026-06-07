@@ -2,6 +2,7 @@ import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef,
 import {
   View, Text, TextInput, StyleSheet, ScrollView,
   Pressable, Alert, ActivityIndicator, Platform, KeyboardAvoidingView,
+  InteractionManager,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useNavigation } from '@react-navigation/native';
@@ -57,13 +58,17 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
   const [page, setPage] = useState<1 | 2>(1);
   const scrollRef = useRef<ScrollView>(null);
 
-  // Tint the nav header when in mushroom mode
+  // Tint the nav header when in mushroom mode.
+  // Defer past the modal slide-in: calling setOptions on a header mid-transition
+  // crashes natively on Android (react-native-screens race).
   useEffect(() => {
-    if (!embedded) {
+    if (embedded) return;
+    const task = InteractionManager.runAfterInteractions(() => {
       navigation.setOptions({
         headerStyle: { backgroundColor: recordType === 'mushroom' ? '#3A2010' : '#003e14' },
       });
-    }
+    });
+    return () => task.cancel();
   }, [embedded, navigation, recordType]);
 
   const mushroomDefaultStages = useCallback((): StageRow[] => {
