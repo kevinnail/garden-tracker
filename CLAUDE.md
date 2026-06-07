@@ -10,6 +10,8 @@ Whenever working with any third-party library or something similar, you MUST loo
 
 Use the DocsExplorer subagent for efficient documentation lookup.
 
+**Cross-platform UI:** Before writing or fixing any UI, consult `.claude/UI_CHECKLIST.md` — it tracks recurring iOS↔Android pitfalls (some can hard-crash) and logs every UI fix with per-platform end-to-end verification status. When you fix a UI issue, add a row to its section 2 and don't mark a platform ✅ until verified on a real build.
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Summary
