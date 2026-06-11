@@ -1,39 +1,48 @@
 # CLAUDE.md
 
-We're building the app described in @SPEC.MD. Read that file for general architectural tasks or to double-check the exact database structure, tech stack or application architecture.
+This is the **garden-tracker** iOS app repo (`com.kevinnail.gardentracker`) — a React Native / Expo crop planning app, a VBA Excel workbook translated into a mobile-first app. **The MVP is built and live on the App Store.** Current work is the opt-in cloud backup / sync feature (see "Current work" below).
+
+Read `SPEC.MD` for the product spec and `design/backend-starter/PLAN.md` for the original phased implementation plan (schema, types, architecture).
 
 Keep your replies extremely concise and focus on conveying the key information. No unnecessary fluff, no long code snippets.
 
 **Always choose the simplest possible implementation.** Before suggesting a solution, ask: does this require new files, new abstractions, flags, or infrastructure that wouldn't otherwise exist? If not, don't suggest them. A problem solved by adding data to an existing file is always better than one solved by adding a new file, flag, env variable, or wrapper. Never layer on complexity that the problem doesn't require.
 
-Whenever working with any third-party library or something similar, you MUST look up the official documentation to ensure that you're working with up-to-date information.
-
-Use the DocsExplorer subagent for efficient documentation lookup.
+Whenever working with any third-party library or something similar, you MUST look up the official documentation to ensure that you're working with up-to-date information. Use the DocsExplorer subagent for efficient documentation lookup.
 
 **Cross-platform UI:** Before writing or fixing any UI, consult `.claude/UI_CHECKLIST.md` — it tracks recurring iOS↔Android pitfalls (some can hard-crash) and logs every UI fix with per-platform end-to-end verification status. When you fix a UI issue, add a row to its section 2 and don't mark a platform ✅ until verified on a real build.
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## Repo layout
 
-## Project Summary
+```
+garden-tracker/                  <- this git repo (iOS app + planning docs)
+├── CLAUDE.md                    <- this file (loads for all work in the repo)
+├── garden-tracker/              <- the Expo app itself (src/, app/, __tests__/, package.json)
+├── design/                      <- planning + handoff docs (no code)
+│   ├── HANDOFF-TO-IOS.md        <- iOS cloud-sync spec, Slices A–G
+│   ├── PROGRESS.md              <- shared cross-repo status, source of truth
+│   └── backend-starter/         <- the crop-planner-server repo's docs, copied in as reference
+│       ├── CLAUDE.md            <- backend's own CLAUDE (only loads when working in that folder)
+│       └── PLAN.md, SPEC.md, SETUP.md
+└── VBA Files/                   <- working Excel/VBA source (defines correct behavior)
+```
 
-This repo contains the design artifacts for a **React Native / Expo crop planning app** — a VBA Excel workbook translated into a mobile-first app. The actual app code lives (or will live) in a subdirectory created by `create-expo-app`. This repo holds:
+There is intentionally only one app-side `CLAUDE.md` (this one, at repo root). It loads whether you're working in `garden-tracker/` or `design/`. Don't add a second copy inside the nested app dir.
 
-- `SPEC.MD` — product specification
-- `PLAN.md` — full phased implementation plan with schema, types, and architecture (authoritative reference)
-- `VBA Files/` — the working Excel/VBA source that defines correct behavior for all features
-- `Screenshots/` — reference screenshots
+## Current work — cloud backup / sync
 
-## Cross-repo build process (cloud backup / sync)
+The MVP (offline-first planner, phases below) is **done and shipped**. Active work is the opt-in cloud backup feature, which spans two repos — this iOS app and the backend (**crop-planner-server**) — built in coordinated vertical slices.
 
-The cloud backup feature spans two repos: this iOS app (**garden-tracker**) and the backend (**crop-planner-server**). They are built in coordinated vertical slices.
+- **`design/HANDOFF-TO-IOS.md`** is the iOS-side spec: **Slices A–G**. It opens with a "Why this order" section explaining the dependency chain — read it once and **do not relitigate the ordering or scope**; it's settled.
+- The backend spec is the server repo's `PLAN.md` (Slices 1–10), mirrored at `design/backend-starter/PLAN.md`.
+- **`design/PROGRESS.md`** is the **shared source of truth** for cross-repo status. It travels between the two repos manually when switching sides.
+- **At the end of every slice, update `design/PROGRESS.md`** (the *At a glance* table + the slice's *Per-feature detail* markers) before wrapping up. Flip "Wired up?" to ✅ only after an end-to-end test across both repos passes.
 
-- `design/PROGRESS.md` is the **shared source of truth** for cross-repo status. It tracks both halves of every slice and travels between the two repos — it is carried over manually when switching sides.
-- `design/HANDOFF-TO-IOS.md` is the iOS-side spec (Slices A–F); the backend spec is the server repo's `PLAN.md` (Slices 1–10).
-- **At the end of every slice, update `design/PROGRESS.md`** (the *At a glance* table + the slice's *Per-feature detail* markers) before wrapping up, so the file is current when it shuttles to the other repo. Flip "Wired up?" to ✅ only after an end-to-end test across both repos passes.
+Current state: backend done through Slice 5 (auth + password reset, not deployed); iOS integration Foundation done (runtime config, typed API client, `/health` button). Next iOS slice: **A** (`deleted_at` migration).
 
 ## Development Commands
 
-The Expo app will be scaffolded under `garden-tracker/` (or similar). Once that directory exists:
+The Expo app lives in the nested `garden-tracker/` directory.
 
 ```bash
 cd garden-tracker
@@ -42,13 +51,12 @@ npx expo start --ios    # iOS simulator
 npx expo start --android
 npx expo run:ios        # Native build (requires Xcode)
 npx expo run:android    # Native build (requires Android Studio)
+npm test                # Jest (unit + integration); __tests__/
 ```
-
-No build or test commands exist yet — the app hasn't been scaffolded.
 
 ## Architecture
 
-See `PLAN.md` for the canonical structure. Key points:
+See `design/backend-starter/PLAN.md` for the canonical structure. Key points:
 
 ### Grid Layout (4-panel frozen-header design)
 ```
@@ -78,9 +86,9 @@ dayXOffset(day) = (day / 7) * CELL_WIDTH + CELL_WIDTH / 14
 ```
 
 ### State Management
-Zustand store (`plannerStore.ts`) holds all grid rows and UI toggle state. SQLite (expo-sqlite) is the local data store — all reads/writes go through `src/db/queries/`.
+Zustand store (`plannerStore.ts`) holds all grid rows and UI toggle state. SQLite (expo-sqlite) is the local data store — all reads/writes go through `garden-tracker/src/db/queries/`.
 
-## Key Constants (from `PLAN.md`)
+## Key Constants
 
 | Constant | Value |
 |---|---|
@@ -117,17 +125,4 @@ When any behavior is unclear, read the VBA file. This table maps features to sou
 
 ## Implementation Phases
 
-The plan is phased — see `PLAN.md § Implementation Phases` for the full breakdown. Phase 1 (walking skeleton) must be verified working before adding forms or DB integration. The phases are:
-
-1. Walking skeleton (grid renders with hardcoded data)
-2. SQLite data loading
-3. Add Crop form
-4. Add Task form + task rendering
-5. Task Assessment form
-6. Location hierarchy forms
-7. Crop editing + archive
-8. Notes
-9. Crop drag to shift timeline
-10. Today Dashboard
-11. Notifications
-12. Accounts + Cloud Sync (post-MVP)
+See `design/backend-starter/PLAN.md § Implementation Phases` for the original phased plan. The current work is cloud backup / sync, tracked in `design/HANDOFF-TO-IOS.md` (Slices A–G). I do not have verified per-phase completion status — do not infer it from this file.
