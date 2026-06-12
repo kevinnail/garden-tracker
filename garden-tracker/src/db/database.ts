@@ -7,6 +7,58 @@ import { formatDateKey, parseDateKey, toSunday } from '@/src/utils/dateUtils';
 let _db: SQLite.SQLiteDatabase | null = null;
 let _dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
+// Current local schema version. Bump when adding a migration step.
+const SCHEMA_VERSION = 1;
+
+// Tables that will be synced to the cloud (Slices E/F). Each needs a nullable
+// `deleted_at` tombstone column. `note_images` is created with the column in
+// Slice F, so it is not listed here.
+export const SYNCED_TABLES = [
+  'locations',
+  'gardens',
+  'sections',
+  'crop_instances',
+  'crop_stages',
+  'tasks',
+  'task_completions',
+  'notes',
+] as const;
+
+// Minimal surface of the SQLite handle the migrations need. The real expo
+// database and the better-sqlite3 test adapter both satisfy it.
+interface MigrationDb {
+  getFirstAsync<T>(source: string, ...params: unknown[]): Promise<T | null>;
+  getAllAsync<T>(source: string, ...params: unknown[]): Promise<T[]>;
+  execAsync(source: string): Promise<void>;
+}
+
+async function columnExists(db: MigrationDb, table: string, column: string): Promise<boolean> {
+  const cols = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(${table})`);
+  return cols.some((c) => c.name === column);
+}
+
+/**
+ * Forward-only schema migrations, gated by SQLite's `user_version`.
+ *
+ * v0 → v1: add nullable `deleted_at` to every synced table (cloud-sync
+ * tombstones). Additive and idempotent — each column is guarded so the step is
+ * a no-op on fresh DBs already created with it (via SCHEMA_SQL), and applies it
+ * to existing App Store DBs that predate the column. No existing data changes.
+ */
+export async function runMigrations(db: MigrationDb): Promise<void> {
+  const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
+  const version = row?.user_version ?? 0;
+  if (version >= SCHEMA_VERSION) return;
+
+  for (const table of SYNCED_TABLES) {
+    if (!(await columnExists(db, table, 'deleted_at'))) {
+      await db.execAsync(`ALTER TABLE ${table} ADD COLUMN deleted_at TEXT`);
+    }
+  }
+
+  await db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+}
+
 export async function resetDatabase(): Promise<void> {
   if (_db) {
     await _db.closeAsync();
@@ -23,6 +75,7 @@ export async function getDb(): Promise<SQLite.SQLiteDatabase> {
   _dbPromise = (async () => {
     const db = await SQLite.openDatabaseAsync('garden_tracker.db');
     await initSchema(db);
+    await runMigrations(db);
     await insertPresetsIfNeeded(db);
     _db = db;
     return db;
