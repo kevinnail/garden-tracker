@@ -20,7 +20,8 @@ export const SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS locations (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     name        TEXT NOT NULL,
-    order_index INTEGER NOT NULL DEFAULT 0
+    order_index INTEGER NOT NULL DEFAULT 0,
+    deleted_at  TEXT
   );
 
   CREATE TABLE IF NOT EXISTS gardens (
@@ -28,14 +29,16 @@ export const SCHEMA_SQL = `
     location_id       INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
     name              TEXT NOT NULL,
     record_type       TEXT NOT NULL DEFAULT 'plant',
-    order_index       INTEGER NOT NULL DEFAULT 0
+    order_index       INTEGER NOT NULL DEFAULT 0,
+    deleted_at        TEXT
   );
 
   CREATE TABLE IF NOT EXISTS sections (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     garden_id   INTEGER NOT NULL REFERENCES gardens(id) ON DELETE CASCADE,
     name        TEXT NOT NULL,
-    order_index INTEGER NOT NULL DEFAULT 0
+    order_index INTEGER NOT NULL DEFAULT 0,
+    deleted_at  TEXT
   );
 
   CREATE TABLE IF NOT EXISTS crop_instances (
@@ -48,7 +51,8 @@ export const SCHEMA_SQL = `
     archived    INTEGER NOT NULL DEFAULT 0,
     notes       TEXT,
     created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    deleted_at  TEXT
   );
 
   CREATE TABLE IF NOT EXISTS crop_stages (
@@ -56,7 +60,8 @@ export const SCHEMA_SQL = `
     crop_instance_id    INTEGER NOT NULL REFERENCES crop_instances(id) ON DELETE CASCADE,
     stage_definition_id INTEGER NOT NULL REFERENCES stage_definitions(id),
     duration_weeks      INTEGER NOT NULL CHECK (duration_weeks > 0),
-    order_index         INTEGER NOT NULL DEFAULT 0
+    order_index         INTEGER NOT NULL DEFAULT 0,
+    deleted_at          TEXT
   );
 
   CREATE TABLE IF NOT EXISTS tasks (
@@ -66,13 +71,15 @@ export const SCHEMA_SQL = `
     day_of_week        INTEGER NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
     frequency_weeks    INTEGER NOT NULL DEFAULT 1 CHECK (frequency_weeks > 0),
     start_offset_weeks INTEGER NOT NULL DEFAULT 0 CHECK (start_offset_weeks >= 0),
-    created_at         TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+    deleted_at         TEXT
   );
 
   CREATE TABLE IF NOT EXISTS task_completions (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
     task_id        INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
     completed_date TEXT NOT NULL,
+    deleted_at     TEXT,
     UNIQUE(task_id, completed_date)
   );
 
@@ -84,7 +91,8 @@ export const SCHEMA_SQL = `
     crop_instance_id INTEGER REFERENCES crop_instances(id) ON DELETE CASCADE,
     content          TEXT NOT NULL,
     created_at       TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at       TEXT NOT NULL DEFAULT (datetime('now'))
+    updated_at       TEXT NOT NULL DEFAULT (datetime('now')),
+    deleted_at       TEXT
   );
 
   CREATE INDEX IF NOT EXISTS idx_crop_instances_section_id  ON crop_instances(section_id);
