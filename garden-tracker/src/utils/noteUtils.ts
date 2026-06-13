@@ -33,7 +33,9 @@ function parseWeeklyNotePayload(content: string): WeeklyNotePayload | null {
   }
 }
 
-export function parseWeeklyNoteEntries(note: Pick<Note, 'content' | 'week_date' | 'created_at' | 'updated_at'> | null): WeeklyNoteEntry[] {
+export function parseWeeklyNoteEntries(
+  note: Pick<Note, 'content' | 'week_date' | 'created_at' | 'updated_at'> | null,
+): WeeklyNoteEntry[] {
   if (!note?.content?.trim()) {
     return [];
   }
@@ -44,7 +46,11 @@ export function parseWeeklyNoteEntries(note: Pick<Note, 'content' | 'week_date' 
   }
 
   return payload.entries
-    .filter(entry => (typeof entry.text === 'string' && entry.text.trim().length > 0) || (entry.images?.length ?? 0) > 0)
+    .filter(
+      (entry) =>
+        (typeof entry.text === 'string' && entry.text.trim().length > 0) ||
+        (entry.images?.length ?? 0) > 0,
+    )
     .sort(compareWeeklyNoteEntries);
 }
 
@@ -52,7 +58,7 @@ export function serializeWeeklyNoteEntries(entries: WeeklyNoteEntry[]): string {
   const payload: WeeklyNotePayload = {
     version: 1,
     entries: [...entries]
-      .filter(entry => entry.text.trim().length > 0 || (entry.images?.length ?? 0) > 0)
+      .filter((entry) => entry.text.trim().length > 0 || (entry.images?.length ?? 0) > 0)
       .sort(compareWeeklyNoteEntries),
   };
 
@@ -69,7 +75,11 @@ export function compareWeeklyNoteEntries(a: WeeklyNoteEntry, b: WeeklyNoteEntry)
   return aTime - bTime;
 }
 
-export function createWeeklyNoteEntry(dayOfWeek: number, text: string, images?: NoteImage[]): WeeklyNoteEntry {
+export function createWeeklyNoteEntry(
+  dayOfWeek: number,
+  text: string,
+  images?: NoteImage[],
+): WeeklyNoteEntry {
   const nowIso = new Date().toISOString();
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -81,7 +91,12 @@ export function createWeeklyNoteEntry(dayOfWeek: number, text: string, images?: 
   };
 }
 
-export function updateWeeklyNoteEntry(entry: WeeklyNoteEntry, dayOfWeek: number, text: string, images?: NoteImage[]): WeeklyNoteEntry {
+export function updateWeeklyNoteEntry(
+  entry: WeeklyNoteEntry,
+  dayOfWeek: number,
+  text: string,
+  images?: NoteImage[],
+): WeeklyNoteEntry {
   return {
     ...entry,
     day_of_week: dayOfWeek,
@@ -126,7 +141,15 @@ export function formatWeekRangeLabel(weekDate: string): string {
   const end = new Date(start);
   end.setDate(end.getDate() + 6);
 
-  const startLabel = start.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  const endLabel = end.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const startLabel = start.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+  const endLabel = end.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
   return `${startLabel} - ${endLabel}`;
 }

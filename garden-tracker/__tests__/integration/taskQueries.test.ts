@@ -68,7 +68,7 @@ describe('getTasksForCrop', () => {
   it('only returns tasks for the given crop', async () => {
     const tasks = await getTasksForCrop(SEED.CROP_ID);
 
-    expect(tasks.every(t => t.crop_instance_id === SEED.CROP_ID)).toBe(true);
+    expect(tasks.every((t) => t.crop_instance_id === SEED.CROP_ID)).toBe(true);
   });
 });
 
@@ -146,7 +146,7 @@ describe('insertTask', () => {
   it('the inserted task is readable via getTasksForCrop', async () => {
     const id = await insertTask(SEED.CROP_ID, SEED.TASK_TYPE_ID, 1, 2, 0);
     const tasks = await getTasksForCrop(SEED.CROP_ID);
-    const inserted = tasks.find(t => t.id === id);
+    const inserted = tasks.find((t) => t.id === id);
 
     expect(inserted).toBeDefined();
     expect(inserted!.day_of_week).toBe(1);
@@ -307,8 +307,8 @@ describe('getTasksForCrops', () => {
 
     const tasks = await getTasksForCrops([SEED.CROP_ID]);
 
-    expect(tasks.map(t => t.id)).toContain(SEED.TASK_ID);
-    expect(tasks.map(t => t.id)).toContain(id2);
+    expect(tasks.map((t) => t.id)).toContain(SEED.TASK_ID);
+    expect(tasks.map((t) => t.id)).toContain(id2);
   });
 
   it('returns empty array for a crop with no tasks', async () => {

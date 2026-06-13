@@ -1,8 +1,4 @@
-import {
-  ApiClientError,
-  fetchBackendHealth,
-  mapStatusToErrorKind,
-} from '@/src/services/apiClient';
+import { ApiClientError, fetchBackendHealth, mapStatusToErrorKind } from '@/src/services/apiClient';
 
 function makeJsonResponse(body: unknown, status: number): Response {
   return {
@@ -46,7 +42,11 @@ describe('fetchBackendHealth', () => {
   });
 
   it('returns parsed health JSON and sends credentials', async () => {
-    const fetchMock = jest.fn().mockResolvedValue(makeJsonResponse({ status: 'ok', timestamp: '2026-05-11T12:00:00.000Z' }, 200));
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValue(
+        makeJsonResponse({ status: 'ok', timestamp: '2026-05-11T12:00:00.000Z' }, 200),
+      );
     global.fetch = fetchMock as unknown as typeof global.fetch;
 
     const result = await fetchBackendHealth();
@@ -58,7 +58,9 @@ describe('fetchBackendHealth', () => {
   });
 
   it('maps a 403 response to a typed forbidden error', async () => {
-    const fetchMock = jest.fn().mockResolvedValue(makeJsonResponse({ error: 'Subscription required' }, 403));
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValue(makeJsonResponse({ error: 'Subscription required' }, 403));
     global.fetch = fetchMock as unknown as typeof global.fetch;
 
     await expect(fetchBackendHealth()).rejects.toMatchObject<Partial<ApiClientError>>({

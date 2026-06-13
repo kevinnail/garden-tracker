@@ -25,7 +25,12 @@ import { NoteImage, WeeklyNoteEntry } from '@/src/types';
 // ---------------------------------------------------------------------------
 
 function makeNote(content: string) {
-  return { content, week_date: '2025-03-02', created_at: '2025-03-02T00:00:00.000Z', updated_at: '2025-03-02T00:00:00.000Z' };
+  return {
+    content,
+    week_date: '2025-03-02',
+    created_at: '2025-03-02T00:00:00.000Z',
+    updated_at: '2025-03-02T00:00:00.000Z',
+  };
 }
 
 function makeImage(id = 'img-1'): NoteImage {
@@ -62,7 +67,9 @@ describe('parseWeeklyNoteEntries', () => {
   });
 
   it('returns empty array for JSON that fails the shape guard', () => {
-    expect(parseWeeklyNoteEntries(makeNote(JSON.stringify({ version: 2, entries: [] })))).toEqual([]);
+    expect(parseWeeklyNoteEntries(makeNote(JSON.stringify({ version: 2, entries: [] })))).toEqual(
+      [],
+    );
   });
 
   it('returns entries that have text', () => {
@@ -94,8 +101,18 @@ describe('parseWeeklyNoteEntries', () => {
   });
 
   it('sorts entries by day_of_week ascending', () => {
-    const fri = makeEntry({ id: 'e2', day_of_week: 5, created_at: '2025-03-07T08:00:00.000Z', updated_at: '2025-03-07T08:00:00.000Z' });
-    const mon = makeEntry({ id: 'e1', day_of_week: 1, created_at: '2025-03-03T08:00:00.000Z', updated_at: '2025-03-03T08:00:00.000Z' });
+    const fri = makeEntry({
+      id: 'e2',
+      day_of_week: 5,
+      created_at: '2025-03-07T08:00:00.000Z',
+      updated_at: '2025-03-07T08:00:00.000Z',
+    });
+    const mon = makeEntry({
+      id: 'e1',
+      day_of_week: 1,
+      created_at: '2025-03-03T08:00:00.000Z',
+      updated_at: '2025-03-03T08:00:00.000Z',
+    });
     const content = JSON.stringify({ version: 1, entries: [fri, mon] });
     const results = parseWeeklyNoteEntries(makeNote(content));
     expect(results[0].day_of_week).toBe(1);
@@ -213,9 +230,14 @@ describe('updateWeeklyNoteEntry', () => {
   });
 
   it('bumps updated_at relative to created_at', () => {
-    const original = makeEntry({ created_at: '2025-01-01T00:00:00.000Z', updated_at: '2025-01-01T00:00:00.000Z' });
+    const original = makeEntry({
+      created_at: '2025-01-01T00:00:00.000Z',
+      updated_at: '2025-01-01T00:00:00.000Z',
+    });
     const updated = updateWeeklyNoteEntry(original, 1, 'new');
-    expect(new Date(updated.updated_at).getTime()).toBeGreaterThanOrEqual(new Date(original.updated_at).getTime());
+    expect(new Date(updated.updated_at).getTime()).toBeGreaterThanOrEqual(
+      new Date(original.updated_at).getTime(),
+    );
   });
 });
 
@@ -233,7 +255,7 @@ describe('compareWeeklyNoteEntries', () => {
 
   it('sorts by updated_at when day_of_week is equal', () => {
     const earlier = makeEntry({ day_of_week: 2, updated_at: '2025-03-03T08:00:00.000Z' });
-    const later   = makeEntry({ day_of_week: 2, updated_at: '2025-03-03T10:00:00.000Z' });
+    const later = makeEntry({ day_of_week: 2, updated_at: '2025-03-03T10:00:00.000Z' });
     expect(compareWeeklyNoteEntries(earlier, later)).toBeLessThan(0);
   });
 

@@ -31,7 +31,7 @@ describe('getNoteForCell', () => {
       expect.stringContaining('WHERE entity_type = ? AND crop_instance_id = ? AND week_date = ?'),
       'week_cell',
       1,
-      '2025-03-02'
+      '2025-03-02',
     );
   });
 
@@ -61,13 +61,15 @@ describe('upsertNote', () => {
       'week_cell',
       1,
       '2025-03-02',
-      'hello'
+      'hello',
     );
     expect(mockDb.getFirstAsync).toHaveBeenCalledWith(
-      expect.stringContaining('SELECT id FROM notes WHERE entity_type = ? AND crop_instance_id = ? AND week_date = ?'),
+      expect.stringContaining(
+        'SELECT id FROM notes WHERE entity_type = ? AND crop_instance_id = ? AND week_date = ?',
+      ),
       'week_cell',
       1,
-      '2025-03-02'
+      '2025-03-02',
     );
   });
 
@@ -83,7 +85,7 @@ describe('upsertNote', () => {
       'week_cell',
       1,
       '2025-03-02',
-      'updated'
+      'updated',
     );
   });
 
@@ -102,7 +104,7 @@ describe('deleteNote', () => {
 
     expect(mockDb.runAsync).toHaveBeenCalledWith(
       expect.stringContaining('DELETE FROM notes WHERE id = ?'),
-      4
+      4,
     );
   });
 
@@ -126,7 +128,7 @@ describe('getAllNotesForCrop', () => {
     expect(mockDb.getAllAsync).toHaveBeenCalledWith(
       expect.stringContaining('WHERE entity_type = ? AND crop_instance_id = ?'),
       'week_cell',
-      1
+      1,
     );
   });
 

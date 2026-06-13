@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - main # Runs only when pushing to main
+      - dev # Runs only when pushing to dev
   pull_request:
     branches:
       - main # Runs only when a PR is created or updated targeting main
+      - dev # Runs only when a PR is created or updated targeting dev
 
 jobs:
   build:

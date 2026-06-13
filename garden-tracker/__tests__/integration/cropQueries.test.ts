@@ -54,6 +54,7 @@ describe('getCropsForSection', () => {
       notes: null,
       created_at: expect.any(String),
       updated_at: expect.any(String),
+      deleted_at: null,
     });
   });
 
@@ -156,7 +157,7 @@ describe('insertCropInstance', () => {
     const id = await insertCropInstance(SEED.SECTION_ID, 'Basil', 4, '2025-04-06');
     const crops = await getCropsForSection(SEED.SECTION_ID);
 
-    const inserted = crops.find(c => c.id === id);
+    const inserted = crops.find((c) => c.id === id);
     expect(inserted).toBeDefined();
     expect(inserted!.name).toBe('Basil');
     expect(inserted!.plant_count).toBe(4);
@@ -167,7 +168,7 @@ describe('insertCropInstance', () => {
     const id = await insertCropInstance(SEED.SECTION_ID, 'Spinach', 2, '2025-03-05');
     const crops = await getCropsForSection(SEED.SECTION_ID);
 
-    const inserted = crops.find(c => c.id === id);
+    const inserted = crops.find((c) => c.id === id);
     expect(inserted!.start_date).toBe('2025-03-02');
   });
 
@@ -182,7 +183,7 @@ describe('insertCropInstance', () => {
     await insertCropInstance(SEED.SECTION_ID, 'Pepper', 6, '2025-03-02');
     const active = await getCropsForSection(SEED.SECTION_ID);
 
-    active.forEach(c => expect(c.archived).toBe(false));
+    active.forEach((c) => expect(c.archived).toBe(false));
   });
 });
 
@@ -191,12 +192,12 @@ describe('insertCropInstance', () => {
 describe('insertCropStage', () => {
   it('inserts a stage that is retrievable via getCropStages', async () => {
     const stageDefs = await getStageDefs();
-    const floweringId = stageDefs.find(s => s.name === 'Flowering')!.id;
+    const floweringId = stageDefs.find((s) => s.name === 'Flowering')!.id;
 
     await insertCropStage(SEED.CROP_ID, floweringId, 8, 2);
 
     const stages = await getCropStages(SEED.CROP_ID);
-    const flowering = stages.find(s => s.stage_name === 'Flowering');
+    const flowering = stages.find((s) => s.stage_name === 'Flowering');
 
     expect(flowering).toBeDefined();
     expect(flowering!.duration_weeks).toBe(8);
@@ -205,12 +206,12 @@ describe('insertCropStage', () => {
 
   it('the joined color comes from the stage definition', async () => {
     const stageDefs = await getStageDefs();
-    const fruitingDef = stageDefs.find(s => s.name === 'Fruiting')!;
+    const fruitingDef = stageDefs.find((s) => s.name === 'Fruiting')!;
 
     await insertCropStage(SEED.CROP_ID, fruitingDef.id, 4, 3);
 
     const stages = await getCropStages(SEED.CROP_ID);
-    const fruiting = stages.find(s => s.stage_name === 'Fruiting');
+    const fruiting = stages.find((s) => s.stage_name === 'Fruiting');
 
     expect(fruiting!.color).toBe(fruitingDef.color);
   });
@@ -246,7 +247,7 @@ describe('updateCropInstance', () => {
     await updateCropInstance(SEED.CROP_ID, { name: 'Updated Tomato' });
 
     const crops = await getCropsForSection(SEED.SECTION_ID);
-    const basil = crops.find(c => c.id === otherId);
+    const basil = crops.find((c) => c.id === otherId);
     expect(basil!.name).toBe('Basil');
   });
 
@@ -263,8 +264,8 @@ describe('updateCropInstance', () => {
 describe('replaceCropStages', () => {
   it('removes existing stages and writes the replacement set in order', async () => {
     const stageDefs = await getStageDefs();
-    const flowering = stageDefs.find(stage => stage.name === 'Flowering');
-    const fruiting = stageDefs.find(stage => stage.name === 'Fruiting');
+    const flowering = stageDefs.find((stage) => stage.name === 'Flowering');
+    const fruiting = stageDefs.find((stage) => stage.name === 'Fruiting');
 
     await replaceCropStages(SEED.CROP_ID, [
       { stage_definition_id: flowering!.id, duration_weeks: 5 },
@@ -312,28 +313,33 @@ describe('archiveCrop', () => {
   });
 });
 
-
 // ── record_type (mushroom mode) ────────────────────────────────────────────────
 
 describe('crop record_type', () => {
   it('defaults to "plant" when no record_type is provided', async () => {
     const id = await insertCropInstance(SEED.SECTION_ID, 'Tomato', 4, '2025-04-06');
     const crops = await getCropsForSection(SEED.SECTION_ID);
-    const crop = crops.find(c => c.id === id);
+    const crop = crops.find((c) => c.id === id);
     expect(crop?.record_type).toBe('plant');
   });
 
   it('persists "mushroom" record_type and reads back correctly', async () => {
-    const id = await insertCropInstance(SEED.SECTION_ID, 'Oyster Flush', 2, '2025-04-06', 'mushroom');
+    const id = await insertCropInstance(
+      SEED.SECTION_ID,
+      'Oyster Flush',
+      2,
+      '2025-04-06',
+      'mushroom',
+    );
     const crops = await getCropsForSection(SEED.SECTION_ID);
-    const crop = crops.find(c => c.id === id);
+    const crop = crops.find((c) => c.id === id);
     expect(crop?.record_type).toBe('mushroom');
   });
 
   it('can update record_type via updateCropInstance', async () => {
     await updateCropInstance(SEED.CROP_ID, { record_type: 'mushroom' });
     const crops = await getCropsForSection(SEED.SECTION_ID);
-    const crop = crops.find(c => c.id === SEED.CROP_ID);
+    const crop = crops.find((c) => c.id === SEED.CROP_ID);
     expect(crop?.record_type).toBe('mushroom');
   });
 });

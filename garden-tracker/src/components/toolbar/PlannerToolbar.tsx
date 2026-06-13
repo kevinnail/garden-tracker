@@ -1,5 +1,14 @@
 import React, { useMemo } from 'react';
-import { View, Pressable, Text, StyleSheet, useWindowDimensions, LayoutAnimation, UIManager, Platform } from 'react-native';
+import {
+  View,
+  Pressable,
+  Text,
+  StyleSheet,
+  useWindowDimensions,
+  LayoutAnimation,
+  UIManager,
+  Platform,
+} from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -40,14 +49,8 @@ function ViewToggle({
       accessibilityState={{ checked: active }}
       accessibilityLabel={label}
     >
-      <Ionicons
-        name={icon}
-        size={18}
-        color={active ? '#2ecc71' : '#666'}
-      />
-      <Text style={[styles.viewToggleLabel, active && styles.viewToggleLabelActive]}>
-        {label}
-      </Text>
+      <Ionicons name={icon} size={18} color={active ? '#2ecc71' : '#666'} />
+      <Text style={[styles.viewToggleLabel, active && styles.viewToggleLabelActive]}>{label}</Text>
     </Pressable>
   );
 }
@@ -61,41 +64,56 @@ export default function PlannerToolbar() {
 
   const {
     hasSections,
-    showArchivedRows, toggleArchivedRows,
-    showTasks, toggleShowTasks,
-    showCursor, toggleShowCursor,
-    showNoteIndicators, toggleShowNoteIndicators,
-    cellZoomLevel, setCellZoomLevel,
-    showViewControls, toggleViewControls,
-    dueTodayCount, overdueCount,
-  } = usePlannerStore(useShallow(s => ({
-    hasSections: s.rows.some(r => r.type === 'section_header'),
-    showArchivedRows: s.showArchivedRows,
-    toggleArchivedRows: s.toggleArchivedRows,
-    showTasks: s.showTasks,
-    toggleShowTasks: s.toggleShowTasks,
-    showCursor: s.showCursor,
-    toggleShowCursor: s.toggleShowCursor,
-    showNoteIndicators: s.showNoteIndicators,
-    toggleShowNoteIndicators: s.toggleShowNoteIndicators,
-    cellZoomLevel: s.cellZoomLevel,
-    setCellZoomLevel: s.setCellZoomLevel,
-    showViewControls: s.showViewControls,
-    toggleViewControls: s.toggleViewControls,
-    dueTodayCount: s.todayDueTasks.length,
-    overdueCount: s.todayOverdueTasks.length,
-  })));
+    showArchivedRows,
+    toggleArchivedRows,
+    showTasks,
+    toggleShowTasks,
+    showCursor,
+    toggleShowCursor,
+    showNoteIndicators,
+    toggleShowNoteIndicators,
+    cellZoomLevel,
+    setCellZoomLevel,
+    showViewControls,
+    toggleViewControls,
+    dueTodayCount,
+    overdueCount,
+  } = usePlannerStore(
+    useShallow((s) => ({
+      hasSections: s.rows.some((r) => r.type === 'section_header'),
+      showArchivedRows: s.showArchivedRows,
+      toggleArchivedRows: s.toggleArchivedRows,
+      showTasks: s.showTasks,
+      toggleShowTasks: s.toggleShowTasks,
+      showCursor: s.showCursor,
+      toggleShowCursor: s.toggleShowCursor,
+      showNoteIndicators: s.showNoteIndicators,
+      toggleShowNoteIndicators: s.toggleShowNoteIndicators,
+      cellZoomLevel: s.cellZoomLevel,
+      setCellZoomLevel: s.setCellZoomLevel,
+      showViewControls: s.showViewControls,
+      toggleViewControls: s.toggleViewControls,
+      dueTodayCount: s.todayDueTasks.length,
+      overdueCount: s.todayOverdueTasks.length,
+    })),
+  );
 
-  const weather = useWeatherStore(s => s.weather);
+  const weather = useWeatherStore((s) => s.weather);
   const todayWeather = weather.status === 'ok' ? weather.days[0] : null;
-  const todayCount    = dueTodayCount + overdueCount;
+  const todayCount = dueTodayCount + overdueCount;
 
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
 
-  const todayLabel = useMemo(() => new Date().toLocaleDateString('en-US', {
-    weekday: 'long', month: 'long', day: 'numeric',
-  }), []);
+  const todayLabel = useMemo(
+    () =>
+      new Date().toLocaleDateString('en-US', {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+      }),
+    [],
+  );
 
   const handleViewToggle = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -146,7 +164,9 @@ export default function PlannerToolbar() {
       ]}
       onPress={() => router.navigate('/(tabs)/today')}
       accessibilityRole="button"
-      accessibilityLabel={todayCount > 0 ? `Today: ${dueTodayCount} due, ${overdueCount} overdue` : 'Today: all clear'}
+      accessibilityLabel={
+        todayCount > 0 ? `Today: ${dueTodayCount} due, ${overdueCount} overdue` : 'Today: all clear'
+      }
       accessibilityHint="Opens the Today dashboard"
     >
       <View style={styles.todayBannerMain}>
@@ -160,7 +180,9 @@ export default function PlannerToolbar() {
                 </Text>
                 {` · ${overdueCount} overdue`}
               </>
-            ) : todayLabel}
+            ) : (
+              todayLabel
+            )}
           </Text>
         )}
         {isLandscape && todayCount > 0 && (
@@ -251,7 +273,7 @@ export default function PlannerToolbar() {
           label="Tasks"
           active={showTasks}
           onPress={toggleShowTasks}
-          />
+        />
         <ViewToggle
           icon="locate-outline"
           label="Today"
@@ -280,10 +302,12 @@ export default function PlannerToolbar() {
           disabled={cellZoomLevel <= 1}
           accessibilityLabel="Zoom out"
         >
-          <Text style={[styles.zoomBtnText, cellZoomLevel <= 1 && styles.zoomBtnTextDisabled]}>−</Text>
+          <Text style={[styles.zoomBtnText, cellZoomLevel <= 1 && styles.zoomBtnTextDisabled]}>
+            −
+          </Text>
         </Pressable>
         <View style={styles.zoomDots}>
-          {[1, 2, 3, 4, 5].map(l => (
+          {[1, 2, 3, 4, 5].map((l) => (
             <View key={l} style={[styles.dot, l <= cellZoomLevel && styles.dotActive]} />
           ))}
         </View>
@@ -293,7 +317,9 @@ export default function PlannerToolbar() {
           disabled={cellZoomLevel >= 5}
           accessibilityLabel="Zoom in"
         >
-          <Text style={[styles.zoomBtnText, cellZoomLevel >= 5 && styles.zoomBtnTextDisabled]}>+</Text>
+          <Text style={[styles.zoomBtnText, cellZoomLevel >= 5 && styles.zoomBtnTextDisabled]}>
+            +
+          </Text>
         </Pressable>
       </View>
     </View>
@@ -362,17 +388,17 @@ const styles = StyleSheet.create({
     minHeight: 0,
     paddingVertical: 5,
   },
-  todayBannerIdle:   { backgroundColor: '#14181d', borderColor: '#28313b' },
+  todayBannerIdle: { backgroundColor: '#14181d', borderColor: '#28313b' },
   todayBannerActive: { backgroundColor: '#18222e', borderColor: '#35506a' },
-  todayBannerOverdue:{ backgroundColor: '#2a1c1c', borderColor: '#6a3d3d' },
+  todayBannerOverdue: { backgroundColor: '#2a1c1c', borderColor: '#6a3d3d' },
   todayBannerMain: { flex: 1 },
   todayBannerTitle: { color: '#edf4ff', fontSize: 14, fontWeight: '700' },
-  todayBannerText:      { color: '#a8b6c7', fontSize: 12 },
-  todayBannerDueToday:  { color: '#f5c842', fontWeight: '600' },
+  todayBannerText: { color: '#a8b6c7', fontSize: 12 },
+  todayBannerDueToday: { color: '#f5c842', fontWeight: '600' },
   todayBannerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   weatherChip: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   weatherEmoji: { fontSize: 16 },
-  weatherTemp:  { color: '#f0c060', fontSize: 13, fontWeight: '700' },
+  weatherTemp: { color: '#f0c060', fontSize: 13, fontWeight: '700' },
   badge: {
     minWidth: 28,
     height: 28,

@@ -42,16 +42,16 @@ beforeEach(() => {
 
 describe('getAllLocations', () => {
   it('returns all locations ordered by order_index', async () => {
-    mockDb.getAllAsync.mockResolvedValueOnce([
-      { id: 1, name: 'Home', order_index: 0 },
-    ]);
+    mockDb.getAllAsync.mockResolvedValueOnce([{ id: 1, name: 'Home', order_index: 0 }]);
 
     const locations = await getAllLocations();
 
     expect(locations).toHaveLength(1);
     expect(locations[0].name).toBe('Home');
     expect(mockDb.getAllAsync).toHaveBeenCalledTimes(1);
-    expect(mockDb.getAllAsync).toHaveBeenCalledWith(expect.stringContaining('ORDER BY order_index'));
+    expect(mockDb.getAllAsync).toHaveBeenCalledWith(
+      expect.stringContaining('ORDER BY order_index'),
+    );
   });
 
   it('returns empty array when no locations exist', async () => {
@@ -81,7 +81,9 @@ describe('getAllGardens', () => {
 
     expect(gardens).toHaveLength(1);
     expect(gardens[0].name).toBe('Raised Beds');
-    expect(mockDb.getAllAsync).toHaveBeenCalledWith(expect.stringContaining('ORDER BY order_index'));
+    expect(mockDb.getAllAsync).toHaveBeenCalledWith(
+      expect.stringContaining('ORDER BY order_index'),
+    );
   });
 
   it('returns empty array when no gardens exist', async () => {
@@ -111,7 +113,9 @@ describe('getAllSections', () => {
 
     expect(sections).toHaveLength(1);
     expect(sections[0].name).toBe('Bed A');
-    expect(mockDb.getAllAsync).toHaveBeenCalledWith(expect.stringContaining('ORDER BY order_index'));
+    expect(mockDb.getAllAsync).toHaveBeenCalledWith(
+      expect.stringContaining('ORDER BY order_index'),
+    );
   });
 
   it('returns empty array when no sections exist', async () => {
@@ -140,7 +144,7 @@ describe('insertLocation', () => {
     expect(id).toBe(2);
     expect(mockDb.runAsync).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO locations'),
-      'Home'
+      'Home',
     );
   });
 
@@ -151,7 +155,7 @@ describe('insertLocation', () => {
 
     expect(mockDb.runAsync).toHaveBeenCalledWith(
       expect.stringContaining('COALESCE(MAX(order_index), -1) + 1 FROM locations'),
-      'First Location'
+      'First Location',
     );
   });
 
@@ -174,7 +178,10 @@ describe('insertGarden', () => {
     expect(id).toBe(3);
     expect(mockDb.runAsync).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO gardens'),
-      1, 'Greenhouse', 'plant', 1
+      1,
+      'Greenhouse',
+      'plant',
+      1,
     );
   });
 
@@ -197,7 +204,9 @@ describe('insertSection', () => {
     expect(id).toBe(4);
     expect(mockDb.runAsync).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO sections'),
-      2, 'Row 1', 2
+      2,
+      'Row 1',
+      2,
     );
   });
 
@@ -220,7 +229,8 @@ describe('updateLocationName', () => {
     expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
     expect(mockDb.runAsync).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE locations'),
-      'Renamed', 1
+      'Renamed',
+      1,
     );
   });
 
@@ -248,7 +258,8 @@ describe('updateGardenName', () => {
     expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
     expect(mockDb.runAsync).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE gardens'),
-      'New Garden Name', 2
+      'New Garden Name',
+      2,
     );
   });
 
@@ -276,7 +287,8 @@ describe('updateSectionName', () => {
     expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
     expect(mockDb.runAsync).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE sections'),
-      'New Section Name', 3
+      'New Section Name',
+      3,
     );
   });
 
@@ -304,7 +316,7 @@ describe('deleteSection', () => {
     expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
     expect(mockDb.runAsync).toHaveBeenCalledWith(
       expect.stringContaining('DELETE FROM sections WHERE id = ?'),
-      1
+      1,
     );
   });
 
@@ -326,7 +338,7 @@ describe('deleteGarden', () => {
     expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
     expect(mockDb.runAsync).toHaveBeenCalledWith(
       expect.stringContaining('DELETE FROM gardens WHERE id = ?'),
-      1
+      1,
     );
   });
 
@@ -348,7 +360,7 @@ describe('deleteLocation', () => {
     expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
     expect(mockDb.runAsync).toHaveBeenCalledWith(
       expect.stringContaining('DELETE FROM locations WHERE id = ?'),
-      1
+      1,
     );
   });
 

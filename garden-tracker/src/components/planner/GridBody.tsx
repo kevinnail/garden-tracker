@@ -3,10 +3,7 @@ import { View } from 'react-native';
 import Svg, { Rect } from 'react-native-svg';
 import { router } from 'expo-router';
 
-import {
-  TOTAL_WEEKS,
-  BACKGROUND_COLOR,
-} from '@/src/constants/layout';
+import { TOTAL_WEEKS, BACKGROUND_COLOR } from '@/src/constants/layout';
 import { formatDateKey, todayWeekIndex, weekIndexToDate } from '@/src/utils/dateUtils';
 import { GridRowItem } from '@/src/types';
 import { getRowHeight, getVisibleRowRange } from '../../utils/rowLayout';
@@ -15,12 +12,7 @@ import { useCellLayout } from '@/src/hooks/useCellLayout';
 import CropCell from './CropCell';
 
 // Must match RowHeader band colors so the full-width strips feel continuous
-import {
-  LOCATION_BAND,
-  GARDEN_BAND,
-  MUSHROOM_BAND,
-  SECTION_BAND,
-} from './RowHeader';
+import { LOCATION_BAND, GARDEN_BAND, MUSHROOM_BAND, SECTION_BAND } from './RowHeader';
 
 interface Props {
   rows: GridRowItem[];
@@ -42,14 +34,14 @@ export default function GridBody({
   viewHeight,
 }: Props) {
   const { cellWidth } = useCellLayout();
-  const showNoteIndicators = usePlannerStore(s => s.showNoteIndicators);
+  const showNoteIndicators = usePlannerStore((s) => s.showNoteIndicators);
   const todayCol = todayWeekIndex(calendarStart);
   const totalWidth = TOTAL_WEEKS * cellWidth;
 
   const totalHeight = rowOffsets[rowOffsets.length - 1] ?? 1;
 
   const colStart = Math.max(0, Math.floor(renderScrollX / cellWidth) - 1);
-  const colEnd   = Math.min(TOTAL_WEEKS - 1, Math.ceil((renderScrollX + viewWidth) / cellWidth) + 1);
+  const colEnd = Math.min(TOTAL_WEEKS - 1, Math.ceil((renderScrollX + viewWidth) / cellWidth) + 1);
   const { rowStart, rowEnd } = getVisibleRowRange(rowOffsets, renderScrollY, viewHeight);
 
   const elements: React.ReactElement[] = [];
@@ -89,7 +81,7 @@ export default function GridBody({
             style={{ left: col * cellWidth, top }}
             onPress={hasNote ? () => openNote('view') : undefined}
             onLongPress={() => openNote('compose')}
-          />
+          />,
         );
       }
     } else {
@@ -121,8 +113,15 @@ export default function GridBody({
       elements.push(
         <View
           key={`band-${row}`}
-          style={{ position: 'absolute', left: 0, width: totalWidth, top, height, backgroundColor: bandColor }}
-        />
+          style={{
+            position: 'absolute',
+            left: 0,
+            width: totalWidth,
+            top,
+            height,
+            backgroundColor: bandColor,
+          }}
+        />,
       );
     }
   }
@@ -131,7 +130,10 @@ export default function GridBody({
     <>
       {elements}
       {pastRects.length > 0 && (
-        <View style={{ position: 'absolute', left: 0, top: 0, width: totalWidth, height: totalHeight }} pointerEvents="none">
+        <View
+          style={{ position: 'absolute', left: 0, top: 0, width: totalWidth, height: totalHeight }}
+          pointerEvents="none"
+        >
           <Svg width={totalWidth} height={totalHeight}>
             {pastRects.map(({ x, y, w, h }, i) => (
               <Rect key={i} x={x} y={y} width={w} height={h} fill="rgba(0,0,0,0.8)" />
@@ -142,4 +144,3 @@ export default function GridBody({
     </>
   );
 }
-

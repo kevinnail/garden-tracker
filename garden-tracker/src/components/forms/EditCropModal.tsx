@@ -16,7 +16,11 @@ function formatShortDate(date: Date | null): string {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-function getCropEndDate(startDate: string, weekColorMap: Record<number, string>, calendarStart: Date): Date | null {
+function getCropEndDate(
+  startDate: string,
+  weekColorMap: Record<number, string>,
+  calendarStart: Date,
+): Date | null {
   const weekIndexes = Object.keys(weekColorMap).map(Number).filter(Number.isFinite);
   if (weekIndexes.length === 0) {
     return parseDateKey(startDate);
@@ -34,11 +38,11 @@ export default function EditCropModal() {
   const isLandscape = width > height;
   const [activeTab, setActiveTab] = useState<TabKey>('crop');
   const cropFormRef = useRef<AddCropFormHandle>(null);
-  const selectedCropId = usePlannerStore(s => s.selectedCropId);
-  const rows = usePlannerStore(s => s.rows);
-  const calendarStart = usePlannerStore(s => s.calendarStart);
+  const selectedCropId = usePlannerStore((s) => s.selectedCropId);
+  const rows = usePlannerStore((s) => s.rows);
+  const calendarStart = usePlannerStore((s) => s.calendarStart);
 
-  const cropRow = rows.find(row => row.type === 'crop_row' && row.crop.id === selectedCropId);
+  const cropRow = rows.find((row) => row.type === 'crop_row' && row.crop.id === selectedCropId);
 
   if (cropRow?.type !== 'crop_row' || selectedCropId == null) {
     return (
@@ -55,20 +59,28 @@ export default function EditCropModal() {
   }
 
   const cropStart = formatShortDate(parseDateKey(cropRow.crop.start_date));
-  const cropEnd = formatShortDate(getCropEndDate(cropRow.crop.start_date, cropRow.weekColorMap, calendarStart));
+  const cropEnd = formatShortDate(
+    getCropEndDate(cropRow.crop.start_date, cropRow.weekColorMap, calendarStart),
+  );
   const cropSummary = `${cropRow.crop.plant_count} ${cropRow.crop.plant_count === 1 ? 'plant' : 'plants'} • ${cropStart} to ${cropEnd}`;
 
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
       <View style={[styles.header, isLandscape && styles.headerCompact]}>
         <Text style={styles.cropName}>{cropRow.crop.name}</Text>
-        <Text style={[styles.cropSummary, isLandscape && styles.cropSummaryCompact]}>{cropSummary}</Text>
+        <Text style={[styles.cropSummary, isLandscape && styles.cropSummaryCompact]}>
+          {cropSummary}
+        </Text>
       </View>
 
       <View style={styles.tabBarWrap}>
         <View style={[styles.tabRow, isLandscape && styles.tabRowCompact]}>
           <Pressable
-            style={[styles.tabBtn, isLandscape && styles.tabBtnCompact, activeTab === 'crop' && styles.tabBtnActive]}
+            style={[
+              styles.tabBtn,
+              isLandscape && styles.tabBtnCompact,
+              activeTab === 'crop' && styles.tabBtnActive,
+            ]}
             onPress={() => setActiveTab('crop')}
             accessibilityRole="tab"
             accessibilityState={{ selected: activeTab === 'crop' }}
@@ -77,13 +89,19 @@ export default function EditCropModal() {
             <Text style={[styles.tabText, activeTab === 'crop' && styles.tabTextActive]}>Crop</Text>
           </Pressable>
           <Pressable
-            style={[styles.tabBtn, isLandscape && styles.tabBtnCompact, activeTab === 'tasks' && styles.tabBtnActive]}
+            style={[
+              styles.tabBtn,
+              isLandscape && styles.tabBtnCompact,
+              activeTab === 'tasks' && styles.tabBtnActive,
+            ]}
             onPress={() => setActiveTab('tasks')}
             accessibilityRole="tab"
             accessibilityState={{ selected: activeTab === 'tasks' }}
             accessibilityLabel="Tasks tab"
           >
-            <Text style={[styles.tabText, activeTab === 'tasks' && styles.tabTextActive]}>Tasks</Text>
+            <Text style={[styles.tabText, activeTab === 'tasks' && styles.tabTextActive]}>
+              Tasks
+            </Text>
           </Pressable>
         </View>
       </View>
@@ -97,7 +115,12 @@ export default function EditCropModal() {
         </View>
       </View>
 
-      <View style={[styles.footer, { paddingBottom: isLandscape ? 0 : Math.max(14, insets.bottom + 8) }]}>
+      <View
+        style={[
+          styles.footer,
+          { paddingBottom: isLandscape ? 0 : Math.max(14, insets.bottom + 8) },
+        ]}
+      >
         <View style={styles.footerMainRow}>
           <Pressable
             style={styles.closeBtn}
@@ -206,7 +229,13 @@ const styles = StyleSheet.create({
   tabBtnActive: {
     backgroundColor: '#d8d0bf',
   },
-  tabText: { color: '#8f8f8f', fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
+  tabText: {
+    color: '#8f8f8f',
+    fontSize: 13,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
   tabTextActive: { color: '#111' },
   content: { flex: 1, minHeight: 0 },
   panel: { flex: 1 },

@@ -84,7 +84,7 @@ describe('getAllSections', () => {
   it('returns sections in order_index order', async () => {
     const locations = await getAllLocations();
     const gardens = await getAllGardens();
-    const gardenId = gardens.find(g => g.location_id === locations[0].id)!.id;
+    const gardenId = gardens.find((g) => g.location_id === locations[0].id)!.id;
 
     await insertSection(gardenId, 'Section B');
     await insertSection(gardenId, 'Section C');
@@ -111,7 +111,7 @@ describe('insertLocation', () => {
     await insertLocation('Rooftop');
 
     const locations = await getAllLocations();
-    const found = locations.find(l => l.name === 'Rooftop');
+    const found = locations.find((l) => l.name === 'Rooftop');
 
     expect(found).toBeDefined();
   });
@@ -121,8 +121,8 @@ describe('insertLocation', () => {
     const id2 = await insertLocation('Second');
 
     const locations = await getAllLocations();
-    const l1 = locations.find(l => l.id === id1)!;
-    const l2 = locations.find(l => l.id === id2)!;
+    const l1 = locations.find((l) => l.id === id1)!;
+    const l2 = locations.find((l) => l.id === id2)!;
 
     expect(l2.order_index).toBeGreaterThan(l1.order_index);
   });
@@ -136,7 +136,7 @@ describe('insertGarden', () => {
     const gardenId = await insertGarden(locationId, 'Test Garden');
 
     const gardens = await getAllGardens();
-    const found = gardens.find(g => g.id === gardenId);
+    const found = gardens.find((g) => g.id === gardenId);
 
     expect(found).toBeDefined();
     expect(found!.location_id).toBe(locationId);
@@ -153,7 +153,7 @@ describe('insertSection', () => {
     const secId = await insertSection(gardenId, 'Bed 1');
 
     const sections = await getAllSections();
-    const found = sections.find(s => s.id === secId);
+    const found = sections.find((s) => s.id === secId);
 
     expect(found).toBeDefined();
     expect(found!.garden_id).toBe(gardenId);
@@ -169,9 +169,9 @@ describe('insertSection', () => {
     const gardens = await getAllGardens();
     const sections = await getAllSections();
 
-    expect(locations.find(l => l.name === 'Greenhouse')).toBeDefined();
-    expect(gardens.find(g => g.name === 'North Wing')).toBeDefined();
-    expect(sections.find(s => s.name === 'Row A')).toBeDefined();
+    expect(locations.find((l) => l.name === 'Greenhouse')).toBeDefined();
+    expect(gardens.find((g) => g.name === 'North Wing')).toBeDefined();
+    expect(sections.find((s) => s.name === 'Row A')).toBeDefined();
   });
 });
 
@@ -185,7 +185,7 @@ describe('updateLocationName', () => {
     await updateLocationName(id, 'Renamed Location');
 
     const updated = await getAllLocations();
-    expect(updated.find(l => l.id === id)!.name).toBe('Renamed Location');
+    expect(updated.find((l) => l.id === id)!.name).toBe('Renamed Location');
   });
 
   it('does not affect other locations', async () => {
@@ -195,7 +195,7 @@ describe('updateLocationName', () => {
     await updateLocationName(id1, 'Alpha Renamed');
 
     const locations = await getAllLocations();
-    expect(locations.find(l => l.id === id2)!.name).toBe('Beta');
+    expect(locations.find((l) => l.id === id2)!.name).toBe('Beta');
   });
 
   it('does nothing when id does not exist', async () => {
@@ -213,7 +213,7 @@ describe('updateGardenName', () => {
     await updateGardenName(id, 'Renamed Garden');
 
     const updated = await getAllGardens();
-    expect(updated.find(g => g.id === id)!.name).toBe('Renamed Garden');
+    expect(updated.find((g) => g.id === id)!.name).toBe('Renamed Garden');
   });
 
   it('does not affect other gardens', async () => {
@@ -224,7 +224,7 @@ describe('updateGardenName', () => {
     await updateGardenName(id1, 'Garden One Renamed');
 
     const gardens = await getAllGardens();
-    expect(gardens.find(g => g.id === id2)!.name).toBe('Garden Two');
+    expect(gardens.find((g) => g.id === id2)!.name).toBe('Garden Two');
   });
 
   it('does nothing when id does not exist', async () => {
@@ -239,7 +239,7 @@ describe('updateSectionName', () => {
     await updateSectionName(SEED.SECTION_ID, 'Renamed Section');
 
     const sections = await getAllSections();
-    expect(sections.find(s => s.id === SEED.SECTION_ID)!.name).toBe('Renamed Section');
+    expect(sections.find((s) => s.id === SEED.SECTION_ID)!.name).toBe('Renamed Section');
   });
 
   it('does not affect other sections', async () => {
@@ -251,7 +251,7 @@ describe('updateSectionName', () => {
     await updateSectionName(id1, 'Bed A Renamed');
 
     const sections = await getAllSections();
-    expect(sections.find(s => s.id === id2)!.name).toBe('Bed B');
+    expect(sections.find((s) => s.id === id2)!.name).toBe('Bed B');
   });
 
   it('does nothing when id does not exist', async () => {
@@ -267,7 +267,7 @@ describe('deleteSection', () => {
 
     const sections = await getAllSections();
 
-    expect(sections.find(s => s.id === SEED.SECTION_ID)).toBeUndefined();
+    expect(sections.find((s) => s.id === SEED.SECTION_ID)).toBeUndefined();
   });
 
   it('does nothing when section does not exist', async () => {
@@ -293,10 +293,10 @@ describe('deleteGarden', () => {
     await deleteGarden(gardenId);
 
     const remaining = await getAllGardens();
-    expect(remaining.find(g => g.id === gardenId)).toBeUndefined();
+    expect(remaining.find((g) => g.id === gardenId)).toBeUndefined();
 
     const sections = await getAllSections();
-    expect(sections.find(s => s.id === SEED.SECTION_ID)).toBeUndefined();
+    expect(sections.find((s) => s.id === SEED.SECTION_ID)).toBeUndefined();
   });
 
   it('does nothing when garden does not exist', async () => {
@@ -323,7 +323,7 @@ describe('deleteLocation', () => {
     await deleteLocation(locationId);
 
     const remaining = await getAllLocations();
-    expect(remaining.find(l => l.id === locationId)).toBeUndefined();
+    expect(remaining.find((l) => l.id === locationId)).toBeUndefined();
 
     const gardens = await getAllGardens();
     expect(gardens).toHaveLength(0);
@@ -344,7 +344,7 @@ describe('garden record_type', () => {
     const locationId = await insertLocation('Home');
     await insertGarden(locationId, 'My Garden');
     const gardens = await getAllGardens();
-    const garden = gardens.find(g => g.name === 'My Garden');
+    const garden = gardens.find((g) => g.name === 'My Garden');
     expect(garden?.record_type).toBe('plant');
   });
 
@@ -352,7 +352,7 @@ describe('garden record_type', () => {
     const locationId = await insertLocation('Lab');
     const gardenId = await insertGarden(locationId, 'Fruiting Chamber', 'mushroom');
     const gardens = await getAllGardens();
-    const garden = gardens.find(g => g.id === gardenId);
+    const garden = gardens.find((g) => g.id === gardenId);
     expect(garden?.record_type).toBe('mushroom');
   });
 });

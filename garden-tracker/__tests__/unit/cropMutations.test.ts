@@ -34,7 +34,9 @@ beforeEach(() => {
   jest.clearAllMocks();
   (getDb as jest.Mock).mockResolvedValue(mockDb);
   mockDb.runAsync.mockResolvedValue({ lastInsertRowId: 1, changes: 1 });
-  mockDb.withTransactionAsync.mockImplementation(async (callback: () => Promise<void>) => callback());
+  mockDb.withTransactionAsync.mockImplementation(async (callback: () => Promise<void>) =>
+    callback(),
+  );
 });
 
 // ── insertCropInstance ─────────────────────────────────────────────────────────
@@ -49,7 +51,11 @@ describe('insertCropInstance', () => {
     expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
     expect(mockDb.runAsync).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO crop_instances'),
-      expect.anything(), expect.anything(), expect.anything(), expect.anything(), expect.anything()
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
     );
   });
 
@@ -87,7 +93,9 @@ describe('insertCropInstance', () => {
   it('handles database errors', async () => {
     mockDb.runAsync.mockRejectedValueOnce(new Error('Database error'));
 
-    await expect(insertCropInstance(1, 'Tomato', 6, '2025-03-02')).rejects.toThrow('Database error');
+    await expect(insertCropInstance(1, 'Tomato', 6, '2025-03-02')).rejects.toThrow(
+      'Database error',
+    );
   });
 });
 
@@ -100,7 +108,10 @@ describe('insertCropStage', () => {
     expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
     expect(mockDb.runAsync).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO crop_stages'),
-      1, 2, 4, 0
+      1,
+      2,
+      4,
+      0,
     );
   });
 
@@ -185,14 +196,18 @@ describe('replaceCropStages', () => {
     ]);
 
     expect(mockDb.withTransactionAsync).toHaveBeenCalledTimes(1);
-    expect(mockDb.runAsync).toHaveBeenNthCalledWith(1, 'DELETE FROM crop_stages WHERE crop_instance_id = ?', 7);
+    expect(mockDb.runAsync).toHaveBeenNthCalledWith(
+      1,
+      'DELETE FROM crop_stages WHERE crop_instance_id = ?',
+      7,
+    );
     expect(mockDb.runAsync).toHaveBeenNthCalledWith(
       2,
       expect.stringContaining('INSERT INTO crop_stages'),
       7,
       2,
       4,
-      0
+      0,
     );
     expect(mockDb.runAsync).toHaveBeenNthCalledWith(
       3,
@@ -200,7 +215,7 @@ describe('replaceCropStages', () => {
       7,
       3,
       8,
-      1
+      1,
     );
   });
 
@@ -208,13 +223,18 @@ describe('replaceCropStages', () => {
     await replaceCropStages(7, []);
 
     expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
-    expect(mockDb.runAsync).toHaveBeenCalledWith('DELETE FROM crop_stages WHERE crop_instance_id = ?', 7);
+    expect(mockDb.runAsync).toHaveBeenCalledWith(
+      'DELETE FROM crop_stages WHERE crop_instance_id = ?',
+      7,
+    );
   });
 
   it('handles database errors', async () => {
     mockDb.runAsync.mockRejectedValueOnce(new Error('Database error'));
 
-    await expect(replaceCropStages(7, [{ stage_definition_id: 2, duration_weeks: 4 }])).rejects.toThrow('Database error');
+    await expect(
+      replaceCropStages(7, [{ stage_definition_id: 2, duration_weeks: 4 }]),
+    ).rejects.toThrow('Database error');
   });
 });
 
@@ -225,10 +245,7 @@ describe('archiveCrop', () => {
     await archiveCrop(5);
 
     expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
-    expect(mockDb.runAsync).toHaveBeenCalledWith(
-      expect.stringContaining('archived = 1'),
-      5
-    );
+    expect(mockDb.runAsync).toHaveBeenCalledWith(expect.stringContaining('archived = 1'), 5);
   });
 
   it('stamps updated_at', async () => {

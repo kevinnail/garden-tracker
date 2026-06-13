@@ -58,8 +58,8 @@ export interface CropStage {
   stage_definition_id: number;
   duration_weeks: number;
   order_index: number;
-  color: string;       // joined from stage_definitions
-  stage_name: string;  // joined from stage_definitions
+  color: string; // joined from stage_definitions
+  stage_name: string; // joined from stage_definitions
 }
 
 // A recurring task definition for a crop row, joined with task_types color
@@ -67,11 +67,11 @@ export interface Task {
   id: number;
   crop_instance_id: number;
   task_type_id: number;
-  day_of_week: number;          // 0=Sun … 6=Sat
-  frequency_weeks: number;      // draw a line every N weeks
-  start_offset_weeks: number;   // skip first N weeks before drawing lines (VBA offsetC)
-  color: string;                // joined from task_types
-  task_type_name: string;       // joined from task_types
+  day_of_week: number; // 0=Sun … 6=Sat
+  frequency_weeks: number; // draw a line every N weeks
+  start_offset_weeks: number; // skip first N weeks before drawing lines (VBA offsetC)
+  color: string; // joined from task_types
+  task_type_name: string; // joined from task_types
 }
 
 export interface TaskCompletion {
@@ -133,20 +133,29 @@ export type GridRowItem =
   | { type: 'location_header'; location: Location }
   | { type: 'location_footer' }
   | { type: 'location_spacer' }
-  | { type: 'garden_header';   garden: Garden }
-  | { type: 'garden_footer';   gardenRecordType: 'plant' | 'mushroom' }
-  | { type: 'garden_spacer';   gardenRecordType: 'plant' | 'mushroom' }
-  | { type: 'section_header';  section: Section; gardenRecordType: 'plant' | 'mushroom' }
-  | { type: 'section_footer';  gardenRecordType: 'plant' | 'mushroom' }
-  | { type: 'section_spacer';  gardenRecordType: 'plant' | 'mushroom' }
-  | { type: 'crop_row';        crop: CropInstance; stages: CropStage[]; weekColorMap: Record<number, string>; tasks: Task[]; completions: TaskCompletion[]; notesByWeek: Record<string, Note>; gardenRecordType: 'plant' | 'mushroom' }
-  | { type: 'placeholder';     index: number };
+  | { type: 'garden_header'; garden: Garden }
+  | { type: 'garden_footer'; gardenRecordType: 'plant' | 'mushroom' }
+  | { type: 'garden_spacer'; gardenRecordType: 'plant' | 'mushroom' }
+  | { type: 'section_header'; section: Section; gardenRecordType: 'plant' | 'mushroom' }
+  | { type: 'section_footer'; gardenRecordType: 'plant' | 'mushroom' }
+  | { type: 'section_spacer'; gardenRecordType: 'plant' | 'mushroom' }
+  | {
+      type: 'crop_row';
+      crop: CropInstance;
+      stages: CropStage[];
+      weekColorMap: Record<number, string>;
+      tasks: Task[];
+      completions: TaskCompletion[];
+      notesByWeek: Record<string, Note>;
+      gardenRecordType: 'plant' | 'mushroom';
+    }
+  | { type: 'placeholder'; index: number };
 
 // Precomputed task line — positions stored as zoom-independent values.
 // x is computed at render time: weekIndex * cellWidth + dayFraction * cellWidth
 export interface PrecomputedTaskLine {
   key: string;
-  weekIndex: number;   // integer column index
+  weekIndex: number; // integer column index
   dayFraction: number; // 0..1 fractional position within the week (day_of_week based)
   y1: number;
   y2: number;

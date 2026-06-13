@@ -1,12 +1,5 @@
 import React, { useState } from 'react';
-import {
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
-} from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 
 import { NoteImage } from '@/src/types';
@@ -27,11 +20,7 @@ export default function NoteImageViewer({ images, initialIndex, onClose }: Props
   return (
     <Modal visible animationType="fade" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <Image
-          source={{ uri: current.uri }}
-          style={{ width, height }}
-          contentFit="contain"
-        />
+        <Image source={{ uri: current.uri }} style={{ width, height }} contentFit="contain" />
 
         <Pressable style={styles.closeBtn} onPress={onClose} hitSlop={16}>
           <Text style={styles.closeBtnText}>✕</Text>
@@ -41,17 +30,19 @@ export default function NoteImageViewer({ images, initialIndex, onClose }: Props
           <View style={styles.navRow}>
             <Pressable
               style={[styles.navBtn, currentIndex === 0 && styles.navBtnDisabled]}
-              onPress={() => currentIndex > 0 && setCurrentIndex(i => i - 1)}
+              onPress={() => currentIndex > 0 && setCurrentIndex((i) => i - 1)}
               hitSlop={16}
             >
               <Text style={styles.navBtnText}>‹</Text>
             </Pressable>
 
-            <Text style={styles.pageIndicator}>{currentIndex + 1} / {images.length}</Text>
+            <Text style={styles.pageIndicator}>
+              {currentIndex + 1} / {images.length}
+            </Text>
 
             <Pressable
               style={[styles.navBtn, currentIndex === images.length - 1 && styles.navBtnDisabled]}
-              onPress={() => currentIndex < images.length - 1 && setCurrentIndex(i => i + 1)}
+              onPress={() => currentIndex < images.length - 1 && setCurrentIndex((i) => i + 1)}
               hitSlop={16}
             >
               <Text style={styles.navBtnText}>›</Text>

@@ -1,8 +1,15 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  View, Text, TextInput, StyleSheet, ScrollView,
-  Pressable, Alert, ActivityIndicator,
-  KeyboardAvoidingView, Platform,
+  View,
+  Text,
+  TextInput,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  Alert,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useNavigation, usePreventRemove } from '@react-navigation/native';
@@ -13,10 +20,14 @@ import { Location, Garden, Section } from '@/src/types';
 import { getAllLocations, getAllGardens, getAllSections } from '@/src/db/queries/locationQueries';
 import { getAllCrops } from '@/src/db/queries/cropQueries';
 
-function locationStatus(location: Location, gardens: Garden[], sections: Section[]): 'ready' | 'needs-garden' | 'needs-section' {
-  const locationGardens = gardens.filter(g => g.location_id === location.id);
+function locationStatus(
+  location: Location,
+  gardens: Garden[],
+  sections: Section[],
+): 'ready' | 'needs-garden' | 'needs-section' {
+  const locationGardens = gardens.filter((g) => g.location_id === location.id);
   if (locationGardens.length === 0) return 'needs-garden';
-  const hasSection = locationGardens.some(g => sections.some(s => s.garden_id === g.id));
+  const hasSection = locationGardens.some((g) => sections.some((s) => s.garden_id === g.id));
   return hasSection ? 'ready' : 'needs-section';
 }
 
@@ -42,16 +53,16 @@ const GUIDE_STEPS = [
 export default function AddLocationForm() {
   const navigation = useNavigation();
 
-  const addLocation = usePlannerStore(s => s.addLocation);
-  const addGarden = usePlannerStore(s => s.addGarden);
-  const addSection = usePlannerStore(s => s.addSection);
-  const removeLocation = usePlannerStore(s => s.removeLocation);
-  const removeGarden = usePlannerStore(s => s.removeGarden);
-  const removeSection = usePlannerStore(s => s.removeSection);
-  const renameLocation = usePlannerStore(s => s.renameLocation);
-  const renameGarden = usePlannerStore(s => s.renameGarden);
-  const renameSection = usePlannerStore(s => s.renameSection);
-  const resetAllData = usePlannerStore(s => s.resetAllData);
+  const addLocation = usePlannerStore((s) => s.addLocation);
+  const addGarden = usePlannerStore((s) => s.addGarden);
+  const addSection = usePlannerStore((s) => s.addSection);
+  const removeLocation = usePlannerStore((s) => s.removeLocation);
+  const removeGarden = usePlannerStore((s) => s.removeGarden);
+  const removeSection = usePlannerStore((s) => s.removeSection);
+  const renameLocation = usePlannerStore((s) => s.renameLocation);
+  const renameGarden = usePlannerStore((s) => s.renameGarden);
+  const renameSection = usePlannerStore((s) => s.renameSection);
+  const resetAllData = usePlannerStore((s) => s.resetAllData);
 
   const [locationName, setLocationName] = useState('');
   const [gardenName, setGardenName] = useState('');
@@ -62,10 +73,17 @@ export default function AddLocationForm() {
   const [locationId, setLocationId] = useState<number | null>(null);
   const [gardenId, setGardenId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [lastAdded, setLastAdded] = useState<{ text: string; level: 'location' | 'garden' | 'section' } | null>(null);
+  const [lastAdded, setLastAdded] = useState<{
+    text: string;
+    level: 'location' | 'garden' | 'section';
+  } | null>(null);
   const [gardenRecordType, setGardenRecordType] = useState<'plant' | 'mushroom'>('plant');
   const [showGuide, setShowGuide] = useState(false);
-  const [editingItem, setEditingItem] = useState<{ type: 'location' | 'garden' | 'section'; id: number; value: string } | null>(null);
+  const [editingItem, setEditingItem] = useState<{
+    type: 'location' | 'garden' | 'section';
+    id: number;
+    value: string;
+  } | null>(null);
   const [initialCropCount, setInitialCropCount] = useState<number | null>(null);
   const [allowDismiss, setAllowDismiss] = useState(false);
   const [createdEntityCount, setCreatedEntityCount] = useState(0);
@@ -81,8 +99,8 @@ export default function AddLocationForm() {
     setLocations(ls);
     setGardens(gs);
     setSections(ss);
-    setLocationId(prev => {
-      if (prev != null && ls.some(x => x.id === prev)) return prev;
+    setLocationId((prev) => {
+      if (prev != null && ls.some((x) => x.id === prev)) return prev;
       return ls[0]?.id ?? null;
     });
     return { ls, gs, ss };
@@ -97,7 +115,9 @@ export default function AddLocationForm() {
     void loadInitial().catch(() => {
       if (!cancelled) setInitialCropCount(0);
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [reload]);
 
   useEffect(() => {
@@ -110,9 +130,9 @@ export default function AddLocationForm() {
   }, [initialCropCount, locations.length, locationName, prefilledTopLevel]);
 
   useEffect(() => {
-    const filtered = gardens.filter(g => g.location_id === locationId);
+    const filtered = gardens.filter((g) => g.location_id === locationId);
     if (filtered.length > 0) {
-      if (!filtered.find(g => g.id === gardenId)) setGardenId(filtered[0].id);
+      if (!filtered.find((g) => g.id === gardenId)) setGardenId(filtered[0].id);
     } else {
       setGardenId(null);
     }
@@ -120,7 +140,9 @@ export default function AddLocationForm() {
 
   const syncCreatedEntityCount = useCallback(() => {
     setCreatedEntityCount(
-      createdLocationIds.current.size + createdGardenIds.current.size + createdSectionIds.current.size
+      createdLocationIds.current.size +
+        createdGardenIds.current.size +
+        createdSectionIds.current.size,
     );
   }, []);
 
@@ -144,41 +166,58 @@ export default function AddLocationForm() {
   }, [reload, removeGarden, removeLocation, removeSection, syncCreatedEntityCount]);
 
   const openAddCrop = useCallback(() => {
-    allowAndRun(() => { router.replace('/(modals)/add-crop'); });
+    allowAndRun(() => {
+      router.replace('/(modals)/add-crop');
+    });
   }, [allowAndRun]);
 
-  const handleExitAttempt = useCallback((onAllowedExit: () => void) => {
-    if (initialCropCount !== 0 || createdEntityCount === 0 || allowDismiss) {
-      onAllowedExit();
-      return;
-    }
-    Alert.alert(
-      'Finish first setup',
-      'You created hierarchy items but no crop yet. To avoid partial setup, add a crop now or discard and exit.',
-      [
-        { text: 'Keep editing', style: 'cancel' },
-        { text: 'Add crop now', onPress: openAddCrop },
-        {
-          text: 'Discard and exit',
-          style: 'destructive',
-          onPress: () => {
-            void (async () => {
-              try {
-                await discardSessionHierarchy();
-                allowAndRun(onAllowedExit);
-              } catch {
-                Alert.alert('Error', 'Failed to discard setup. Please try again.');
-              }
-            })();
+  const handleExitAttempt = useCallback(
+    (onAllowedExit: () => void) => {
+      if (initialCropCount !== 0 || createdEntityCount === 0 || allowDismiss) {
+        onAllowedExit();
+        return;
+      }
+      Alert.alert(
+        'Finish first setup',
+        'You created hierarchy items but no crop yet. To avoid partial setup, add a crop now or discard and exit.',
+        [
+          { text: 'Keep editing', style: 'cancel' },
+          { text: 'Add crop now', onPress: openAddCrop },
+          {
+            text: 'Discard and exit',
+            style: 'destructive',
+            onPress: () => {
+              void (async () => {
+                try {
+                  await discardSessionHierarchy();
+                  allowAndRun(onAllowedExit);
+                } catch {
+                  Alert.alert('Error', 'Failed to discard setup. Please try again.');
+                }
+              })();
+            },
           },
-        },
-      ]
-    );
-  }, [allowAndRun, allowDismiss, createdEntityCount, discardSessionHierarchy, initialCropCount, openAddCrop]);
+        ],
+      );
+    },
+    [
+      allowAndRun,
+      allowDismiss,
+      createdEntityCount,
+      discardSessionHierarchy,
+      initialCropCount,
+      openAddCrop,
+    ],
+  );
 
-  usePreventRemove(initialCropCount === 0 && createdEntityCount > 0 && !allowDismiss, ({ data }) => {
-    handleExitAttempt(() => { navigation.dispatch(data.action); });
-  });
+  usePreventRemove(
+    initialCropCount === 0 && createdEntityCount > 0 && !allowDismiss,
+    ({ data }) => {
+      handleExitAttempt(() => {
+        navigation.dispatch(data.action);
+      });
+    },
+  );
 
   const handleAddLocation = async () => {
     const trimmed = locationName.trim();
@@ -240,59 +279,55 @@ export default function AddLocationForm() {
   };
 
   const confirmDeleteLocation = (location: Location) => {
-    const locationGardenIds = gardens.filter(g => g.location_id === location.id).map(g => g.id);
-    const locationSectionIds = sections.filter(s => locationGardenIds.includes(s.garden_id)).map(s => s.id);
-    const gardenCount = gardens.filter(g => g.location_id === location.id).length;
-    const detail = gardenCount > 0 ? ` It contains ${gardenCount} garden(s) and all their crops.` : '';
-    Alert.alert(
-      'Delete Location',
-      `Delete "${location.name}"?${detail} This cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await removeLocation(location.id);
-              createdLocationIds.current.delete(location.id);
-              for (const id of locationGardenIds) createdGardenIds.current.delete(id);
-              for (const id of locationSectionIds) createdSectionIds.current.delete(id);
-              syncCreatedEntityCount();
-              if (locationId === location.id) setLocationId(null);
-              await reload();
-            } catch {}
-          },
+    const locationGardenIds = gardens.filter((g) => g.location_id === location.id).map((g) => g.id);
+    const locationSectionIds = sections
+      .filter((s) => locationGardenIds.includes(s.garden_id))
+      .map((s) => s.id);
+    const gardenCount = gardens.filter((g) => g.location_id === location.id).length;
+    const detail =
+      gardenCount > 0 ? ` It contains ${gardenCount} garden(s) and all their crops.` : '';
+    Alert.alert('Delete Location', `Delete "${location.name}"?${detail} This cannot be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await removeLocation(location.id);
+            createdLocationIds.current.delete(location.id);
+            for (const id of locationGardenIds) createdGardenIds.current.delete(id);
+            for (const id of locationSectionIds) createdSectionIds.current.delete(id);
+            syncCreatedEntityCount();
+            if (locationId === location.id) setLocationId(null);
+            await reload();
+          } catch {}
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const confirmDeleteGarden = (garden: Garden) => {
-    const gardenSectionIds = sections.filter(s => s.garden_id === garden.id).map(s => s.id);
-    const sectionCount = sections.filter(s => s.garden_id === garden.id).length;
-    const detail = sectionCount > 0 ? ` It contains ${sectionCount} section(s) and all their crops.` : '';
-    Alert.alert(
-      'Delete Garden',
-      `Delete "${garden.name}"?${detail} This cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await removeGarden(garden.id);
-              createdGardenIds.current.delete(garden.id);
-              for (const id of gardenSectionIds) createdSectionIds.current.delete(id);
-              syncCreatedEntityCount();
-              if (gardenId === garden.id) setGardenId(null);
-              await reload();
-            } catch {}
-          },
+    const gardenSectionIds = sections.filter((s) => s.garden_id === garden.id).map((s) => s.id);
+    const sectionCount = sections.filter((s) => s.garden_id === garden.id).length;
+    const detail =
+      sectionCount > 0 ? ` It contains ${sectionCount} section(s) and all their crops.` : '';
+    Alert.alert('Delete Garden', `Delete "${garden.name}"?${detail} This cannot be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await removeGarden(garden.id);
+            createdGardenIds.current.delete(garden.id);
+            for (const id of gardenSectionIds) createdSectionIds.current.delete(id);
+            syncCreatedEntityCount();
+            if (gardenId === garden.id) setGardenId(null);
+            await reload();
+          } catch {}
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const confirmDeleteSection = (section: Section) => {
@@ -313,7 +348,7 @@ export default function AddLocationForm() {
             } catch {}
           },
         },
-      ]
+      ],
     );
   };
 
@@ -330,14 +365,16 @@ export default function AddLocationForm() {
     } catch {}
   };
 
-  const filteredGardens = gardens.filter(g => g.location_id === locationId);
-  const filteredSections = sections.filter(s => s.garden_id === gardenId);
-  const selectedLocation = locations.find(l => l.id === locationId) ?? null;
-  const selectedGarden = gardens.find(g => g.id === gardenId) ?? null;
-  const hasReadyLocation = locations.some(l => locationStatus(l, gardens, sections) === 'ready');
+  const filteredGardens = gardens.filter((g) => g.location_id === locationId);
+  const filteredSections = sections.filter((s) => s.garden_id === gardenId);
+  const selectedLocation = locations.find((l) => l.id === locationId) ?? null;
+  const selectedGarden = gardens.find((g) => g.id === gardenId) ?? null;
+  const hasReadyLocation = locations.some((l) => locationStatus(l, gardens, sections) === 'ready');
 
   const handleDone = () => {
-    handleExitAttempt(() => { router.back(); });
+    handleExitAttempt(() => {
+      router.back();
+    });
   };
 
   return (
@@ -354,13 +391,17 @@ export default function AddLocationForm() {
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         >
           {/* Guide */}
-          <Pressable style={styles.guideToggle} onPress={() => setShowGuide(v => !v)}>
-            <Text style={styles.guideToggleText}>{showGuide ? 'Hide guide' : 'How does this work?'}</Text>
+          <Pressable style={styles.guideToggle} onPress={() => setShowGuide((v) => !v)}>
+            <Text style={styles.guideToggleText}>
+              {showGuide ? 'Hide guide' : 'How does this work?'}
+            </Text>
           </Pressable>
           {showGuide && (
             <View style={styles.guideBox}>
               {GUIDE_STEPS.map((step, i) => (
-                <Text key={i} style={styles.guideText}>{step}</Text>
+                <Text key={i} style={styles.guideText}>
+                  {step}
+                </Text>
               ))}
             </View>
           )}
@@ -369,18 +410,21 @@ export default function AddLocationForm() {
           <View style={styles.levelBox}>
             <Text style={styles.levelTitle}>1. Location</Text>
 
-            {locations.map(location => {
+            {locations.map((location) => {
               const status = locationStatus(location, gardens, sections);
               const isEditing = editingItem?.type === 'location' && editingItem.id === location.id;
               const isSelected = locationId === location.id;
               return (
-                <View key={location.id} style={[styles.itemRow, isSelected && styles.itemRowSelected]}>
+                <View
+                  key={location.id}
+                  style={[styles.itemRow, isSelected && styles.itemRowSelected]}
+                >
                   {isEditing ? (
                     <>
                       <TextInput
                         style={[styles.input, styles.inlineEditInput]}
                         value={editingItem.value}
-                        onChangeText={v => setEditingItem(e => e ? { ...e, value: v } : e)}
+                        onChangeText={(v) => setEditingItem((e) => (e ? { ...e, value: v } : e))}
                         onSubmitEditing={handleSaveRename}
                         returnKeyType="done"
                         autoFocus
@@ -394,14 +438,36 @@ export default function AddLocationForm() {
                     </>
                   ) : (
                     <>
-                      <Pressable style={styles.itemSelectArea} onPress={() => { setLocationId(location.id); setEditingItem(null); }}>
-                        <Text style={[styles.itemName, isSelected && styles.itemNameSelected]}>{location.name}</Text>
-                        <Text style={[styles.itemBadge, { color: STATUS_COLOR[status] }]}>{STATUS_LABEL[status]}</Text>
+                      <Pressable
+                        style={styles.itemSelectArea}
+                        onPress={() => {
+                          setLocationId(location.id);
+                          setEditingItem(null);
+                        }}
+                      >
+                        <Text style={[styles.itemName, isSelected && styles.itemNameSelected]}>
+                          {location.name}
+                        </Text>
+                        <Text style={[styles.itemBadge, { color: STATUS_COLOR[status] }]}>
+                          {STATUS_LABEL[status]}
+                        </Text>
                       </Pressable>
-                      <Pressable style={styles.iconBtn} onPress={() => setEditingItem({ type: 'location', id: location.id, value: location.name })}>
+                      <Pressable
+                        style={styles.iconBtn}
+                        onPress={() =>
+                          setEditingItem({
+                            type: 'location',
+                            id: location.id,
+                            value: location.name,
+                          })
+                        }
+                      >
                         <Text style={styles.editBtnText}>✎</Text>
                       </Pressable>
-                      <Pressable style={styles.iconBtn} onPress={() => confirmDeleteLocation(location)}>
+                      <Pressable
+                        style={styles.iconBtn}
+                        onPress={() => confirmDeleteLocation(location)}
+                      >
                         <Text style={styles.deleteBtnText}>×</Text>
                       </Pressable>
                     </>
@@ -423,7 +489,11 @@ export default function AddLocationForm() {
                 onFocus={() => scrollRef.current?.scrollToEnd({ animated: true })}
               />
               <Pressable style={styles.addBtn} onPress={handleAddLocation} disabled={submitting}>
-                {submitting ? <ActivityIndicator color="#111" size="small" /> : <Text style={styles.addBtnText}>Add</Text>}
+                {submitting ? (
+                  <ActivityIndicator color="#111" size="small" />
+                ) : (
+                  <Text style={styles.addBtnText}>Add</Text>
+                )}
               </Pressable>
             </View>
             {lastAdded?.level === 'location' && (
@@ -443,30 +513,53 @@ export default function AddLocationForm() {
 
               <View style={styles.recordTypeToggle}>
                 <Pressable
-                  style={[styles.recordTypeBtn, gardenRecordType === 'plant' && styles.recordTypeBtnActive]}
+                  style={[
+                    styles.recordTypeBtn,
+                    gardenRecordType === 'plant' && styles.recordTypeBtnActive,
+                  ]}
                   onPress={() => setGardenRecordType('plant')}
                 >
-                  <Text style={[styles.recordTypeBtnText, gardenRecordType === 'plant' && styles.recordTypeBtnTextActive]}>Plants</Text>
+                  <Text
+                    style={[
+                      styles.recordTypeBtnText,
+                      gardenRecordType === 'plant' && styles.recordTypeBtnTextActive,
+                    ]}
+                  >
+                    Plants
+                  </Text>
                 </Pressable>
                 <Pressable
-                  style={[styles.recordTypeBtn, gardenRecordType === 'mushroom' && styles.recordTypeBtnMushroomActive]}
+                  style={[
+                    styles.recordTypeBtn,
+                    gardenRecordType === 'mushroom' && styles.recordTypeBtnMushroomActive,
+                  ]}
                   onPress={() => setGardenRecordType('mushroom')}
                 >
-                  <Text style={[styles.recordTypeBtnText, gardenRecordType === 'mushroom' && styles.recordTypeBtnTextActive]}>Mushrooms</Text>
+                  <Text
+                    style={[
+                      styles.recordTypeBtnText,
+                      gardenRecordType === 'mushroom' && styles.recordTypeBtnTextActive,
+                    ]}
+                  >
+                    Mushrooms
+                  </Text>
                 </Pressable>
               </View>
 
-              {filteredGardens.map(garden => {
+              {filteredGardens.map((garden) => {
                 const isEditing = editingItem?.type === 'garden' && editingItem.id === garden.id;
                 const isSelected = gardenId === garden.id;
                 return (
-                  <View key={garden.id} style={[styles.itemRow, isSelected && styles.itemRowSelected]}>
+                  <View
+                    key={garden.id}
+                    style={[styles.itemRow, isSelected && styles.itemRowSelected]}
+                  >
                     {isEditing ? (
                       <>
                         <TextInput
                           style={[styles.input, styles.inlineEditInput]}
                           value={editingItem.value}
-                          onChangeText={v => setEditingItem(e => e ? { ...e, value: v } : e)}
+                          onChangeText={(v) => setEditingItem((e) => (e ? { ...e, value: v } : e))}
                           onSubmitEditing={handleSaveRename}
                           returnKeyType="done"
                           autoFocus
@@ -480,9 +573,17 @@ export default function AddLocationForm() {
                       </>
                     ) : (
                       <>
-                        <Pressable style={styles.itemSelectArea} onPress={() => { setGardenId(garden.id); setEditingItem(null); }}>
+                        <Pressable
+                          style={styles.itemSelectArea}
+                          onPress={() => {
+                            setGardenId(garden.id);
+                            setEditingItem(null);
+                          }}
+                        >
                           <View style={styles.gardenNameRow}>
-                            <Text style={[styles.itemName, isSelected && styles.itemNameSelected]}>{garden.name}</Text>
+                            <Text style={[styles.itemName, isSelected && styles.itemNameSelected]}>
+                              {garden.name}
+                            </Text>
                             {garden.record_type === 'mushroom' && (
                               <View style={styles.zoneBadge}>
                                 <Text style={styles.zoneBadgeText}>Zone</Text>
@@ -490,10 +591,18 @@ export default function AddLocationForm() {
                             )}
                           </View>
                         </Pressable>
-                        <Pressable style={styles.iconBtn} onPress={() => setEditingItem({ type: 'garden', id: garden.id, value: garden.name })}>
+                        <Pressable
+                          style={styles.iconBtn}
+                          onPress={() =>
+                            setEditingItem({ type: 'garden', id: garden.id, value: garden.name })
+                          }
+                        >
                           <Text style={styles.editBtnText}>✎</Text>
                         </Pressable>
-                        <Pressable style={styles.iconBtn} onPress={() => confirmDeleteGarden(garden)}>
+                        <Pressable
+                          style={styles.iconBtn}
+                          onPress={() => confirmDeleteGarden(garden)}
+                        >
                           <Text style={styles.deleteBtnText}>×</Text>
                         </Pressable>
                       </>
@@ -507,7 +616,11 @@ export default function AddLocationForm() {
                   style={[styles.input, { flex: 1 }]}
                   value={gardenName}
                   onChangeText={setGardenName}
-                  placeholder={gardenRecordType === 'mushroom' ? 'e.g. Lab, Fruiting Chamber' : 'e.g. Backyard Beds'}
+                  placeholder={
+                    gardenRecordType === 'mushroom'
+                      ? 'e.g. Lab, Fruiting Chamber'
+                      : 'e.g. Backyard Beds'
+                  }
                   placeholderTextColor="#555"
                   maxLength={100}
                   onSubmitEditing={handleAddGarden}
@@ -515,7 +628,11 @@ export default function AddLocationForm() {
                   onFocus={() => scrollRef.current?.scrollToEnd({ animated: true })}
                 />
                 <Pressable style={styles.addBtn} onPress={handleAddGarden} disabled={submitting}>
-                  {submitting ? <ActivityIndicator color="#111" size="small" /> : <Text style={styles.addBtnText}>Add</Text>}
+                  {submitting ? (
+                    <ActivityIndicator color="#111" size="small" />
+                  ) : (
+                    <Text style={styles.addBtnText}>Add</Text>
+                  )}
                 </Pressable>
               </View>
               {lastAdded?.level === 'garden' && (
@@ -531,10 +648,12 @@ export default function AddLocationForm() {
             <View style={styles.levelBox}>
               <Text style={styles.levelTitle}>
                 {'3. Section  '}
-                <Text style={styles.levelParent}>{selectedLocation?.name} {'>'} {selectedGarden?.name}</Text>
+                <Text style={styles.levelParent}>
+                  {selectedLocation?.name} {'>'} {selectedGarden?.name}
+                </Text>
               </Text>
 
-              {filteredSections.map(section => {
+              {filteredSections.map((section) => {
                 const isEditing = editingItem?.type === 'section' && editingItem.id === section.id;
                 return (
                   <View key={section.id} style={styles.itemRow}>
@@ -543,7 +662,7 @@ export default function AddLocationForm() {
                         <TextInput
                           style={[styles.input, styles.inlineEditInput]}
                           value={editingItem.value}
-                          onChangeText={v => setEditingItem(e => e ? { ...e, value: v } : e)}
+                          onChangeText={(v) => setEditingItem((e) => (e ? { ...e, value: v } : e))}
                           onSubmitEditing={handleSaveRename}
                           returnKeyType="done"
                           autoFocus
@@ -558,10 +677,18 @@ export default function AddLocationForm() {
                     ) : (
                       <>
                         <Text style={[styles.itemName, { flex: 1 }]}>{section.name}</Text>
-                        <Pressable style={styles.iconBtn} onPress={() => setEditingItem({ type: 'section', id: section.id, value: section.name })}>
+                        <Pressable
+                          style={styles.iconBtn}
+                          onPress={() =>
+                            setEditingItem({ type: 'section', id: section.id, value: section.name })
+                          }
+                        >
                           <Text style={styles.editBtnText}>✎</Text>
                         </Pressable>
-                        <Pressable style={styles.iconBtn} onPress={() => confirmDeleteSection(section)}>
+                        <Pressable
+                          style={styles.iconBtn}
+                          onPress={() => confirmDeleteSection(section)}
+                        >
                           <Text style={styles.deleteBtnText}>×</Text>
                         </Pressable>
                       </>
@@ -583,7 +710,11 @@ export default function AddLocationForm() {
                   onFocus={() => scrollRef.current?.scrollToEnd({ animated: true })}
                 />
                 <Pressable style={styles.addBtn} onPress={handleAddSection} disabled={submitting}>
-                  {submitting ? <ActivityIndicator color="#111" size="small" /> : <Text style={styles.addBtnText}>Add</Text>}
+                  {submitting ? (
+                    <ActivityIndicator color="#111" size="small" />
+                  ) : (
+                    <Text style={styles.addBtnText}>Add</Text>
+                  )}
                 </Pressable>
               </View>
               {lastAdded?.level === 'section' && (
@@ -609,19 +740,23 @@ export default function AddLocationForm() {
           <Pressable
             style={styles.resetBtn}
             onPress={() =>
-              Alert.alert('Reset All Data', 'Delete everything and start fresh? This cannot be undone.', [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Reset',
-                  style: 'destructive',
-                  onPress: async () => {
-                    try {
-                      await resetAllData();
-                      await reload();
-                    } catch {}
+              Alert.alert(
+                'Reset All Data',
+                'Delete everything and start fresh? This cannot be undone.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Reset',
+                    style: 'destructive',
+                    onPress: async () => {
+                      try {
+                        await resetAllData();
+                        await reload();
+                      } catch {}
+                    },
                   },
-                },
-              ])
+                ],
+              )
             }
           >
             <Text style={styles.resetBtnText}>Reset Database</Text>
@@ -679,7 +814,12 @@ const styles = StyleSheet.create({
   itemNameSelected: { color: '#7dcea0' },
   itemBadge: { fontSize: 11, marginTop: 1 },
 
-  zoneBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: '#3A2010' },
+  zoneBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    backgroundColor: '#3A2010',
+  },
   zoneBadgeText: { color: '#d4a882', fontSize: 10, fontWeight: '700' },
 
   inputRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
@@ -694,7 +834,12 @@ const styles = StyleSheet.create({
     borderColor: '#3a3a3a',
   },
   inlineEditInput: { flex: 1, paddingVertical: 4, marginRight: 4 },
-  addBtn: { backgroundColor: '#2ecc71', borderRadius: 6, paddingHorizontal: 18, justifyContent: 'center' },
+  addBtn: {
+    backgroundColor: '#2ecc71',
+    borderRadius: 6,
+    paddingHorizontal: 18,
+    justifyContent: 'center',
+  },
   addBtnText: { color: '#111', fontWeight: 'bold', fontSize: 14 },
 
   successBox: { backgroundColor: '#1a3a2a', borderRadius: 6, padding: 8 },
@@ -721,7 +866,13 @@ const styles = StyleSheet.create({
   recordTypeBtnText: { color: '#9a9a9a', fontSize: 12, fontWeight: '600' },
   recordTypeBtnTextActive: { color: '#eee' },
 
-  addCropBtn: { marginBottom: 4, paddingVertical: 14, borderRadius: 8, backgroundColor: '#2ecc71', alignItems: 'center' },
+  addCropBtn: {
+    marginBottom: 4,
+    paddingVertical: 14,
+    borderRadius: 8,
+    backgroundColor: '#2ecc71',
+    alignItems: 'center',
+  },
   addCropBtnText: { color: '#111', fontWeight: '700', fontSize: 15 },
 
   actionRow: { marginTop: 6 },
