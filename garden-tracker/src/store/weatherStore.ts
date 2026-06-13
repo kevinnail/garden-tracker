@@ -26,7 +26,10 @@ export const useWeatherStore = create<WeatherStore>((set, get) => ({
     try {
       const [wxData, geo] = await Promise.all([
         fetchWeather(loc.coords.latitude, loc.coords.longitude),
-        Location.reverseGeocodeAsync({ latitude: loc.coords.latitude, longitude: loc.coords.longitude }),
+        Location.reverseGeocodeAsync({
+          latitude: loc.coords.latitude,
+          longitude: loc.coords.longitude,
+        }),
       ]);
       const { current, hourly, days } = wxData;
       const place = geo[0];

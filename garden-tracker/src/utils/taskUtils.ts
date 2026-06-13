@@ -2,9 +2,9 @@ import { CELL_WIDTH } from '@/src/constants/layout';
 import { dayXOffset, weekIndexToDate, formatDateKey } from '@/src/utils/dateUtils';
 
 export interface TaskLineOccurrence {
-  x: number;           // pixel x within the virtual canvas
-  weekIndex: number;   // column index (used to check completions)
-  weekSunday: string;  // ISO date of that week's Sunday (key for completion lookup)
+  x: number; // pixel x within the virtual canvas
+  weekIndex: number; // column index (used to check completions)
+  weekSunday: string; // ISO date of that week's Sunday (key for completion lookup)
 }
 
 interface TaskDef {

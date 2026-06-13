@@ -36,29 +36,29 @@ export default function PlannerGrid() {
   // long-running session.
   useTodayTick();
 
-  const rows         = usePlannerStore(s => s.rows);
-  const allTaskLines = usePlannerStore(s => s.allTaskLines);
-  const calendarStart = usePlannerStore(s => s.calendarStart);
-  const isLoaded     = usePlannerStore(s => s.isLoaded);
-  const plannerFocusCropId = usePlannerStore(s => s.plannerFocusCropId);
-  const plannerFocusDate = usePlannerStore(s => s.plannerFocusDate);
-  const clearPlannerFocus = usePlannerStore(s => s.clearPlannerFocus);
-  const resetViewState = usePlannerStore(s => s.resetViewState);
+  const rows = usePlannerStore((s) => s.rows);
+  const allTaskLines = usePlannerStore((s) => s.allTaskLines);
+  const calendarStart = usePlannerStore((s) => s.calendarStart);
+  const isLoaded = usePlannerStore((s) => s.isLoaded);
+  const plannerFocusCropId = usePlannerStore((s) => s.plannerFocusCropId);
+  const plannerFocusDate = usePlannerStore((s) => s.plannerFocusDate);
+  const clearPlannerFocus = usePlannerStore((s) => s.clearPlannerFocus);
+  const resetViewState = usePlannerStore((s) => s.resetViewState);
 
-  const totalWidth  = TOTAL_WEEKS * cellWidth;
+  const totalWidth = TOTAL_WEEKS * cellWidth;
   const rowOffsets = useMemo(() => getRowOffsets(rows), [rows]);
   const totalHeight = Math.max(rowOffsets[rowOffsets.length - 1] ?? 0, 1);
 
   // ── Shared values (UI thread) ─────────────────────────────────────────────
-  const scrollX      = useSharedValue(0);
-  const scrollY      = useSharedValue(0);
+  const scrollX = useSharedValue(0);
+  const scrollY = useSharedValue(0);
   const startScrollX = useSharedValue(0);
   const startScrollY = useSharedValue(0);
-  const sharedViewW  = useSharedValue(1);
-  const sharedViewH  = useSharedValue(1);
+  const sharedViewW = useSharedValue(1);
+  const sharedViewH = useSharedValue(1);
   // Track the last scroll values committed to JS-side state for threshold gating
-  const lastRenderX  = useSharedValue(0);
-  const lastRenderY  = useSharedValue(0);
+  const lastRenderX = useSharedValue(0);
+  const lastRenderY = useSharedValue(0);
 
   // ── React state (JS thread) — drives virtualization ───────────────────────
   const [renderScrollX, setRenderScrollX] = useState(0);
@@ -68,16 +68,16 @@ export default function PlannerGrid() {
   const initialized = useRef(false);
 
   // Refs for values the focus effect reads but must not re-trigger on
-  const rowsRef       = useRef(rows);
+  const rowsRef = useRef(rows);
   const rowOffsetsRef = useRef(rowOffsets);
   const totalHeightRef = useRef(totalHeight);
-  const totalWidthRef  = useRef(totalWidth);
-  const viewDimsRef    = useRef(viewDims);
-  rowsRef.current       = rows;
+  const totalWidthRef = useRef(totalWidth);
+  const viewDimsRef = useRef(viewDims);
+  rowsRef.current = rows;
   rowOffsetsRef.current = rowOffsets;
   totalHeightRef.current = totalHeight;
-  totalWidthRef.current  = totalWidth;
-  viewDimsRef.current    = viewDims;
+  totalWidthRef.current = totalWidth;
+  viewDimsRef.current = viewDims;
 
   // ── Pan gesture ───────────────────────────────────────────────────────────
   const panGesture = Gesture.Pan()
@@ -86,13 +86,13 @@ export default function PlannerGrid() {
       startScrollY.value = scrollY.value;
     })
     .onUpdate((e) => {
-      const maxX = Math.max(0, totalWidth  - sharedViewW.value);
+      const maxX = Math.max(0, totalWidth - sharedViewW.value);
       const maxY = Math.max(0, totalHeight - sharedViewH.value);
       scrollX.value = Math.min(Math.max(startScrollX.value - e.translationX, 0), maxX);
       scrollY.value = Math.min(Math.max(startScrollY.value - e.translationY, 0), maxY);
     })
     .onEnd((e) => {
-      const maxX = Math.max(0, totalWidth  - sharedViewW.value);
+      const maxX = Math.max(0, totalWidth - sharedViewW.value);
       const maxY = Math.max(0, totalHeight - sharedViewH.value);
       scrollX.value = withDecay({ velocity: -e.velocityX, clamp: [0, maxX] });
       scrollY.value = withDecay({ velocity: -e.velocityY, clamp: [0, maxY] });
@@ -173,7 +173,7 @@ export default function PlannerGrid() {
     if (vd.height <= 1 || vd.width <= 1) return;
 
     const rowIndex = rowsRef.current.findIndex(
-      row => row.type === 'crop_row' && row.crop.id === plannerFocusCropId
+      (row) => row.type === 'crop_row' && row.crop.id === plannerFocusCropId,
     );
 
     if (rowIndex < 0) {
@@ -199,11 +199,26 @@ export default function PlannerGrid() {
     setRenderScrollX(nextX);
     setRenderScrollY(nextY);
     clearPlannerFocus();
-  }, [calendarStart, cellWidth, clearPlannerFocus, plannerFocusCropId, plannerFocusDate, rowHeight, scrollX, scrollY]);
+  }, [
+    calendarStart,
+    cellWidth,
+    clearPlannerFocus,
+    plannerFocusCropId,
+    plannerFocusDate,
+    rowHeight,
+    scrollX,
+    scrollY,
+  ]);
 
-  const todayLabel = useMemo(() => new Date().toLocaleDateString('en-US', {
-    month: 'numeric', day: 'numeric', year: '2-digit',
-  }), []);
+  const todayLabel = useMemo(
+    () =>
+      new Date().toLocaleDateString('en-US', {
+        month: 'numeric',
+        day: 'numeric',
+        year: '2-digit',
+      }),
+    [],
+  );
 
   const handleHomePress = useCallback(() => {
     resetViewState();
@@ -224,7 +239,8 @@ export default function PlannerGrid() {
         <View style={styles.emptyState}>
           <Text style={styles.emptyTitle}>Welcome to Crop Planner</Text>
           <Text style={styles.emptyBody}>
-            Tap <Text style={styles.emptyHighlight}>+ Crop</Text> to get started. You&apos;ll set up your locations first, then add crops.
+            Tap <Text style={styles.emptyHighlight}>+ Crop</Text> to get started. You&apos;ll set up
+            your locations first, then add crops.
           </Text>
           <Text style={styles.emptyHint}>
             Each row shows a crop&apos;s growing stages across the calendar.
@@ -236,10 +252,13 @@ export default function PlannerGrid() {
 
   return (
     <View style={[styles.root, { paddingLeft: leftInset }]}>
-
       {/* ── Top row: corner + column header ── */}
       <View style={styles.headerRow}>
-        <Pressable style={styles.corner} onPress={handleHomePress} accessibilityLabel="Home — reset view to today">
+        <Pressable
+          style={styles.corner}
+          onPress={handleHomePress}
+          accessibilityLabel="Home — reset view to today"
+        >
           <Text style={styles.cornerText}>{todayLabel}</Text>
           <Text style={styles.cornerHint}>⌂ Home</Text>
         </Pressable>
@@ -255,9 +274,17 @@ export default function PlannerGrid() {
         <GestureDetector gesture={rowHeaderPanGesture}>
           <View style={styles.rowHeaderClip}>
             <Animated.View
-              style={[{ position: 'absolute', width: ROW_HEADER_WIDTH, height: totalHeight }, rowHeaderStyle]}
+              style={[
+                { position: 'absolute', width: ROW_HEADER_WIDTH, height: totalHeight },
+                rowHeaderStyle,
+              ]}
             >
-              <RowHeader rows={rows} rowOffsets={rowOffsets} renderScrollY={renderScrollY} viewHeight={viewDims.height} />
+              <RowHeader
+                rows={rows}
+                rowOffsets={rowOffsets}
+                renderScrollY={renderScrollY}
+                viewHeight={viewDims.height}
+              />
             </Animated.View>
           </View>
         </GestureDetector>
@@ -266,7 +293,10 @@ export default function PlannerGrid() {
           <GestureDetector gesture={panGesture}>
             <View style={StyleSheet.absoluteFill}>
               <Animated.View
-                style={[{ position: 'absolute', width: totalWidth, height: totalHeight }, gridBodyStyle]}
+                style={[
+                  { position: 'absolute', width: totalWidth, height: totalHeight },
+                  gridBodyStyle,
+                ]}
               >
                 <GridBody
                   rows={rows}
@@ -289,7 +319,6 @@ export default function PlannerGrid() {
             </View>
           </GestureDetector>
         </View>
-
       </View>
     </View>
   );

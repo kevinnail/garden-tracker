@@ -17,11 +17,14 @@ export function useTodayTick(): number {
       now.getFullYear(),
       now.getMonth(),
       now.getDate() + 1,
-      0, 0, 0, 100, // +100ms cushion so Date() is unambiguously on the new day
+      0,
+      0,
+      0,
+      100, // +100ms cushion so Date() is unambiguously on the new day
     ).getTime();
     const delay = Math.max(1000, nextMidnight - now.getTime());
 
-    const timer = setTimeout(() => setTick(t => t + 1), delay);
+    const timer = setTimeout(() => setTick((t) => t + 1), delay);
     return () => clearTimeout(timer);
   }, [tick]);
 

@@ -19,7 +19,7 @@ import { createNoteImage, copyImageToAppStorage, deleteImageFile } from '@/src/u
 const MOCK_IMAGES_DIR_URI = 'file:///app/documents/note-images/';
 
 const mockDirCreate = jest.fn();
-const mockFileCopy   = jest.fn();
+const mockFileCopy = jest.fn();
 const mockFileDelete = jest.fn();
 
 jest.mock('expo-file-system', () => {
@@ -32,9 +32,7 @@ jest.mock('expo-file-system', () => {
 
   // File mock — handles both File(uri) and File(directory, name)
   const MockFile = jest.fn().mockImplementation((uriOrDir: unknown, name?: string) => {
-    const uri = name
-      ? `${(uriOrDir as { uri: string }).uri}${name}`
-      : (uriOrDir as string);
+    const uri = name ? `${(uriOrDir as { uri: string }).uri}${name}` : (uriOrDir as string);
     return {
       uri,
       exists: true,
@@ -111,7 +109,9 @@ describe('deleteImageFile', () => {
     File.mockImplementationOnce((uri: string) => ({
       uri,
       exists: true,
-      delete: jest.fn().mockImplementation(() => { throw new Error('permission denied'); }),
+      delete: jest.fn().mockImplementation(() => {
+        throw new Error('permission denied');
+      }),
     }));
 
     expect(deleteImageFile('file:///app/note-images/photo.jpg')).toBe(false);

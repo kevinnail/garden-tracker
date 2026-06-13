@@ -103,7 +103,7 @@ async function initSchema(db: SQLite.SQLiteDatabase) {
 
 async function insertPresetsIfNeeded(db: SQLite.SQLiteDatabase) {
   const seeded = await db.getFirstAsync<{ value: string }>(
-    `SELECT value FROM settings WHERE key = 'seeded'`
+    `SELECT value FROM settings WHERE key = 'seeded'`,
   );
   if (seeded) return;
 
@@ -112,32 +112,30 @@ async function insertPresetsIfNeeded(db: SQLite.SQLiteDatabase) {
     for (let i = 0; i < PRESET_STAGES.length; i++) {
       await db.runAsync(
         `INSERT INTO stage_definitions (name, color, order_index) VALUES (?, ?, ?)`,
-        PRESET_STAGES[i].name, PRESET_STAGES[i].color, i
+        PRESET_STAGES[i].name,
+        PRESET_STAGES[i].color,
+        i,
       );
     }
 
     // Task types
     for (const tt of PRESET_TASK_TYPES) {
-      await db.runAsync(
-        `INSERT INTO task_types (name, color) VALUES (?, ?)`,
-        tt.name, tt.color
-      );
+      await db.runAsync(`INSERT INTO task_types (name, color) VALUES (?, ?)`, tt.name, tt.color);
     }
 
     // Mushroom stage definitions
     for (const s of PRESET_MUSHROOM_STAGES) {
       await db.runAsync(
         `INSERT INTO stage_definitions (name, color, order_index) VALUES (?, ?, ?)`,
-        s.name, s.color, s.order_index
+        s.name,
+        s.color,
+        s.order_index,
       );
     }
 
     // Mushroom task types
     for (const tt of PRESET_MUSHROOM_TASK_TYPES) {
-      await db.runAsync(
-        `INSERT INTO task_types (name, color) VALUES (?, ?)`,
-        tt.name, tt.color
-      );
+      await db.runAsync(`INSERT INTO task_types (name, color) VALUES (?, ?)`, tt.name, tt.color);
     }
 
     await db.runAsync(`INSERT INTO settings (key, value) VALUES ('seeded', '1')`);
@@ -148,13 +146,16 @@ async function insertPresetsIfNeeded(db: SQLite.SQLiteDatabase) {
     // task-completion keys depend on.
     const origin = new Date();
     origin.setDate(origin.getDate() - 365);
-    await db.runAsync(`INSERT INTO settings (key, value) VALUES ('calendar_start', ?)`, formatDateKey(toSunday(origin)));
+    await db.runAsync(
+      `INSERT INTO settings (key, value) VALUES ('calendar_start', ?)`,
+      formatDateKey(toSunday(origin)),
+    );
   });
 }
 
 export async function getCalendarStart(db: SQLite.SQLiteDatabase): Promise<Date> {
   const row = await db.getFirstAsync<{ value: string }>(
-    `SELECT value FROM settings WHERE key = 'calendar_start'`
+    `SELECT value FROM settings WHERE key = 'calendar_start'`,
   );
   if (row) {
     const parsed = parseDateKey(row.value);
@@ -166,6 +167,9 @@ export async function getCalendarStart(db: SQLite.SQLiteDatabase): Promise<Date>
   const origin = new Date();
   origin.setDate(origin.getDate() - 365);
   const sunday = toSunday(origin);
-  await db.runAsync(`INSERT INTO settings (key, value) VALUES ('calendar_start', ?)`, formatDateKey(sunday));
+  await db.runAsync(
+    `INSERT INTO settings (key, value) VALUES ('calendar_start', ?)`,
+    formatDateKey(sunday),
+  );
   return sunday;
 }

@@ -6,10 +6,10 @@ import { EMPTY_CELL_COLOR } from '@/src/constants/layout';
 import { useCellLayout } from '@/src/hooks/useCellLayout';
 
 interface Props {
-  stageColor: string | null;     // null = empty cell (outside crop span)
-  hasNote?: boolean;             // shows red triangle in top-right corner
-  showNoteIndicators?: boolean;  // when false, suppresses the red triangle
-  style?: ViewStyle;             // position: absolute left/top injected by GridBody
+  stageColor: string | null; // null = empty cell (outside crop span)
+  hasNote?: boolean; // shows red triangle in top-right corner
+  showNoteIndicators?: boolean; // when false, suppresses the red triangle
+  style?: ViewStyle; // position: absolute left/top injected by GridBody
   onPress?: () => void;
   onLongPress?: () => void;
 }
@@ -22,7 +22,14 @@ interface Props {
  * - hasNote   → small red triangle in top-right corner
  *
  */
-export default function CropCell({ stageColor, hasNote = false, showNoteIndicators = true, style, onPress, onLongPress }: Props) {
+export default function CropCell({
+  stageColor,
+  hasNote = false,
+  showNoteIndicators = true,
+  style,
+  onPress,
+  onLongPress,
+}: Props) {
   const { cellWidth, rowHeight } = useCellLayout();
   const bg = stageColor ?? EMPTY_CELL_COLOR;
   const longPressTriggered = useRef(false);
@@ -43,7 +50,16 @@ export default function CropCell({ stageColor, hasNote = false, showNoteIndicato
 
   return (
     <Pressable
-      style={[{ position: 'absolute', width: cellWidth - 1, height: rowHeight - 1, overflow: 'hidden', backgroundColor: bg }, style]}
+      style={[
+        {
+          position: 'absolute',
+          width: cellWidth - 1,
+          height: rowHeight - 1,
+          overflow: 'hidden',
+          backgroundColor: bg,
+        },
+        style,
+      ]}
       onPress={hasNote ? handlePress : undefined}
       onLongPress={handleLongPress}
       delayLongPress={250}

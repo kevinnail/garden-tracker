@@ -12,13 +12,16 @@ function normalizeStartDate(startDate: string): string {
   return formatDateKey(toSunday(new Date()));
 }
 
-export async function getCropsForSection(sectionId: number, includeArchived = false): Promise<CropInstance[]> {
+export async function getCropsForSection(
+  sectionId: number,
+  includeArchived = false,
+): Promise<CropInstance[]> {
   const db = await getDb();
   const sql = includeArchived
     ? `SELECT * FROM crop_instances WHERE section_id = ? ORDER BY start_date`
     : `SELECT * FROM crop_instances WHERE section_id = ? AND archived = 0 ORDER BY start_date`;
   const rows = await db.getAllAsync<any>(sql, sectionId);
-  return rows.map(r => ({ ...r, archived: r.archived === 1 }));
+  return rows.map((r) => ({ ...r, archived: r.archived === 1 }));
 }
 
 export async function getAllCrops(includeArchived = false): Promise<CropInstance[]> {
@@ -27,12 +30,13 @@ export async function getAllCrops(includeArchived = false): Promise<CropInstance
     ? `SELECT * FROM crop_instances ORDER BY section_id, start_date`
     : `SELECT * FROM crop_instances WHERE archived = 0 ORDER BY section_id, start_date`;
   const rows = await db.getAllAsync<any>(sql);
-  return rows.map(r => ({ ...r, archived: r.archived === 1 }));
+  return rows.map((r) => ({ ...r, archived: r.archived === 1 }));
 }
 
 export async function getCropStages(cropInstanceId: number): Promise<CropStage[]> {
   const db = await getDb();
-  return db.getAllAsync<CropStage>(`
+  return db.getAllAsync<CropStage>(
+    `
     SELECT
       cs.id,
       cs.crop_instance_id,
@@ -45,14 +49,17 @@ export async function getCropStages(cropInstanceId: number): Promise<CropStage[]
     JOIN stage_definitions sd ON sd.id = cs.stage_definition_id
     WHERE cs.crop_instance_id = ?
     ORDER BY cs.order_index
-  `, cropInstanceId);
+  `,
+    cropInstanceId,
+  );
 }
 
 export async function getCropStagesForCrops(cropInstanceIds: number[]): Promise<CropStage[]> {
   if (cropInstanceIds.length === 0) return [];
   const db = await getDb();
   const placeholders = cropInstanceIds.map(() => '?').join(',');
-  return db.getAllAsync<CropStage>(`
+  return db.getAllAsync<CropStage>(
+    `
     SELECT
       cs.id,
       cs.crop_instance_id,
@@ -65,14 +72,14 @@ export async function getCropStagesForCrops(cropInstanceIds: number[]): Promise<
     JOIN stage_definitions sd ON sd.id = cs.stage_definition_id
     WHERE cs.crop_instance_id IN (${placeholders})
     ORDER BY cs.crop_instance_id, cs.order_index
-  `, ...cropInstanceIds);
+  `,
+    ...cropInstanceIds,
+  );
 }
 
 export async function getStageDefs(): Promise<StageDefinition[]> {
   const db = await getDb();
-  return db.getAllAsync<StageDefinition>(
-    `SELECT * FROM stage_definitions ORDER BY order_index`
-  );
+  return db.getAllAsync<StageDefinition>(`SELECT * FROM stage_definitions ORDER BY order_index`);
 }
 
 export async function insertCropInstance(
@@ -80,13 +87,17 @@ export async function insertCropInstance(
   name: string,
   plantCount: number,
   startDate: string,
-  recordType: 'plant' | 'mushroom' = 'plant'
+  recordType: 'plant' | 'mushroom' = 'plant',
 ): Promise<number> {
   const db = await getDb();
   const normalizedStartDate = normalizeStartDate(startDate);
   const result = await db.runAsync(
     `INSERT INTO crop_instances (section_id, name, plant_count, start_date, record_type) VALUES (?, ?, ?, ?, ?)`,
-    sectionId, name, plantCount, normalizedStartDate, recordType
+    sectionId,
+    name,
+    plantCount,
+    normalizedStartDate,
+    recordType,
   );
   return result.lastInsertRowId;
 }
@@ -95,12 +106,15 @@ export async function insertCropStage(
   cropInstanceId: number,
   stageDefinitionId: number,
   durationWeeks: number,
-  orderIndex: number
+  orderIndex: number,
 ): Promise<void> {
   const db = await getDb();
   await db.runAsync(
     `INSERT INTO crop_stages (crop_instance_id, stage_definition_id, duration_weeks, order_index) VALUES (?, ?, ?, ?)`,
-    cropInstanceId, stageDefinitionId, durationWeeks, orderIndex
+    cropInstanceId,
+    stageDefinitionId,
+    durationWeeks,
+    orderIndex,
   );
 }
 
@@ -110,7 +124,7 @@ export async function insertCropWithStages(
   plantCount: number,
   startDate: string,
   stages: { stage_definition_id: number; duration_weeks: number }[],
-  recordType: 'plant' | 'mushroom' = 'plant'
+  recordType: 'plant' | 'mushroom' = 'plant',
 ): Promise<number> {
   const db = await getDb();
   const normalizedStartDate = normalizeStartDate(startDate);
@@ -118,24 +132,43 @@ export async function insertCropWithStages(
   await db.withTransactionAsync(async () => {
     const result = await db.runAsync(
       `INSERT INTO crop_instances (section_id, name, plant_count, start_date, record_type) VALUES (?, ?, ?, ?, ?)`,
-      sectionId, name, plantCount, normalizedStartDate, recordType
+      sectionId,
+      name,
+      plantCount,
+      normalizedStartDate,
+      recordType,
     );
     cropId = result.lastInsertRowId;
     for (let i = 0; i < stages.length; i++) {
       await db.runAsync(
         `INSERT INTO crop_stages (crop_instance_id, stage_definition_id, duration_weeks, order_index) VALUES (?, ?, ?, ?)`,
-        cropId, stages[i].stage_definition_id, stages[i].duration_weeks, i
+        cropId,
+        stages[i].stage_definition_id,
+        stages[i].duration_weeks,
+        i,
       );
     }
   });
   return cropId;
 }
 
-const CROP_INSTANCE_COLUMNS = new Set(['name', 'plant_count', 'start_date', 'notes', 'section_id', 'record_type']);
+const CROP_INSTANCE_COLUMNS = new Set([
+  'name',
+  'plant_count',
+  'start_date',
+  'notes',
+  'section_id',
+  'record_type',
+]);
 
 export async function updateCropInstance(
   id: number,
-  fields: Partial<Pick<CropInstance, 'name' | 'plant_count' | 'start_date' | 'notes' | 'section_id' | 'record_type'>>
+  fields: Partial<
+    Pick<
+      CropInstance,
+      'name' | 'plant_count' | 'start_date' | 'notes' | 'section_id' | 'record_type'
+    >
+  >,
 ): Promise<void> {
   const normalizedFields = {
     ...fields,
@@ -150,13 +183,14 @@ export async function updateCropInstance(
   const values = entries.map(([, v]) => v);
   await db.runAsync(
     `UPDATE crop_instances SET ${sets}, updated_at = datetime('now') WHERE id = ?`,
-    ...values, id
+    ...values,
+    id,
   );
 }
 
 export async function replaceCropStages(
   cropInstanceId: number,
-  stages: { stage_definition_id: number; duration_weeks: number }[]
+  stages: { stage_definition_id: number; duration_weeks: number }[],
 ): Promise<void> {
   const db = await getDb();
 
@@ -169,7 +203,7 @@ export async function replaceCropStages(
         cropInstanceId,
         stages[i].stage_definition_id,
         stages[i].duration_weeks,
-        i
+        i,
       );
     }
   });
@@ -178,7 +212,8 @@ export async function replaceCropStages(
 export async function archiveCrop(id: number): Promise<void> {
   const db = await getDb();
   await db.runAsync(
-    `UPDATE crop_instances SET archived = 1, updated_at = datetime('now') WHERE id = ?`, id
+    `UPDATE crop_instances SET archived = 1, updated_at = datetime('now') WHERE id = ?`,
+    id,
   );
 }
 

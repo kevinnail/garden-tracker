@@ -3,23 +3,17 @@ import { Location, Garden, Section } from '@/src/types';
 
 export async function getAllLocations(): Promise<Location[]> {
   const db = await getDb();
-  return db.getAllAsync<Location>(
-    `SELECT * FROM locations ORDER BY order_index`
-  );
+  return db.getAllAsync<Location>(`SELECT * FROM locations ORDER BY order_index`);
 }
 
 export async function getAllGardens(): Promise<Garden[]> {
   const db = await getDb();
-  return db.getAllAsync<Garden>(
-    `SELECT * FROM gardens ORDER BY order_index`
-  );
+  return db.getAllAsync<Garden>(`SELECT * FROM gardens ORDER BY order_index`);
 }
 
 export async function getAllSections(): Promise<Section[]> {
   const db = await getDb();
-  return db.getAllAsync<Section>(
-    `SELECT * FROM sections ORDER BY order_index`
-  );
+  return db.getAllAsync<Section>(`SELECT * FROM sections ORDER BY order_index`);
 }
 
 export async function insertLocation(name: string): Promise<number> {
@@ -27,22 +21,32 @@ export async function insertLocation(name: string): Promise<number> {
   const result = await db.runAsync(
     `INSERT INTO locations (name, order_index)
      VALUES (?, (SELECT COALESCE(MAX(order_index), -1) + 1 FROM locations))`,
-    name
+    name,
   );
   return result.lastInsertRowId;
 }
 
-export async function insertGarden(locationId: number, name: string, recordType: 'plant' | 'mushroom' = 'plant'): Promise<number> {
+export async function insertGarden(
+  locationId: number,
+  name: string,
+  recordType: 'plant' | 'mushroom' = 'plant',
+): Promise<number> {
   const db = await getDb();
   const result = await db.runAsync(
     `INSERT INTO gardens (location_id, name, record_type, order_index)
      VALUES (?, ?, ?, (SELECT COALESCE(MAX(order_index), -1) + 1 FROM gardens WHERE location_id = ?))`,
-    locationId, name, recordType, locationId
+    locationId,
+    name,
+    recordType,
+    locationId,
   );
   return result.lastInsertRowId;
 }
 
-export async function updateGardenRecordType(id: number, recordType: 'plant' | 'mushroom'): Promise<void> {
+export async function updateGardenRecordType(
+  id: number,
+  recordType: 'plant' | 'mushroom',
+): Promise<void> {
   const db = await getDb();
   await db.runAsync(`UPDATE gardens SET record_type = ? WHERE id = ?`, recordType, id);
 }
@@ -52,7 +56,9 @@ export async function insertSection(gardenId: number, name: string): Promise<num
   const result = await db.runAsync(
     `INSERT INTO sections (garden_id, name, order_index)
      VALUES (?, ?, (SELECT COALESCE(MAX(order_index), -1) + 1 FROM sections WHERE garden_id = ?))`,
-    gardenId, name, gardenId
+    gardenId,
+    name,
+    gardenId,
   );
   return result.lastInsertRowId;
 }

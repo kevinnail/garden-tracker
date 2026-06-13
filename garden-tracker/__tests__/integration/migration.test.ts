@@ -65,13 +65,27 @@ const OLD_SCHEMA_SQL = `
 // "real user data" the migration must preserve byte-for-byte.
 function seedOldDb(db: BetterSqlite3.Database) {
   db.prepare('INSERT INTO locations (id, name, order_index) VALUES (1, ?, 0)').run('Backyard');
-  db.prepare('INSERT INTO gardens (id, location_id, name, order_index) VALUES (1, 1, ?, 0)').run('Raised Beds');
-  db.prepare('INSERT INTO sections (id, garden_id, name, order_index) VALUES (1, 1, ?, 0)').run('Bed 1');
-  db.prepare('INSERT INTO crop_instances (id, section_id, name, plant_count, start_date) VALUES (1, 1, ?, 6, ?)').run('Tomato', '2025-03-02');
-  db.prepare('INSERT INTO crop_stages (id, crop_instance_id, stage_definition_id, duration_weeks, order_index) VALUES (1, 1, 1, 3, 0)').run();
-  db.prepare('INSERT INTO tasks (id, crop_instance_id, task_type_id, day_of_week) VALUES (1, 1, 1, 3)').run();
-  db.prepare('INSERT INTO task_completions (id, task_id, completed_date) VALUES (1, 1, ?)').run('2025-03-19');
-  db.prepare("INSERT INTO notes (id, entity_type, content) VALUES (1, 'crop', ?)").run('Looking healthy');
+  db.prepare('INSERT INTO gardens (id, location_id, name, order_index) VALUES (1, 1, ?, 0)').run(
+    'Raised Beds',
+  );
+  db.prepare('INSERT INTO sections (id, garden_id, name, order_index) VALUES (1, 1, ?, 0)').run(
+    'Bed 1',
+  );
+  db.prepare(
+    'INSERT INTO crop_instances (id, section_id, name, plant_count, start_date) VALUES (1, 1, ?, 6, ?)',
+  ).run('Tomato', '2025-03-02');
+  db.prepare(
+    'INSERT INTO crop_stages (id, crop_instance_id, stage_definition_id, duration_weeks, order_index) VALUES (1, 1, 1, 3, 0)',
+  ).run();
+  db.prepare(
+    'INSERT INTO tasks (id, crop_instance_id, task_type_id, day_of_week) VALUES (1, 1, 1, 3)',
+  ).run();
+  db.prepare('INSERT INTO task_completions (id, task_id, completed_date) VALUES (1, 1, ?)').run(
+    '2025-03-19',
+  );
+  db.prepare("INSERT INTO notes (id, entity_type, content) VALUES (1, 'crop', ?)").run(
+    'Looking healthy',
+  );
 }
 
 function makeOldDb() {
@@ -99,7 +113,9 @@ describe('runMigrations — v0 → v1 deleted_at', () => {
     await runMigrations(createTestAdapter(db));
 
     for (const table of SYNCED_TABLES) {
-      const rows = db.prepare(`SELECT deleted_at FROM ${table}`).all() as { deleted_at: string | null }[];
+      const rows = db.prepare(`SELECT deleted_at FROM ${table}`).all() as {
+        deleted_at: string | null;
+      }[];
       expect(rows).toHaveLength(1);
       expect(rows[0].deleted_at).toBeNull();
     }
@@ -124,7 +140,7 @@ describe('runMigrations — v0 → v1 deleted_at', () => {
   it('bumps user_version to 1', async () => {
     const db = makeOldDb();
     await runMigrations(createTestAdapter(db));
-    expect((db.pragma('user_version', { simple: true }) as number)).toBe(1);
+    expect(db.pragma('user_version', { simple: true }) as number).toBe(1);
   });
 
   it('is idempotent — running twice does not error or duplicate columns', async () => {
@@ -142,13 +158,15 @@ describe('runMigrations — v0 → v1 deleted_at', () => {
     // Fresh install: tables already have the column. Migration must not throw
     // (no duplicate-column ALTER) and must still set the version.
     const db = new BetterSqlite3(':memory:');
-    db.exec('CREATE TABLE locations (id INTEGER PRIMARY KEY, name TEXT, order_index INTEGER, deleted_at TEXT);');
+    db.exec(
+      'CREATE TABLE locations (id INTEGER PRIMARY KEY, name TEXT, order_index INTEGER, deleted_at TEXT);',
+    );
     for (const t of SYNCED_TABLES) {
       if (t === 'locations') continue;
       db.exec(`CREATE TABLE ${t} (id INTEGER PRIMARY KEY, deleted_at TEXT);`);
     }
 
     await expect(runMigrations(createTestAdapter(db))).resolves.toBeUndefined();
-    expect((db.pragma('user_version', { simple: true }) as number)).toBe(1);
+    expect(db.pragma('user_version', { simple: true }) as number).toBe(1);
   });
 });

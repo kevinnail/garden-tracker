@@ -4,7 +4,7 @@
 **Mode:** BUGS
 **Scope:** `garden-tracker/` Expo app (all `src/**`, `app/**`)
 
-Ordered roughly by severity. Items marked *latent* are correct under current inputs but fragile to future changes or data corruption.
+Ordered roughly by severity. Items marked _latent_ are correct under current inputs but fragile to future changes or data corruption.
 
 ---
 
@@ -16,7 +16,7 @@ Ordered roughly by severity. Items marked *latent* are correct under current inp
 const [taskTypeId, setTaskTypeId] = useState<number>(taskTypes[0]?.id ?? 1);
 ```
 
-`useState`'s initializer is run once on mount. If the form opens before `taskTypes` is populated in the store (empty array on first open), the initial value falls back to the hardcoded literal `1`. When task types load a moment later, the chips re-render but the selected `taskTypeId` is *not* updated — it stays at `1`. The visually "first" chip may not have id `1`, so a user who submits without tapping a chip silently writes the wrong task type. Worse, if id `1` doesn't exist (e.g. after `resetAllData` + partial re-seed), the `INSERT` fails the FK `tasks.task_type_id → task_types(id)`.
+`useState`'s initializer is run once on mount. If the form opens before `taskTypes` is populated in the store (empty array on first open), the initial value falls back to the hardcoded literal `1`. When task types load a moment later, the chips re-render but the selected `taskTypeId` is _not_ updated — it stays at `1`. The visually "first" chip may not have id `1`, so a user who submits without tapping a chip silently writes the wrong task type. Worse, if id `1` doesn't exist (e.g. after `resetAllData` + partial re-seed), the `INSERT` fails the FK `tasks.task_type_id → task_types(id)`.
 
 **Fix:** Initialize to `null` and sync via `useEffect` when `taskTypes` arrives; block submit if `taskTypeId == null`.
 
@@ -33,7 +33,7 @@ export function defaultCalendarStart(): Date {
 }
 ```
 
-Subtracting a fixed number of milliseconds crosses DST boundaries wrong. If `now` is at local midnight Sunday and 8 weeks back straddles a spring-forward, the returned `Date` is 11:00 pm the previous Saturday *local time*. Then `toSunday` reads `getDay() === 6` and rolls back 6 days, producing a calendar start **9 weeks** before today rather than 8.
+Subtracting a fixed number of milliseconds crosses DST boundaries wrong. If `now` is at local midnight Sunday and 8 weeks back straddles a spring-forward, the returned `Date` is 11:00 pm the previous Saturday _local time_. Then `toSunday` reads `getDay() === 6` and rolls back 6 days, producing a calendar start **9 weeks** before today rather than 8.
 
 Same pattern (less exposed) in `database.ts:153` when computing the demo crop's `startDate`.
 
@@ -53,6 +53,7 @@ while (col <= cropEndWeek) {
 ```
 
 The DB schema enforces `CHECK (frequency_weeks > 0)`, so in the live app this is safe. However:
+
 - If that check is ever loosened or a migration forgets it, the UI thread spins forever.
 - Tests that synthesize `Task` objects bypass the DB and could hang the runner.
 
@@ -73,12 +74,13 @@ The DB schema enforces `CHECK (frequency_weeks > 0)`, so in the live app this is
 `GridBody` passes both `onPress` and `onLongPress` for every cell (both opening the note modal at `GridBody.tsx:61`). `CropCell` then silently drops `onPress` unless a note already exists. Result: an empty cell needs a long-press to create a note, but one that already has a note responds to both.
 
 This inconsistency is almost certainly deliberate (stop scrolling taps from creating stray notes), but two things to tighten:
+
 - Comment it so future refactors don't "fix" it.
 - `GridBody.tsx:61` constructs an `openNote` callback inline for every cell on every render — even the short-press branch that will be thrown away. Minor perf loss in a very hot loop.
 
 ---
 
-## 5. `migrateLegacyHierarchy` toggles `PRAGMA foreign_keys` *inside* a transaction — LATENT
+## 5. `migrateLegacyHierarchy` toggles `PRAGMA foreign_keys` _inside_ a transaction — LATENT
 
 **File:** `src/db/database.ts:72-98`
 
@@ -90,7 +92,7 @@ await db.withTransactionAsync(async () => {
 });
 ```
 
-Per SQLite docs, `PRAGMA foreign_keys` is a no-op while a transaction is open. The intended "drop FK checks while renaming" effect doesn't happen. Today the `ALTER TABLE RENAME` / `RENAME COLUMN` statements in this block don't actually need FKs off, so nothing currently breaks. But the code is lying to itself — anyone who adds a DDL operation that *does* need FKs off (e.g. a table recreate-and-copy) will find the pragma silently ignored.
+Per SQLite docs, `PRAGMA foreign_keys` is a no-op while a transaction is open. The intended "drop FK checks while renaming" effect doesn't happen. Today the `ALTER TABLE RENAME` / `RENAME COLUMN` statements in this block don't actually need FKs off, so nothing currently breaks. But the code is lying to itself — anyone who adds a DDL operation that _does_ need FKs off (e.g. a table recreate-and-copy) will find the pragma silently ignored.
 
 **Fix:** Set the pragma outside the transaction, or remove the misleading lines entirely.
 

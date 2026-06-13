@@ -27,15 +27,15 @@ interface Props {
 // Bar colors MATCH their band colors — the left bar IS the same color as the
 // header/footer it connects, making each level read as one continuous frame.
 export const LOCATION_BAND = '#0d0d0d';
-export const LOCATION_BAR  = '#0d0d0d';  // 10 px — same as location band
+export const LOCATION_BAR = '#0d0d0d'; // 10 px — same as location band
 
-export const GARDEN_BAND   = '#003e14';
-export const GARDEN_BAR    = '#003e14';  // 8 px — same as garden band
+export const GARDEN_BAND = '#003e14';
+export const GARDEN_BAR = '#003e14'; // 8 px — same as garden band
 export const MUSHROOM_BAND = '#3A2010';
-export const MUSHROOM_BAR  = '#3A2010';
+export const MUSHROOM_BAR = '#3A2010';
 
-export const SECTION_BAND  = '#cdcdcd';
-export const SECTION_BAR   = '#cdcdcd';  // 6 px — same as section band
+export const SECTION_BAND = '#cdcdcd';
+export const SECTION_BAR = '#cdcdcd'; // 6 px — same as section band
 
 const CROP_BG = '#191928';
 
@@ -44,42 +44,42 @@ const CONTAINER_RADIUS = 5;
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function RowHeader({ rows, rowOffsets, renderScrollY, viewHeight }: Props) {
-  const selectedCropId = usePlannerStore(s => s.selectedCropId);
-  const setSelectedCrop = usePlannerStore(s => s.setSelectedCrop);
+  const selectedCropId = usePlannerStore((s) => s.selectedCropId);
+  const setSelectedCrop = usePlannerStore((s) => s.setSelectedCrop);
   const totalHeight = rowOffsets[rowOffsets.length - 1] ?? 0;
 
   const { rowStart, rowEnd } = getVisibleRowRange(rowOffsets, renderScrollY, viewHeight);
 
   return (
-    <View style={[styles.container, { height: totalHeight }] }>
+    <View style={[styles.container, { height: totalHeight }]}>
       {rows.slice(rowStart, rowEnd + 1).map((item, offset) => {
         const i = rowStart + offset;
         const rowHeight = getRowHeight(item);
-        const rowStyle = [
-          styles.row,
-          { top: rowOffsets[i], height: rowHeight },
-        ] as const;
+        const rowStyle = [styles.row, { top: rowOffsets[i], height: rowHeight }] as const;
 
         // ── Location top band ──────────────────────────────────────────────
-        if (item.type === 'location_header') return (
-          <View key={i} style={[rowStyle, { backgroundColor: BACKGROUND_COLOR }]}>
-            <View style={[styles.bandContent, { backgroundColor: LOCATION_BAND,  }]}>
-              <Text style={styles.locationText} numberOfLines={1}>{item.location.name}</Text>
+        if (item.type === 'location_header')
+          return (
+            <View key={i} style={[rowStyle, { backgroundColor: BACKGROUND_COLOR }]}>
+              <View style={[styles.bandContent, { backgroundColor: LOCATION_BAND }]}>
+                <Text style={styles.locationText} numberOfLines={1}>
+                  {item.location.name}
+                </Text>
+              </View>
             </View>
-          </View>
-        );
+          );
 
         // ── Location bottom band ───────────────────────────────────────────
-        if (item.type === 'location_footer') return (
-          <View key={i} style={[rowStyle, { backgroundColor: BACKGROUND_COLOR }]}>
-            <View style={[styles.bandContent, { backgroundColor: LOCATION_BAND,  }]} />
-          </View>
-        );
+        if (item.type === 'location_footer')
+          return (
+            <View key={i} style={[rowStyle, { backgroundColor: BACKGROUND_COLOR }]}>
+              <View style={[styles.bandContent, { backgroundColor: LOCATION_BAND }]} />
+            </View>
+          );
 
         // ── Location spacer (between locations, in background color) ───────
-        if (item.type === 'location_spacer') return (
-          <View key={i} style={[rowStyle, { backgroundColor: BACKGROUND_COLOR }]} />
-        );
+        if (item.type === 'location_spacer')
+          return <View key={i} style={[rowStyle, { backgroundColor: BACKGROUND_COLOR }]} />;
 
         // ── Garden top band (location bar on left connects to location bands) ─
         if (item.type === 'garden_header') {
@@ -87,8 +87,15 @@ export default function RowHeader({ rows, rowOffsets, renderScrollY, viewHeight 
           return (
             <View key={i} style={[rowStyle, { backgroundColor: LOCATION_BAND }]}>
               <View style={[styles.bar, { width: 10, backgroundColor: LOCATION_BAR }]} />
-              <View style={[styles.bandContent, { backgroundColor: gBand, borderTopLeftRadius: CONTAINER_RADIUS }]}>
-                <Text style={styles.gardenText} numberOfLines={1}>{item.garden.name}</Text>
+              <View
+                style={[
+                  styles.bandContent,
+                  { backgroundColor: gBand, borderTopLeftRadius: CONTAINER_RADIUS },
+                ]}
+              >
+                <Text style={styles.gardenText} numberOfLines={1}>
+                  {item.garden.name}
+                </Text>
               </View>
             </View>
           );
@@ -100,28 +107,41 @@ export default function RowHeader({ rows, rowOffsets, renderScrollY, viewHeight 
           return (
             <View key={i} style={[rowStyle, { backgroundColor: LOCATION_BAND }]}>
               <View style={[styles.bar, { width: 10, backgroundColor: LOCATION_BAR }]} />
-              <View style={[styles.bandContent, { backgroundColor: gBand, borderBottomLeftRadius: CONTAINER_RADIUS }]} />
+              <View
+                style={[
+                  styles.bandContent,
+                  { backgroundColor: gBand, borderBottomLeftRadius: CONTAINER_RADIUS },
+                ]}
+              />
             </View>
           );
         }
 
         // ── Garden spacer (between gardens, in location band color) ────────
-        if (item.type === 'garden_spacer') return (
-          <View key={i} style={[rowStyle, { backgroundColor: LOCATION_BAND }]}>
-            <View style={[styles.bar, { width: 10, backgroundColor: LOCATION_BAR }]} />
-          </View>
-        );
+        if (item.type === 'garden_spacer')
+          return (
+            <View key={i} style={[rowStyle, { backgroundColor: LOCATION_BAND }]}>
+              <View style={[styles.bar, { width: 10, backgroundColor: LOCATION_BAR }]} />
+            </View>
+          );
 
         // ── Section top band ───────────────────────────────────────────────
         if (item.type === 'section_header') {
           const gBand = item.gardenRecordType === 'mushroom' ? MUSHROOM_BAND : GARDEN_BAND;
-          const gBar  = item.gardenRecordType === 'mushroom' ? MUSHROOM_BAR  : GARDEN_BAR;
+          const gBar = item.gardenRecordType === 'mushroom' ? MUSHROOM_BAR : GARDEN_BAR;
           return (
             <View key={i} style={[rowStyle, { backgroundColor: gBand }]}>
               <View style={[styles.bar, { width: 10, backgroundColor: LOCATION_BAR }]} />
               <View style={[styles.bar, { width: 8, backgroundColor: gBar }]} />
-              <View style={[styles.bandContent, { backgroundColor: SECTION_BAND, borderTopLeftRadius: CONTAINER_RADIUS }]}>
-                <Text style={styles.sectionText} numberOfLines={1}>{item.section.name}</Text>
+              <View
+                style={[
+                  styles.bandContent,
+                  { backgroundColor: SECTION_BAND, borderTopLeftRadius: CONTAINER_RADIUS },
+                ]}
+              >
+                <Text style={styles.sectionText} numberOfLines={1}>
+                  {item.section.name}
+                </Text>
               </View>
             </View>
           );
@@ -130,12 +150,17 @@ export default function RowHeader({ rows, rowOffsets, renderScrollY, viewHeight 
         // ── Section bottom band ────────────────────────────────────────────
         if (item.type === 'section_footer') {
           const gBand = item.gardenRecordType === 'mushroom' ? MUSHROOM_BAND : GARDEN_BAND;
-          const gBar  = item.gardenRecordType === 'mushroom' ? MUSHROOM_BAR  : GARDEN_BAR;
+          const gBar = item.gardenRecordType === 'mushroom' ? MUSHROOM_BAR : GARDEN_BAR;
           return (
             <View key={i} style={[rowStyle, { backgroundColor: gBand }]}>
               <View style={[styles.bar, { width: 10, backgroundColor: LOCATION_BAR }]} />
               <View style={[styles.bar, { width: 8, backgroundColor: gBar }]} />
-              <View style={[styles.bandContent, { backgroundColor: SECTION_BAND, borderBottomLeftRadius: CONTAINER_RADIUS }]} />
+              <View
+                style={[
+                  styles.bandContent,
+                  { backgroundColor: SECTION_BAND, borderBottomLeftRadius: CONTAINER_RADIUS },
+                ]}
+              />
             </View>
           );
         }
@@ -174,7 +199,10 @@ export default function RowHeader({ rows, rowOffsets, renderScrollY, viewHeight 
                 <Text style={styles.countText}>{item.crop.plant_count}</Text>
               </View>
               <View style={styles.nameCell}>
-                <Text style={[styles.nameText, isSelected && styles.nameTextSelected]} numberOfLines={1}>
+                <Text
+                  style={[styles.nameText, isSelected && styles.nameTextSelected]}
+                  numberOfLines={1}
+                >
                   {item.crop.name}
                 </Text>
               </View>
@@ -222,7 +250,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     paddingHorizontal: 8,
-    paddingTop:4
+    paddingTop: 4,
   },
   gardenText: {
     flex: 1,
@@ -230,14 +258,14 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
     paddingHorizontal: 6,
-    paddingTop:4
+    paddingTop: 4,
   },
   sectionText: {
     flex: 1,
     color: '#000000',
     fontSize: 10,
     paddingHorizontal: 5,
-    paddingTop:4
+    paddingTop: 4,
   },
 
   // ── Crop cell internals ────────────────────────────────────────────────────

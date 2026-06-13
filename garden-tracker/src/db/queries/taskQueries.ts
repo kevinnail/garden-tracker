@@ -70,7 +70,7 @@ function isTaskScheduledOnDate(task: DashboardTaskRow, dueDate: Date): boolean {
 function countMissedOccurrences(
   task: DashboardTaskRow,
   mostRecentDueDate: Date,
-  completions: Set<string>
+  completions: Set<string>,
 ): number {
   const stepDays = task.frequency_weeks * 7;
   let count = 0;
@@ -86,7 +86,11 @@ function countMissedOccurrences(
   return count;
 }
 
-function buildDashboardItem(task: DashboardTaskRow, dueDate: Date, missed_count = 1): TodayTaskItem {
+function buildDashboardItem(
+  task: DashboardTaskRow,
+  dueDate: Date,
+  missed_count = 1,
+): TodayTaskItem {
   return {
     task_id: task.task_id,
     crop_instance_id: task.crop_instance_id,
@@ -175,12 +179,13 @@ async function getCompletionSet(): Promise<Set<string>> {
     WHERE ci.archived = 0
   `);
 
-  return new Set((rows ?? []).map(row => `${row.task_id}:${row.completed_date}`));
+  return new Set((rows ?? []).map((row) => `${row.task_id}:${row.completed_date}`));
 }
 
 export async function getTasksForCrop(cropInstanceId: number): Promise<Task[]> {
   const db = await getDb();
-  return db.getAllAsync<Task>(`
+  return db.getAllAsync<Task>(
+    `
     SELECT
       t.id,
       t.crop_instance_id,
@@ -193,24 +198,30 @@ export async function getTasksForCrop(cropInstanceId: number): Promise<Task[]> {
     FROM tasks t
     JOIN task_types tt ON tt.id = t.task_type_id
     WHERE t.crop_instance_id = ?
-  `, cropInstanceId);
+  `,
+    cropInstanceId,
+  );
 }
 
 export async function getCompletionsForCrop(cropInstanceId: number): Promise<TaskCompletion[]> {
   const db = await getDb();
-  return db.getAllAsync<TaskCompletion>(`
+  return db.getAllAsync<TaskCompletion>(
+    `
     SELECT tc.id, tc.task_id, tc.completed_date
     FROM task_completions tc
     JOIN tasks t ON t.id = tc.task_id
     WHERE t.crop_instance_id = ?
-  `, cropInstanceId);
+  `,
+    cropInstanceId,
+  );
 }
 
 export async function getTasksForCrops(cropInstanceIds: number[]): Promise<Task[]> {
   if (cropInstanceIds.length === 0) return [];
   const db = await getDb();
   const placeholders = cropInstanceIds.map(() => '?').join(',');
-  return db.getAllAsync<Task>(`
+  return db.getAllAsync<Task>(
+    `
     SELECT
       t.id,
       t.crop_instance_id,
@@ -223,21 +234,26 @@ export async function getTasksForCrops(cropInstanceIds: number[]): Promise<Task[
     FROM tasks t
     JOIN task_types tt ON tt.id = t.task_type_id
     WHERE t.crop_instance_id IN (${placeholders})
-  `, ...cropInstanceIds);
+  `,
+    ...cropInstanceIds,
+  );
 }
 
 export async function getCompletionsForCrops(
-  cropInstanceIds: number[]
+  cropInstanceIds: number[],
 ): Promise<(TaskCompletion & { crop_instance_id: number })[]> {
   if (cropInstanceIds.length === 0) return [];
   const db = await getDb();
   const placeholders = cropInstanceIds.map(() => '?').join(',');
-  return db.getAllAsync<TaskCompletion & { crop_instance_id: number }>(`
+  return db.getAllAsync<TaskCompletion & { crop_instance_id: number }>(
+    `
     SELECT tc.id, tc.task_id, tc.completed_date, t.crop_instance_id
     FROM task_completions tc
     JOIN tasks t ON t.id = tc.task_id
     WHERE t.crop_instance_id IN (${placeholders})
-  `, ...cropInstanceIds);
+  `,
+    ...cropInstanceIds,
+  );
 }
 
 export async function getTaskTypes(): Promise<TaskType[]> {
@@ -250,12 +266,16 @@ export async function insertTask(
   taskTypeId: number,
   dayOfWeek: number,
   frequencyWeeks: number,
-  startOffsetWeeks: number
+  startOffsetWeeks: number,
 ): Promise<number> {
   const db = await getDb();
   const result = await db.runAsync(
     `INSERT INTO tasks (crop_instance_id, task_type_id, day_of_week, frequency_weeks, start_offset_weeks) VALUES (?, ?, ?, ?, ?)`,
-    cropInstanceId, taskTypeId, dayOfWeek, frequencyWeeks, startOffsetWeeks
+    cropInstanceId,
+    taskTypeId,
+    dayOfWeek,
+    frequencyWeeks,
+    startOffsetWeeks,
   );
   return result.lastInsertRowId;
 }
@@ -264,7 +284,8 @@ export async function insertCompletion(taskId: number, weekDate: string): Promis
   const db = await getDb();
   await db.runAsync(
     `INSERT OR IGNORE INTO task_completions (task_id, completed_date) VALUES (?, ?)`,
-    taskId, weekDate
+    taskId,
+    weekDate,
   );
 }
 
@@ -272,7 +293,8 @@ export async function deleteCompletion(taskId: number, weekDate: string): Promis
   const db = await getDb();
   await db.runAsync(
     `DELETE FROM task_completions WHERE task_id = ? AND completed_date = ?`,
-    taskId, weekDate
+    taskId,
+    weekDate,
   );
 }
 
@@ -286,7 +308,9 @@ export async function updateTaskDay(id: number, dayOfWeek: number): Promise<void
   await db.runAsync(`UPDATE tasks SET day_of_week = ? WHERE id = ?`, dayOfWeek, id);
 }
 
-export async function getTodayAndOverdue(referenceDate: Date = new Date()): Promise<{ due: TodayTaskItem[]; overdue: TodayTaskItem[] }> {
+export async function getTodayAndOverdue(
+  referenceDate: Date = new Date(),
+): Promise<{ due: TodayTaskItem[]; overdue: TodayTaskItem[] }> {
   const today = new Date(referenceDate);
   today.setHours(0, 0, 0, 0);
 
@@ -294,16 +318,16 @@ export async function getTodayAndOverdue(referenceDate: Date = new Date()): Prom
 
   const todayWeekDate = formatDateKey(toSunday(today));
   const due = tasks
-    .filter(task => task.day_of_week === today.getDay())
-    .filter(task => isTaskScheduledOnDate(task, today))
-    .filter(task => !completions.has(`${task.task_id}:${todayWeekDate}`))
-    .map(task => buildDashboardItem(task, today))
+    .filter((task) => task.day_of_week === today.getDay())
+    .filter((task) => isTaskScheduledOnDate(task, today))
+    .filter((task) => !completions.has(`${task.task_id}:${todayWeekDate}`))
+    .map((task) => buildDashboardItem(task, today))
     .sort(compareDashboardItems);
 
   // For each task find the most recent *uncompleted* past occurrence, walking
   // backwards through the crop span until one is found or the span is exhausted.
   const overdue = tasks
-    .map(task => {
+    .map((task) => {
       const dayDelta = (7 + today.getDay() - task.day_of_week) % 7;
       const daysBack = dayDelta === 0 ? 7 : dayDelta;
       let dueDate = addDays(today, -daysBack);
@@ -319,7 +343,9 @@ export async function getTodayAndOverdue(referenceDate: Date = new Date()): Prom
       return null;
     })
     .filter((x): x is { task: DashboardTaskRow; dueDate: Date } => x !== null)
-    .map(({ task, dueDate }) => buildDashboardItem(task, dueDate, countMissedOccurrences(task, dueDate, completions)))
+    .map(({ task, dueDate }) =>
+      buildDashboardItem(task, dueDate, countMissedOccurrences(task, dueDate, completions)),
+    )
     .sort(compareDashboardItems);
 
   return { due, overdue };
