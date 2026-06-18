@@ -12,7 +12,7 @@ export async function getNoteForCell(
     `
     SELECT id, entity_type, entity_id, week_date, crop_instance_id, content, created_at, updated_at
     FROM notes
-    WHERE entity_type = ? AND crop_instance_id = ? AND week_date = ?
+    WHERE entity_type = ? AND crop_instance_id = ? AND week_date = ? AND deleted_at IS NULL
     ORDER BY updated_at DESC, id DESC
     LIMIT 1
   `,
@@ -35,14 +35,14 @@ export async function upsertNote(
      VALUES (?, ?, ?, ?)
      ON CONFLICT(entity_type, crop_instance_id, week_date)
      WHERE entity_type = 'week_cell' AND crop_instance_id IS NOT NULL AND week_date IS NOT NULL
-     DO UPDATE SET content = excluded.content, updated_at = datetime('now')`,
+     DO UPDATE SET content = excluded.content, updated_at = datetime('now'), deleted_at = NULL`,
     WEEK_CELL_ENTITY,
     cropInstanceId,
     weekDate,
     content,
   );
   const row = await db.getFirstAsync<{ id: number }>(
-    `SELECT id FROM notes WHERE entity_type = ? AND crop_instance_id = ? AND week_date = ? LIMIT 1`,
+    `SELECT id FROM notes WHERE entity_type = ? AND crop_instance_id = ? AND week_date = ? AND deleted_at IS NULL LIMIT 1`,
     WEEK_CELL_ENTITY,
     cropInstanceId,
     weekDate,
@@ -52,7 +52,10 @@ export async function upsertNote(
 
 export async function deleteNote(id: number): Promise<void> {
   const db = await getDb();
-  await db.runAsync(`DELETE FROM notes WHERE id = ?`, id);
+  await db.runAsync(
+    `UPDATE notes SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
+    id,
+  );
 }
 
 export async function getAllNotesForCrop(cropInstanceId: number): Promise<Note[]> {
@@ -61,7 +64,7 @@ export async function getAllNotesForCrop(cropInstanceId: number): Promise<Note[]
     `
     SELECT id, entity_type, entity_id, week_date, crop_instance_id, content, created_at, updated_at
     FROM notes
-    WHERE entity_type = ? AND crop_instance_id = ?
+    WHERE entity_type = ? AND crop_instance_id = ? AND deleted_at IS NULL
     ORDER BY week_date, updated_at DESC, id DESC
   `,
     WEEK_CELL_ENTITY,
@@ -77,7 +80,7 @@ export async function getNotesForCrops(cropInstanceIds: number[]): Promise<Note[
     `
     SELECT id, entity_type, entity_id, week_date, crop_instance_id, content, created_at, updated_at
     FROM notes
-    WHERE entity_type = ? AND crop_instance_id IN (${placeholders})
+    WHERE entity_type = ? AND crop_instance_id IN (${placeholders}) AND deleted_at IS NULL
     ORDER BY crop_instance_id, week_date, updated_at DESC, id DESC
   `,
     WEEK_CELL_ENTITY,
