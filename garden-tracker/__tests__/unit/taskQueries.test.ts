@@ -30,10 +30,14 @@ const mockDb = {
   getAllAsync: jest.fn(),
   getFirstAsync: jest.fn(),
   runAsync: jest.fn(),
+  withTransactionAsync: jest.fn(async (fn: () => Promise<void>) => {
+    await fn();
+  }),
 };
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockDb.runAsync.mockResolvedValue({});
   (getDb as jest.Mock).mockResolvedValue(mockDb);
 });
 
@@ -176,14 +180,14 @@ describe('insertTask', () => {
 // ── insertCompletion ───────────────────────────────────────────────────────────
 
 describe('insertCompletion', () => {
-  it('inserts a completion record using INSERT OR IGNORE', async () => {
-    mockDb.runAsync.mockResolvedValueOnce({});
-
+  it('upserts a completion, reviving any soft-deleted row on conflict', async () => {
     await insertCompletion(1, '2025-03-02');
 
     expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
     expect(mockDb.runAsync).toHaveBeenCalledWith(
-      expect.stringContaining('INSERT OR IGNORE'),
+      expect.stringContaining(
+        'ON CONFLICT(task_id, completed_date) DO UPDATE SET deleted_at = NULL',
+      ),
       1,
       '2025-03-02',
     );
@@ -205,14 +209,12 @@ describe('insertCompletion', () => {
 // ── deleteCompletion ───────────────────────────────────────────────────────────
 
 describe('deleteCompletion', () => {
-  it('deletes the completion matching task_id and completed_date', async () => {
-    mockDb.runAsync.mockResolvedValueOnce({});
-
+  it('soft-deletes the completion matching task_id and completed_date', async () => {
     await deleteCompletion(1, '2025-03-02');
 
     expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
     expect(mockDb.runAsync).toHaveBeenCalledWith(
-      expect.stringContaining('DELETE FROM task_completions'),
+      expect.stringContaining("UPDATE task_completions SET deleted_at = datetime('now')"),
       1,
       '2025-03-02',
     );
@@ -234,13 +236,19 @@ describe('deleteCompletion', () => {
 // ── deleteTask ─────────────────────────────────────────────────────────────────
 
 describe('deleteTask', () => {
-  it('deletes the task by id', async () => {
-    mockDb.runAsync.mockResolvedValueOnce({});
-
+  it('soft-deletes the task and cascades to its completions', async () => {
     await deleteTask(5);
 
-    expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
-    expect(mockDb.runAsync).toHaveBeenCalledWith(expect.stringContaining('DELETE FROM tasks'), 5);
+    expect(mockDb.runAsync).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "UPDATE task_completions SET deleted_at = datetime('now') WHERE task_id = ?",
+      ),
+      5,
+    );
+    expect(mockDb.runAsync).toHaveBeenCalledWith(
+      expect.stringContaining("UPDATE tasks SET deleted_at = datetime('now') WHERE id = ?"),
+      5,
+    );
   });
 
   it('resolves without a return value', async () => {
