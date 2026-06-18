@@ -1,3 +1,4 @@
+import { type SQLiteDatabase } from 'expo-sqlite';
 import { getDb } from '@/src/db/database';
 import { CropInstance, CropStage, StageDefinition } from '@/src/types';
 import { formatDateKey, parseDateKey, toSunday } from '@/src/utils/dateUtils';
@@ -18,8 +19,8 @@ export async function getCropsForSection(
 ): Promise<CropInstance[]> {
   const db = await getDb();
   const sql = includeArchived
-    ? `SELECT * FROM crop_instances WHERE section_id = ? ORDER BY start_date`
-    : `SELECT * FROM crop_instances WHERE section_id = ? AND archived = 0 ORDER BY start_date`;
+    ? `SELECT * FROM crop_instances WHERE section_id = ? AND deleted_at IS NULL ORDER BY start_date`
+    : `SELECT * FROM crop_instances WHERE section_id = ? AND archived = 0 AND deleted_at IS NULL ORDER BY start_date`;
   const rows = await db.getAllAsync<any>(sql, sectionId);
   return rows.map((r) => ({ ...r, archived: r.archived === 1 }));
 }
@@ -27,8 +28,8 @@ export async function getCropsForSection(
 export async function getAllCrops(includeArchived = false): Promise<CropInstance[]> {
   const db = await getDb();
   const sql = includeArchived
-    ? `SELECT * FROM crop_instances ORDER BY section_id, start_date`
-    : `SELECT * FROM crop_instances WHERE archived = 0 ORDER BY section_id, start_date`;
+    ? `SELECT * FROM crop_instances WHERE deleted_at IS NULL ORDER BY section_id, start_date`
+    : `SELECT * FROM crop_instances WHERE archived = 0 AND deleted_at IS NULL ORDER BY section_id, start_date`;
   const rows = await db.getAllAsync<any>(sql);
   return rows.map((r) => ({ ...r, archived: r.archived === 1 }));
 }
@@ -47,7 +48,7 @@ export async function getCropStages(cropInstanceId: number): Promise<CropStage[]
       sd.name AS stage_name
     FROM crop_stages cs
     JOIN stage_definitions sd ON sd.id = cs.stage_definition_id
-    WHERE cs.crop_instance_id = ?
+    WHERE cs.crop_instance_id = ? AND cs.deleted_at IS NULL
     ORDER BY cs.order_index
   `,
     cropInstanceId,
@@ -70,7 +71,7 @@ export async function getCropStagesForCrops(cropInstanceIds: number[]): Promise<
       sd.name AS stage_name
     FROM crop_stages cs
     JOIN stage_definitions sd ON sd.id = cs.stage_definition_id
-    WHERE cs.crop_instance_id IN (${placeholders})
+    WHERE cs.crop_instance_id IN (${placeholders}) AND cs.deleted_at IS NULL
     ORDER BY cs.crop_instance_id, cs.order_index
   `,
     ...cropInstanceIds,
@@ -195,7 +196,13 @@ export async function replaceCropStages(
   const db = await getDb();
 
   await db.withTransactionAsync(async () => {
-    await db.runAsync(`DELETE FROM crop_stages WHERE crop_instance_id = ?`, cropInstanceId);
+    // Soft-delete (tombstone) the existing stages instead of hard-deleting so the
+    // removal propagates to other devices on sync. New stages are inserted fresh
+    // below; the old tombstoned rows stay invisible via the deleted_at filter.
+    await db.runAsync(
+      `UPDATE crop_stages SET deleted_at = datetime('now') WHERE crop_instance_id = ? AND deleted_at IS NULL`,
+      cropInstanceId,
+    );
 
     for (let i = 0; i < stages.length; i++) {
       await db.runAsync(
@@ -217,10 +224,46 @@ export async function archiveCrop(id: number): Promise<void> {
   );
 }
 
+/**
+ * Soft-delete the given crops and every descendant row (tasks, task_completions,
+ * crop_stages, notes). The schema's `ON DELETE CASCADE` FKs no longer fire now
+ * that deletes are tombstones, so the cascade is done explicitly here. Each step
+ * guards on `deleted_at IS NULL` so an already-tombstoned row keeps its original
+ * deletion timestamp (the LWW comparator Slice E relies on). Caller wraps this in
+ * a transaction.
+ */
+export async function softDeleteCrops(db: SQLiteDatabase, cropIds: number[]): Promise<void> {
+  if (cropIds.length === 0) return;
+  const ph = cropIds.map(() => '?').join(',');
+
+  await db.runAsync(
+    `UPDATE task_completions SET deleted_at = datetime('now')
+     WHERE task_id IN (SELECT id FROM tasks WHERE crop_instance_id IN (${ph})) AND deleted_at IS NULL`,
+    ...cropIds,
+  );
+  await db.runAsync(
+    `UPDATE tasks SET deleted_at = datetime('now') WHERE crop_instance_id IN (${ph}) AND deleted_at IS NULL`,
+    ...cropIds,
+  );
+  await db.runAsync(
+    `UPDATE crop_stages SET deleted_at = datetime('now') WHERE crop_instance_id IN (${ph}) AND deleted_at IS NULL`,
+    ...cropIds,
+  );
+  await db.runAsync(
+    `UPDATE notes SET deleted_at = datetime('now'), updated_at = datetime('now')
+     WHERE crop_instance_id IN (${ph}) AND deleted_at IS NULL`,
+    ...cropIds,
+  );
+  await db.runAsync(
+    `UPDATE crop_instances SET deleted_at = datetime('now'), updated_at = datetime('now')
+     WHERE id IN (${ph}) AND deleted_at IS NULL`,
+    ...cropIds,
+  );
+}
+
 export async function deleteCropInstance(id: number): Promise<void> {
-  // tasks, crop_stages, notes all ON DELETE CASCADE against crop_instances,
-  // and task_completions ON DELETE CASCADE against tasks, so this one DELETE
-  // propagates through every child table via FK enforcement.
   const db = await getDb();
-  await db.runAsync(`DELETE FROM crop_instances WHERE id = ?`, id);
+  await db.withTransactionAsync(async () => {
+    await softDeleteCrops(db, [id]);
+  });
 }
