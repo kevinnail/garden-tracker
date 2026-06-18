@@ -156,7 +156,7 @@ async function getDashboardTasks(): Promise<DashboardTaskRow[]> {
       COALESCE((
         SELECT SUM(cs.duration_weeks)
         FROM crop_stages cs
-        WHERE cs.crop_instance_id = ci.id
+        WHERE cs.crop_instance_id = ci.id AND cs.deleted_at IS NULL
       ), 0) AS total_duration_weeks
     FROM tasks t
     JOIN task_types tt ON tt.id = t.task_type_id
@@ -165,6 +165,11 @@ async function getDashboardTasks(): Promise<DashboardTaskRow[]> {
     JOIN gardens g ON g.id = s.garden_id
     JOIN locations l ON l.id = g.location_id
     WHERE ci.archived = 0
+      AND t.deleted_at IS NULL
+      AND ci.deleted_at IS NULL
+      AND s.deleted_at IS NULL
+      AND g.deleted_at IS NULL
+      AND l.deleted_at IS NULL
     ORDER BY l.order_index, g.order_index, s.order_index, ci.start_date, ci.id, t.id
   `);
 }
@@ -177,6 +182,9 @@ async function getCompletionSet(): Promise<Set<string>> {
     JOIN tasks t ON t.id = tc.task_id
     JOIN crop_instances ci ON ci.id = t.crop_instance_id
     WHERE ci.archived = 0
+      AND tc.deleted_at IS NULL
+      AND t.deleted_at IS NULL
+      AND ci.deleted_at IS NULL
   `);
 
   return new Set((rows ?? []).map((row) => `${row.task_id}:${row.completed_date}`));
@@ -197,7 +205,7 @@ export async function getTasksForCrop(cropInstanceId: number): Promise<Task[]> {
       tt.name AS task_type_name
     FROM tasks t
     JOIN task_types tt ON tt.id = t.task_type_id
-    WHERE t.crop_instance_id = ?
+    WHERE t.crop_instance_id = ? AND t.deleted_at IS NULL
   `,
     cropInstanceId,
   );
@@ -210,7 +218,7 @@ export async function getCompletionsForCrop(cropInstanceId: number): Promise<Tas
     SELECT tc.id, tc.task_id, tc.completed_date
     FROM task_completions tc
     JOIN tasks t ON t.id = tc.task_id
-    WHERE t.crop_instance_id = ?
+    WHERE t.crop_instance_id = ? AND tc.deleted_at IS NULL AND t.deleted_at IS NULL
   `,
     cropInstanceId,
   );
@@ -233,7 +241,7 @@ export async function getTasksForCrops(cropInstanceIds: number[]): Promise<Task[
       tt.name AS task_type_name
     FROM tasks t
     JOIN task_types tt ON tt.id = t.task_type_id
-    WHERE t.crop_instance_id IN (${placeholders})
+    WHERE t.crop_instance_id IN (${placeholders}) AND t.deleted_at IS NULL
   `,
     ...cropInstanceIds,
   );
@@ -250,7 +258,7 @@ export async function getCompletionsForCrops(
     SELECT tc.id, tc.task_id, tc.completed_date, t.crop_instance_id
     FROM task_completions tc
     JOIN tasks t ON t.id = tc.task_id
-    WHERE t.crop_instance_id IN (${placeholders})
+    WHERE t.crop_instance_id IN (${placeholders}) AND tc.deleted_at IS NULL AND t.deleted_at IS NULL
   `,
     ...cropInstanceIds,
   );
@@ -282,8 +290,12 @@ export async function insertTask(
 
 export async function insertCompletion(taskId: number, weekDate: string): Promise<void> {
   const db = await getDb();
+  // Revive on conflict: a prior uncomplete soft-deletes the row, which still
+  // occupies the UNIQUE(task_id, completed_date) slot, so INSERT OR IGNORE would
+  // silently no-op. Clearing deleted_at restores the completion.
   await db.runAsync(
-    `INSERT OR IGNORE INTO task_completions (task_id, completed_date) VALUES (?, ?)`,
+    `INSERT INTO task_completions (task_id, completed_date) VALUES (?, ?)
+     ON CONFLICT(task_id, completed_date) DO UPDATE SET deleted_at = NULL`,
     taskId,
     weekDate,
   );
@@ -292,7 +304,8 @@ export async function insertCompletion(taskId: number, weekDate: string): Promis
 export async function deleteCompletion(taskId: number, weekDate: string): Promise<void> {
   const db = await getDb();
   await db.runAsync(
-    `DELETE FROM task_completions WHERE task_id = ? AND completed_date = ?`,
+    `UPDATE task_completions SET deleted_at = datetime('now')
+     WHERE task_id = ? AND completed_date = ? AND deleted_at IS NULL`,
     taskId,
     weekDate,
   );
@@ -300,7 +313,13 @@ export async function deleteCompletion(taskId: number, weekDate: string): Promis
 
 export async function deleteTask(id: number): Promise<void> {
   const db = await getDb();
-  await db.runAsync(`DELETE FROM tasks WHERE id = ?`, id);
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      `UPDATE task_completions SET deleted_at = datetime('now') WHERE task_id = ? AND deleted_at IS NULL`,
+      id,
+    );
+    await db.runAsync(`UPDATE tasks SET deleted_at = datetime('now') WHERE id = ?`, id);
+  });
 }
 
 export async function updateTaskDay(id: number, dayOfWeek: number): Promise<void> {

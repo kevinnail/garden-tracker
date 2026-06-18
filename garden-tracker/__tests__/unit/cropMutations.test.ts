@@ -198,7 +198,9 @@ describe('replaceCropStages', () => {
     expect(mockDb.withTransactionAsync).toHaveBeenCalledTimes(1);
     expect(mockDb.runAsync).toHaveBeenNthCalledWith(
       1,
-      'DELETE FROM crop_stages WHERE crop_instance_id = ?',
+      expect.stringContaining(
+        "UPDATE crop_stages SET deleted_at = datetime('now') WHERE crop_instance_id = ?",
+      ),
       7,
     );
     expect(mockDb.runAsync).toHaveBeenNthCalledWith(
@@ -224,7 +226,9 @@ describe('replaceCropStages', () => {
 
     expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
     expect(mockDb.runAsync).toHaveBeenCalledWith(
-      'DELETE FROM crop_stages WHERE crop_instance_id = ?',
+      expect.stringContaining(
+        "UPDATE crop_stages SET deleted_at = datetime('now') WHERE crop_instance_id = ?",
+      ),
       7,
     );
   });

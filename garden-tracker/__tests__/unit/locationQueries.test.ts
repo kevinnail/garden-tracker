@@ -31,10 +31,15 @@ const mockDb = {
   getAllAsync: jest.fn(),
   getFirstAsync: jest.fn(),
   runAsync: jest.fn(),
+  withTransactionAsync: jest.fn(async (fn: () => Promise<void>) => {
+    await fn();
+  }),
 };
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockDb.getAllAsync.mockResolvedValue([]);
+  mockDb.runAsync.mockResolvedValue({});
   (getDb as jest.Mock).mockResolvedValue(mockDb);
 });
 
@@ -308,21 +313,16 @@ describe('updateSectionName', () => {
 // ── deleteSection ──────────────────────────────────────────────────────────────
 
 describe('deleteSection', () => {
-  it('deletes the section by id', async () => {
-    mockDb.runAsync.mockResolvedValue({});
-
+  it('soft-deletes the section by stamping deleted_at', async () => {
     await deleteSection(1);
 
-    expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
     expect(mockDb.runAsync).toHaveBeenCalledWith(
-      expect.stringContaining('DELETE FROM sections WHERE id = ?'),
+      expect.stringContaining("UPDATE sections SET deleted_at = datetime('now') WHERE id = ?"),
       1,
     );
   });
 
   it('resolves without a return value', async () => {
-    mockDb.runAsync.mockResolvedValue({});
-
     await expect(deleteSection(1)).resolves.toBeUndefined();
   });
 });
@@ -330,21 +330,22 @@ describe('deleteSection', () => {
 // ── deleteGarden ───────────────────────────────────────────────────────────────
 
 describe('deleteGarden', () => {
-  it('deletes the garden by id', async () => {
-    mockDb.runAsync.mockResolvedValue({});
-
+  it('soft-deletes the garden and cascades to its sections', async () => {
     await deleteGarden(1);
 
-    expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
     expect(mockDb.runAsync).toHaveBeenCalledWith(
-      expect.stringContaining('DELETE FROM gardens WHERE id = ?'),
+      expect.stringContaining(
+        "UPDATE sections SET deleted_at = datetime('now') WHERE garden_id = ?",
+      ),
+      1,
+    );
+    expect(mockDb.runAsync).toHaveBeenCalledWith(
+      expect.stringContaining("UPDATE gardens SET deleted_at = datetime('now') WHERE id = ?"),
       1,
     );
   });
 
   it('resolves without a return value', async () => {
-    mockDb.runAsync.mockResolvedValue({});
-
     await expect(deleteGarden(1)).resolves.toBeUndefined();
   });
 });
@@ -352,21 +353,22 @@ describe('deleteGarden', () => {
 // ── deleteLocation ─────────────────────────────────────────────────────────────
 
 describe('deleteLocation', () => {
-  it('deletes the location by id', async () => {
-    mockDb.runAsync.mockResolvedValue({});
-
+  it('soft-deletes the location and cascades to gardens and sections', async () => {
     await deleteLocation(1);
 
-    expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
     expect(mockDb.runAsync).toHaveBeenCalledWith(
-      expect.stringContaining('DELETE FROM locations WHERE id = ?'),
+      expect.stringContaining(
+        "UPDATE gardens SET deleted_at = datetime('now') WHERE location_id = ?",
+      ),
+      1,
+    );
+    expect(mockDb.runAsync).toHaveBeenCalledWith(
+      expect.stringContaining("UPDATE locations SET deleted_at = datetime('now') WHERE id = ?"),
       1,
     );
   });
 
   it('resolves without a return value', async () => {
-    mockDb.runAsync.mockResolvedValue({});
-
     await expect(deleteLocation(1)).resolves.toBeUndefined();
   });
 });
