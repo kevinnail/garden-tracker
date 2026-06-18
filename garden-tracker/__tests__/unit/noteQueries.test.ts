@@ -97,13 +97,13 @@ describe('upsertNote', () => {
 });
 
 describe('deleteNote', () => {
-  it('calls db with the note id', async () => {
+  it('soft-deletes the note by stamping deleted_at', async () => {
     mockDb.runAsync.mockResolvedValueOnce({});
 
     await deleteNote(4);
 
     expect(mockDb.runAsync).toHaveBeenCalledWith(
-      expect.stringContaining('DELETE FROM notes WHERE id = ?'),
+      expect.stringContaining("UPDATE notes SET deleted_at = datetime('now')"),
       4,
     );
   });
