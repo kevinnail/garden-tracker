@@ -10,6 +10,8 @@ interface AuthState {
   error: string | null;
   /** Create an account. Returns true on success, false on failure (error set). */
   signUp: (email: string, password: string) => Promise<boolean>;
+  /** Sign in to an existing account. Returns true on success, false on failure (error set). */
+  signIn: (email: string, password: string) => Promise<boolean>;
 }
 
 /**
@@ -46,6 +48,21 @@ export const useAuthStore = create<AuthState>((set) => ({
       // from the email local-part as a placeholder.
       name: deriveName(trimmed),
     });
+
+    if (error || !data) {
+      set({ status: 'signed-out', email: null, error: messageFromAuthError(error) });
+      return false;
+    }
+
+    set({ status: 'signed-in', email: trimmed, error: null });
+    return true;
+  },
+
+  signIn: async (email, password) => {
+    const trimmed = email.trim();
+    set({ error: null });
+
+    const { data, error } = await authClient.signIn.email({ email: trimmed, password });
 
     if (error || !data) {
       set({ status: 'signed-out', email: null, error: messageFromAuthError(error) });
