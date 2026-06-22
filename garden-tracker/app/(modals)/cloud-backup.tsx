@@ -23,14 +23,24 @@ export default function CloudBackupModal() {
             <Text style={styles.accountEmail}>{email}</Text>
           </View>
         ) : (
-          <Pressable
-            style={styles.primaryBtn}
-            onPress={() => router.push('/(modals)/sign-up')}
-            accessibilityRole="button"
-            accessibilityLabel="Create account"
-          >
-            <Text style={styles.primaryBtnText}>Create account</Text>
-          </Pressable>
+          <>
+            <Pressable
+              style={styles.primaryBtn}
+              onPress={() => router.push('/(modals)/sign-up')}
+              accessibilityRole="button"
+              accessibilityLabel="Create account"
+            >
+              <Text style={styles.primaryBtnText}>Create account</Text>
+            </Pressable>
+            <Pressable
+              style={styles.secondaryBtn}
+              onPress={() => router.push('/(modals)/sign-in')}
+              accessibilityRole="button"
+              accessibilityLabel="Sign in"
+            >
+              <Text style={styles.secondaryBtnText}>Sign in</Text>
+            </Pressable>
+          </>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -51,6 +61,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   primaryBtnText: { color: '#111', fontWeight: '700', fontSize: 15 },
+
+  secondaryBtn: {
+    marginTop: 10,
+    paddingVertical: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#4a4a4a',
+    backgroundColor: '#262626',
+    alignItems: 'center',
+  },
+  secondaryBtnText: { color: '#ddd', fontWeight: '600', fontSize: 15 },
 
   accountBox: {
     borderWidth: 1,
