@@ -17,47 +17,44 @@ import { useAuthStore } from '@/src/store/authStore';
 import {
   isValidEmail,
   cappedOnChange,
-  weakPasswordError,
   EMAIL_MAX_LENGTH,
-  PASSWORD_MIN_LENGTH,
   PASSWORD_MAX_LENGTH,
 } from '@/src/utils/authFormValidate';
 
-export default function SignUpForm() {
-  const signUp = useAuthStore((s) => s.signUp);
+export default function SignInForm() {
+  const signIn = useAuthStore((s) => s.signIn);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const onChangeEmail = cappedOnChange(setEmail, EMAIL_MAX_LENGTH, 'Email');
   const onChangePassword = cappedOnChange(setPassword, PASSWORD_MAX_LENGTH, 'Password');
-  const onChangeConfirm = cappedOnChange(setConfirm, PASSWORD_MAX_LENGTH, 'Password');
 
   const trimmedEmail = email.trim();
   const validationError = !isValidEmail(trimmedEmail)
     ? 'Enter a valid email address.'
-    : password.length < PASSWORD_MIN_LENGTH
-      ? `Password must be at least ${PASSWORD_MIN_LENGTH} characters.`
-      : weakPasswordError(password)
-        ? weakPasswordError(password)
-        : password !== confirm
-          ? 'Passwords do not match.'
-          : null;
+    : password.length === 0
+      ? 'Enter your password.'
+      : null;
 
   const handleSubmit = async () => {
     if (validationError || submitting) return;
     setSubmitting(true);
     try {
-      const ok = await signUp(trimmedEmail, password);
+      const ok = await signIn(trimmedEmail, password);
       if (ok) {
-        Toast.show({ type: 'success', text1: 'Account created' });
-        router.back();
+        Toast.show({ type: 'success', text1: 'Signed in' });
+        // Every path to sign-in (cloud-backup button, sign-up link, reset
+        // deep-link) lives inside the cloud-backup flow, so land there. dismissTo
+        // pops back to it when it's in the stack and pushes it otherwise — which
+        // also fixes the reset deep-link case where plain back() left the form
+        // open because sign-in was the stack root.
+        router.dismissTo('/(modals)/cloud-backup');
       } else {
         Toast.show({
           type: 'error',
-          text1: 'Sign-up failed',
+          text1: 'Sign-in failed',
           text2: useAuthStore.getState().error ?? undefined,
           visibilityTime: 4500,
         });
@@ -79,9 +76,9 @@ export default function SignUpForm() {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         >
-          <Text style={styles.heading}>Create account</Text>
+          <Text style={styles.heading}>Sign in</Text>
           <Text style={styles.subheading}>
-            Your account backs up your garden data to the cloud and syncs it across devices.
+            Sign in to back up and sync your garden data across devices.
           </Text>
 
           <Text style={styles.label}>Email</Text>
@@ -102,23 +99,11 @@ export default function SignUpForm() {
             style={styles.input}
             value={password}
             onChangeText={onChangePassword}
-            placeholder={`At least ${PASSWORD_MIN_LENGTH} characters`}
+            placeholder="Your password"
             placeholderTextColor="#555"
             autoCapitalize="none"
             secureTextEntry
-            textContentType="newPassword"
-          />
-
-          <Text style={styles.label}>Confirm password</Text>
-          <TextInput
-            style={styles.input}
-            value={confirm}
-            onChangeText={onChangeConfirm}
-            placeholder="Re-enter password"
-            placeholderTextColor="#555"
-            autoCapitalize="none"
-            secureTextEntry
-            textContentType="newPassword"
+            textContentType="password"
             onSubmitEditing={handleSubmit}
             returnKeyType="go"
           />
@@ -132,22 +117,31 @@ export default function SignUpForm() {
             onPress={handleSubmit}
             disabled={!!validationError || submitting}
             accessibilityRole="button"
-            accessibilityLabel="Create account"
+            accessibilityLabel="Sign in"
           >
             {submitting ? (
               <ActivityIndicator color="#111" size="small" />
             ) : (
-              <Text style={styles.submitBtnText}>Create account</Text>
+              <Text style={styles.submitBtnText}>Sign in</Text>
             )}
           </Pressable>
 
           <Pressable
             style={styles.linkBtn}
-            onPress={() => router.replace('/(modals)/sign-in')}
+            onPress={() => router.push('/(modals)/forgot-password')}
             accessibilityRole="button"
-            accessibilityLabel="Sign in"
+            accessibilityLabel="Forgot password"
           >
-            <Text style={styles.linkText}>Already have an account? Sign in</Text>
+            <Text style={styles.linkText}>Forgot password?</Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.linkBtn}
+            onPress={() => router.replace('/(modals)/sign-up')}
+            accessibilityRole="button"
+            accessibilityLabel="Create an account"
+          >
+            <Text style={styles.linkText}>Don&apos;t have an account? Create one</Text>
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>

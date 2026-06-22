@@ -108,6 +108,36 @@ export default function RootLayout() {
               headerTitleStyle: { fontWeight: '800' },
             }}
           />
+          <Stack.Screen
+            name="(modals)/sign-in"
+            options={{
+              presentation: 'modal',
+              title: 'Sign In',
+              headerStyle: { backgroundColor: '#111111' },
+              headerTintColor: '#fff',
+              headerTitleStyle: { fontWeight: '800' },
+            }}
+          />
+          <Stack.Screen
+            name="(modals)/forgot-password"
+            options={{
+              presentation: 'modal',
+              title: 'Reset Password',
+              headerStyle: { backgroundColor: '#111111' },
+              headerTintColor: '#fff',
+              headerTitleStyle: { fontWeight: '800' },
+            }}
+          />
+          <Stack.Screen
+            name="(modals)/reset-password"
+            options={{
+              presentation: 'modal',
+              title: 'Set New Password',
+              headerStyle: { backgroundColor: '#111111' },
+              headerTintColor: '#fff',
+              headerTitleStyle: { fontWeight: '800' },
+            }}
+          />
         </Stack>
         <StatusBar style="light" />
         <Toast />

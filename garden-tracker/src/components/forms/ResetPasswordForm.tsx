@@ -9,36 +9,55 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuthStore } from '@/src/store/authStore';
 import {
-  isValidEmail,
   cappedOnChange,
   weakPasswordError,
-  EMAIL_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
   PASSWORD_MAX_LENGTH,
 } from '@/src/utils/authFormValidate';
 
-export default function SignUpForm() {
-  const signUp = useAuthStore((s) => s.signUp);
+export default function ResetPasswordForm() {
+  const resetPassword = useAuthStore((s) => s.resetPassword);
+  const { token } = useLocalSearchParams<{ token?: string }>();
 
-  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const onChangeEmail = cappedOnChange(setEmail, EMAIL_MAX_LENGTH, 'Email');
   const onChangePassword = cappedOnChange(setPassword, PASSWORD_MAX_LENGTH, 'Password');
   const onChangeConfirm = cappedOnChange(setConfirm, PASSWORD_MAX_LENGTH, 'Password');
 
-  const trimmedEmail = email.trim();
-  const validationError = !isValidEmail(trimmedEmail)
-    ? 'Enter a valid email address.'
-    : password.length < PASSWORD_MIN_LENGTH
+  // The token arrives via the cropplanner://reset-password?token=… deep link.
+  // Without it there is nothing to submit — tell the user to reopen the email link.
+  if (!token) {
+    return (
+      <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
+        <ScrollView contentContainerStyle={styles.content}>
+          <Text style={styles.heading}>Reset link invalid</Text>
+          <Text style={styles.subheading}>
+            This screen needs a valid reset link. Open the most recent password-reset email on this
+            device and tap the link again.
+          </Text>
+          <Pressable
+            style={styles.linkBtn}
+            onPress={() => router.replace('/(modals)/sign-in')}
+            accessibilityRole="button"
+            accessibilityLabel="Back to sign in"
+          >
+            <Text style={styles.linkText}>Back to sign in</Text>
+          </Pressable>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  const validationError =
+    password.length < PASSWORD_MIN_LENGTH
       ? `Password must be at least ${PASSWORD_MIN_LENGTH} characters.`
       : weakPasswordError(password)
         ? weakPasswordError(password)
@@ -50,14 +69,14 @@ export default function SignUpForm() {
     if (validationError || submitting) return;
     setSubmitting(true);
     try {
-      const ok = await signUp(trimmedEmail, password);
+      const ok = await resetPassword(token, password);
       if (ok) {
-        Toast.show({ type: 'success', text1: 'Account created' });
-        router.back();
+        Toast.show({ type: 'success', text1: 'Password updated', text2: 'Sign in with it now.' });
+        router.replace('/(modals)/sign-in');
       } else {
         Toast.show({
           type: 'error',
-          text1: 'Sign-up failed',
+          text1: 'Could not reset password',
           text2: useAuthStore.getState().error ?? undefined,
           visibilityTime: 4500,
         });
@@ -79,25 +98,10 @@ export default function SignUpForm() {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         >
-          <Text style={styles.heading}>Create account</Text>
-          <Text style={styles.subheading}>
-            Your account backs up your garden data to the cloud and syncs it across devices.
-          </Text>
+          <Text style={styles.heading}>Set a new password</Text>
+          <Text style={styles.subheading}>Choose a new password for your account.</Text>
 
-          <Text style={styles.label}>Email</Text>
-          <TextInput
-            style={styles.input}
-            value={email}
-            onChangeText={onChangeEmail}
-            placeholder="you@example.com"
-            placeholderTextColor="#555"
-            autoCapitalize="none"
-            autoComplete="email"
-            keyboardType="email-address"
-            textContentType="emailAddress"
-          />
-
-          <Text style={styles.label}>Password</Text>
+          <Text style={styles.label}>New password</Text>
           <TextInput
             style={styles.input}
             value={password}
@@ -123,7 +127,7 @@ export default function SignUpForm() {
             returnKeyType="go"
           />
 
-          {validationError && (email.length > 0 || password.length > 0) && (
+          {validationError && (password.length > 0 || confirm.length > 0) && (
             <Text style={styles.validationText}>{validationError}</Text>
           )}
 
@@ -132,22 +136,13 @@ export default function SignUpForm() {
             onPress={handleSubmit}
             disabled={!!validationError || submitting}
             accessibilityRole="button"
-            accessibilityLabel="Create account"
+            accessibilityLabel="Update password"
           >
             {submitting ? (
               <ActivityIndicator color="#111" size="small" />
             ) : (
-              <Text style={styles.submitBtnText}>Create account</Text>
+              <Text style={styles.submitBtnText}>Update password</Text>
             )}
-          </Pressable>
-
-          <Pressable
-            style={styles.linkBtn}
-            onPress={() => router.replace('/(modals)/sign-in')}
-            accessibilityRole="button"
-            accessibilityLabel="Sign in"
-          >
-            <Text style={styles.linkText}>Already have an account? Sign in</Text>
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
