@@ -6,12 +6,24 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 
 import { useWeatherStore } from '@/src/store/weatherStore';
+import { useAuthStore } from '@/src/store/authStore';
+import { authClient } from '@/src/services/authClient';
 
 export default function RootLayout() {
   const loadWeather = useWeatherStore((s) => s.load);
   useEffect(() => {
     loadWeather().catch(() => {});
   }, [loadWeather]);
+
+  // Mirror the better-auth session into the store. The Expo client fires one
+  // /get-session per launch on mount; useSession reads that result (and any
+  // later sign-in/out) — we do NOT add a second getSession() call.
+  const setSession = useAuthStore((s) => s.setSession);
+  const { data: session, isPending } = authClient.useSession();
+  useEffect(() => {
+    if (isPending) return;
+    setSession(session ?? null);
+  }, [session, isPending, setSession]);
 
   return (
     <SafeAreaProvider>
