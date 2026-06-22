@@ -7,6 +7,7 @@ jest.mock('@/src/services/authClient', () => ({
     signIn: { email: jest.fn() },
     requestPasswordReset: jest.fn(),
     resetPassword: jest.fn(),
+    signOut: jest.fn(),
   },
 }));
 
@@ -14,6 +15,7 @@ const signUpEmailMock = authClient.signUp.email as unknown as jest.Mock;
 const signInEmailMock = authClient.signIn.email as unknown as jest.Mock;
 const requestPasswordResetMock = authClient.requestPasswordReset as unknown as jest.Mock;
 const resetPasswordMock = authClient.resetPassword as unknown as jest.Mock;
+const signOutMock = authClient.signOut as unknown as jest.Mock;
 
 function resetStore() {
   useAuthStore.setState({ status: 'signed-out', email: null, error: null });
@@ -207,6 +209,45 @@ describe('authStore.resetPassword', () => {
 
     expect(ok).toBe(false);
     expect(useAuthStore.getState().error).toBe('Invalid or expired token');
+  });
+});
+
+describe('authStore.signOut', () => {
+  beforeEach(() => {
+    resetStore();
+    signOutMock.mockReset();
+  });
+
+  it('clears the session and returns to signed-out on success', async () => {
+    useAuthStore.setState({ status: 'signed-in', email: 'grower@example.com' });
+    signOutMock.mockResolvedValue({ data: { success: true }, error: null });
+
+    const ok = await useAuthStore.getState().signOut();
+
+    expect(ok).toBe(true);
+    expect(signOutMock).toHaveBeenCalledTimes(1);
+    expect(useAuthStore.getState()).toMatchObject({
+      status: 'signed-out',
+      email: null,
+      error: null,
+    });
+  });
+
+  it('stays signed-in and surfaces the error when sign-out fails', async () => {
+    useAuthStore.setState({ status: 'signed-in', email: 'grower@example.com' });
+    signOutMock.mockResolvedValue({
+      data: null,
+      error: { message: 'Network request failed', status: 0 },
+    });
+
+    const ok = await useAuthStore.getState().signOut();
+
+    expect(ok).toBe(false);
+    expect(useAuthStore.getState()).toMatchObject({
+      status: 'signed-in',
+      email: 'grower@example.com',
+      error: 'Network request failed',
+    });
   });
 });
 
