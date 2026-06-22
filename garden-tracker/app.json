@@ -65,7 +65,8 @@
           "photosPermission": "Allow Crop Planner to access your photos for note attachments.",
           "cameraPermission": "Allow Crop Planner to take photos for note attachments."
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,

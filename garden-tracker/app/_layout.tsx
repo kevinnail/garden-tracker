@@ -88,6 +88,26 @@ export default function RootLayout() {
               headerTitleStyle: { fontWeight: '800' },
             }}
           />
+          <Stack.Screen
+            name="(modals)/cloud-backup"
+            options={{
+              presentation: 'modal',
+              title: 'Cloud Backup',
+              headerStyle: { backgroundColor: '#111111' },
+              headerTintColor: '#fff',
+              headerTitleStyle: { fontWeight: '800' },
+            }}
+          />
+          <Stack.Screen
+            name="(modals)/sign-up"
+            options={{
+              presentation: 'modal',
+              title: 'Create Account',
+              headerStyle: { backgroundColor: '#111111' },
+              headerTintColor: '#fff',
+              headerTitleStyle: { fontWeight: '800' },
+            }}
+          />
         </Stack>
         <StatusBar style="light" />
         <Toast />

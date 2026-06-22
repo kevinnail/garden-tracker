@@ -247,6 +247,15 @@ export default function PlannerToolbar() {
           View {showViewControls ? '▲' : '▾'}
         </Text>
       </Pressable>
+      <Pressable
+        style={styles.cloudBtn}
+        onPress={() => router.push('/(modals)/cloud-backup')}
+        accessibilityRole="button"
+        accessibilityLabel="Cloud backup"
+        accessibilityHint="Opens the cloud backup and account screen"
+      >
+        <Ionicons name="cloud-outline" size={15} color="#666" />
+      </Pressable>
       {__DEV__ && (
         <Pressable
           style={styles.debugBtn}
@@ -460,6 +469,16 @@ const styles = StyleSheet.create({
     borderColor: '#35506a',
   },
   debugBtnText: { color: '#9ec3ea', fontWeight: '700', fontSize: 13 },
+
+  cloudBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#242424',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#3a3a3a',
+    justifyContent: 'center',
+  },
 
   // ── View panel ─────────────────────────────────────────────────────────────
   viewPanel: {
