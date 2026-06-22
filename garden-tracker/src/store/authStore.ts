@@ -12,6 +12,10 @@ interface AuthState {
   signUp: (email: string, password: string) => Promise<boolean>;
   /** Sign in to an existing account. Returns true on success, false on failure (error set). */
   signIn: (email: string, password: string) => Promise<boolean>;
+  /** Send a password-reset email. Returns true on success, false on failure (error set). */
+  requestPasswordReset: (email: string) => Promise<boolean>;
+  /** Apply a reset token + new password. Returns true on success, false on failure (error set). */
+  resetPassword: (token: string, newPassword: string) => Promise<boolean>;
 }
 
 /**
@@ -70,6 +74,32 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
 
     set({ status: 'signed-in', email: trimmed, error: null });
+    return true;
+  },
+
+  requestPasswordReset: async (email) => {
+    set({ error: null });
+
+    // The server supplies the callbackURL (cropplanner://reset-password) via its
+    // sendResetPassword config, so the client does not pass redirectTo.
+    const { error } = await authClient.requestPasswordReset({ email: email.trim() });
+
+    if (error) {
+      set({ error: messageFromAuthError(error) });
+      return false;
+    }
+    return true;
+  },
+
+  resetPassword: async (token, newPassword) => {
+    set({ error: null });
+
+    const { error } = await authClient.resetPassword({ newPassword, token });
+
+    if (error) {
+      set({ error: messageFromAuthError(error) });
+      return false;
+    }
     return true;
   },
 }));
