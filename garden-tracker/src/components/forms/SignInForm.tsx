@@ -14,10 +14,12 @@ import Toast from 'react-native-toast-message';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuthStore } from '@/src/store/authStore';
-
-function isValidEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
+import {
+  isValidEmail,
+  cappedOnChange,
+  EMAIL_MAX_LENGTH,
+  PASSWORD_MAX_LENGTH,
+} from '@/src/utils/authFormValidate';
 
 export default function SignInForm() {
   const signIn = useAuthStore((s) => s.signIn);
@@ -25,6 +27,9 @@ export default function SignInForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const onChangeEmail = cappedOnChange(setEmail, EMAIL_MAX_LENGTH, 'Email');
+  const onChangePassword = cappedOnChange(setPassword, PASSWORD_MAX_LENGTH, 'Password');
 
   const trimmedEmail = email.trim();
   const validationError = !isValidEmail(trimmedEmail)
@@ -40,7 +45,12 @@ export default function SignInForm() {
       const ok = await signIn(trimmedEmail, password);
       if (ok) {
         Toast.show({ type: 'success', text1: 'Signed in' });
-        router.back();
+        // Every path to sign-in (cloud-backup button, sign-up link, reset
+        // deep-link) lives inside the cloud-backup flow, so land there. dismissTo
+        // pops back to it when it's in the stack and pushes it otherwise — which
+        // also fixes the reset deep-link case where plain back() left the form
+        // open because sign-in was the stack root.
+        router.dismissTo('/(modals)/cloud-backup');
       } else {
         Toast.show({
           type: 'error',
@@ -75,7 +85,7 @@ export default function SignInForm() {
           <TextInput
             style={styles.input}
             value={email}
-            onChangeText={setEmail}
+            onChangeText={onChangeEmail}
             placeholder="you@example.com"
             placeholderTextColor="#555"
             autoCapitalize="none"
@@ -88,7 +98,7 @@ export default function SignInForm() {
           <TextInput
             style={styles.input}
             value={password}
-            onChangeText={setPassword}
+            onChangeText={onChangePassword}
             placeholder="Your password"
             placeholderTextColor="#555"
             autoCapitalize="none"
@@ -114,6 +124,15 @@ export default function SignInForm() {
             ) : (
               <Text style={styles.submitBtnText}>Sign in</Text>
             )}
+          </Pressable>
+
+          <Pressable
+            style={styles.linkBtn}
+            onPress={() => router.push('/(modals)/forgot-password')}
+            accessibilityRole="button"
+            accessibilityLabel="Forgot password"
+          >
+            <Text style={styles.linkText}>Forgot password?</Text>
           </Pressable>
 
           <Pressable
