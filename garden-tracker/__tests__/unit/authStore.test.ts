@@ -209,3 +209,34 @@ describe('authStore.resetPassword', () => {
     expect(useAuthStore.getState().error).toBe('Invalid or expired token');
   });
 });
+
+describe('authStore.setSession', () => {
+  beforeEach(resetStore);
+
+  it('mirrors a restored session into signed-in state with the email', () => {
+    useAuthStore
+      .getState()
+      .setSession({ user: { id: 'u1', email: 'grower@example.com' } } as never);
+
+    expect(useAuthStore.getState()).toMatchObject({
+      status: 'signed-in',
+      email: 'grower@example.com',
+    });
+  });
+
+  it('returns to signed-out when the session is null (signed out / expired)', () => {
+    useAuthStore.setState({ status: 'signed-in', email: 'grower@example.com' });
+
+    useAuthStore.getState().setSession(null);
+
+    expect(useAuthStore.getState()).toMatchObject({ status: 'signed-out', email: null });
+  });
+
+  it('treats a session without an email as signed-out', () => {
+    useAuthStore.setState({ status: 'signed-in', email: 'grower@example.com' });
+
+    useAuthStore.getState().setSession({ user: null } as never);
+
+    expect(useAuthStore.getState()).toMatchObject({ status: 'signed-out', email: null });
+  });
+});
