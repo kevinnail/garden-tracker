@@ -108,6 +108,16 @@ export default function RootLayout() {
               headerTitleStyle: { fontWeight: '800' },
             }}
           />
+          <Stack.Screen
+            name="(modals)/sign-in"
+            options={{
+              presentation: 'modal',
+              title: 'Sign In',
+              headerStyle: { backgroundColor: '#111111' },
+              headerTintColor: '#fff',
+              headerTitleStyle: { fontWeight: '800' },
+            }}
+          />
         </Stack>
         <StatusBar style="light" />
         <Toast />
