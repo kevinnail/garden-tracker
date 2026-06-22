@@ -8,6 +8,7 @@ import { useAuthStore } from '@/src/store/authStore';
 export default function CloudBackupModal() {
   const status = useAuthStore((s) => s.status);
   const email = useAuthStore((s) => s.email);
+  const signOut = useAuthStore((s) => s.signOut);
 
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
@@ -18,10 +19,20 @@ export default function CloudBackupModal() {
         </Text>
 
         {status === 'signed-in' ? (
-          <View style={styles.accountBox}>
-            <Text style={styles.accountLabel}>Signed in as</Text>
-            <Text style={styles.accountEmail}>{email}</Text>
-          </View>
+          <>
+            <View style={styles.accountBox}>
+              <Text style={styles.accountLabel}>Signed in as</Text>
+              <Text style={styles.accountEmail}>{email}</Text>
+            </View>
+            <Pressable
+              style={styles.secondaryBtn}
+              onPress={() => signOut()}
+              accessibilityRole="button"
+              accessibilityLabel="Sign out"
+            >
+              <Text style={styles.secondaryBtnText}>Sign out</Text>
+            </Pressable>
+          </>
         ) : (
           <>
             <Pressable
