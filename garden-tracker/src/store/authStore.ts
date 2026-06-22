@@ -16,6 +16,12 @@ interface AuthState {
   requestPasswordReset: (email: string) => Promise<boolean>;
   /** Apply a reset token + new password. Returns true on success, false on failure (error set). */
   resetPassword: (token: string, newPassword: string) => Promise<boolean>;
+  /**
+   * Mirror the better-auth session into the store. Called from the root layout's
+   * `authClient.useSession()` subscription so a session restored from SecureStore
+   * on launch is reflected without an extra `getSession()` call.
+   */
+  setSession: (session: { user?: { email?: string | null } | null } | null) => void;
 }
 
 /**
@@ -101,5 +107,14 @@ export const useAuthStore = create<AuthState>((set) => ({
       return false;
     }
     return true;
+  },
+
+  setSession: (session) => {
+    const email = session?.user?.email;
+    if (email) {
+      set({ status: 'signed-in', email });
+    } else {
+      set({ status: 'signed-out', email: null });
+    }
   },
 }));
