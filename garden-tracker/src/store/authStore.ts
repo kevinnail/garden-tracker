@@ -17,6 +17,12 @@ interface AuthState {
   /** Apply a reset token + new password. Returns true on success, false on failure (error set). */
   resetPassword: (token: string, newPassword: string) => Promise<boolean>;
   /**
+   * Sign out: clear the better-auth session (and the SecureStore cookie the Expo
+   * client holds). Returns true on success, false on failure (error set, stays
+   * signed-in). Does NOT touch local SQLite — sign-out never deletes local data.
+   */
+  signOut: () => Promise<boolean>;
+  /**
    * Mirror the better-auth session into the store. Called from the root layout's
    * `authClient.useSession()` subscription so a session restored from SecureStore
    * on launch is reflected without an extra `getSession()` call.
@@ -106,6 +112,21 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ error: messageFromAuthError(error) });
       return false;
     }
+    return true;
+  },
+
+  signOut: async () => {
+    set({ error: null });
+
+    const { error } = await authClient.signOut();
+
+    if (error) {
+      set({ error: messageFromAuthError(error) });
+      return false;
+    }
+
+    // Local data is intentionally left intact — sign-out only drops the session.
+    set({ status: 'signed-out', email: null });
     return true;
   },
 
