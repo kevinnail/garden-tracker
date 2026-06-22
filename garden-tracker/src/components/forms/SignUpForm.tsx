@@ -14,12 +14,14 @@ import Toast from 'react-native-toast-message';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuthStore } from '@/src/store/authStore';
-
-const MIN_PASSWORD_LENGTH = 8;
-
-function isValidEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
+import {
+  isValidEmail,
+  cappedOnChange,
+  weakPasswordError,
+  EMAIL_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  PASSWORD_MAX_LENGTH,
+} from '@/src/utils/authFormValidate';
 
 export default function SignUpForm() {
   const signUp = useAuthStore((s) => s.signUp);
@@ -29,14 +31,20 @@ export default function SignUpForm() {
   const [confirm, setConfirm] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  const onChangeEmail = cappedOnChange(setEmail, EMAIL_MAX_LENGTH, 'Email');
+  const onChangePassword = cappedOnChange(setPassword, PASSWORD_MAX_LENGTH, 'Password');
+  const onChangeConfirm = cappedOnChange(setConfirm, PASSWORD_MAX_LENGTH, 'Password');
+
   const trimmedEmail = email.trim();
   const validationError = !isValidEmail(trimmedEmail)
     ? 'Enter a valid email address.'
-    : password.length < MIN_PASSWORD_LENGTH
-      ? `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`
-      : password !== confirm
-        ? 'Passwords do not match.'
-        : null;
+    : password.length < PASSWORD_MIN_LENGTH
+      ? `Password must be at least ${PASSWORD_MIN_LENGTH} characters.`
+      : weakPasswordError(password)
+        ? weakPasswordError(password)
+        : password !== confirm
+          ? 'Passwords do not match.'
+          : null;
 
   const handleSubmit = async () => {
     if (validationError || submitting) return;
@@ -80,7 +88,7 @@ export default function SignUpForm() {
           <TextInput
             style={styles.input}
             value={email}
-            onChangeText={setEmail}
+            onChangeText={onChangeEmail}
             placeholder="you@example.com"
             placeholderTextColor="#555"
             autoCapitalize="none"
@@ -93,8 +101,8 @@ export default function SignUpForm() {
           <TextInput
             style={styles.input}
             value={password}
-            onChangeText={setPassword}
-            placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
+            onChangeText={onChangePassword}
+            placeholder={`At least ${PASSWORD_MIN_LENGTH} characters`}
             placeholderTextColor="#555"
             autoCapitalize="none"
             secureTextEntry
@@ -105,7 +113,7 @@ export default function SignUpForm() {
           <TextInput
             style={styles.input}
             value={confirm}
-            onChangeText={setConfirm}
+            onChangeText={onChangeConfirm}
             placeholder="Re-enter password"
             placeholderTextColor="#555"
             autoCapitalize="none"
