@@ -132,6 +132,15 @@ export default function SignUpForm() {
               <Text style={styles.submitBtnText}>Create account</Text>
             )}
           </Pressable>
+
+          <Pressable
+            style={styles.linkBtn}
+            onPress={() => router.replace('/(modals)/sign-in')}
+            accessibilityRole="button"
+            accessibilityLabel="Sign in"
+          >
+            <Text style={styles.linkText}>Already have an account? Sign in</Text>
+          </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -169,4 +178,7 @@ const styles = StyleSheet.create({
   },
   submitBtnDisabled: { backgroundColor: '#2a4a38' },
   submitBtnText: { color: '#111', fontWeight: '700', fontSize: 15 },
+
+  linkBtn: { marginTop: 18, alignItems: 'center', paddingVertical: 8 },
+  linkText: { color: '#7dcea0', fontSize: 13, fontWeight: '600' },
 });
