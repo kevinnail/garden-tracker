@@ -13,6 +13,7 @@ import { authClient } from '@/src/services/authClient';
 export default function RootLayout() {
   const loadWeather = useWeatherStore((s) => s.load);
   const initSubscriptions = useSubscriptionStore((s) => s.init);
+
   useEffect(() => {
     loadWeather().catch(() => {});
     // Configure RevenueCat once at startup and seed the entitlement/offering.
@@ -26,6 +27,7 @@ export default function RootLayout() {
   const identify = useSubscriptionStore((s) => s.identify);
   const forget = useSubscriptionStore((s) => s.forget);
   const { data: session, isPending } = authClient.useSession();
+
   useEffect(() => {
     if (isPending) return;
     setSession(session ?? null);
