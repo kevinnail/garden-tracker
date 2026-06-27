@@ -49,10 +49,22 @@ cd garden-tracker
 npx expo start          # Start dev server (opens Expo Go on device/emulator)
 npx expo start --ios    # iOS simulator
 npx expo start --android
-npx expo run:ios        # Native build (requires Xcode)
-npx expo run:android    # Native build (requires Android Studio)
 npm test                # Jest (unit + integration); __tests__/
 ```
+
+## Build & Deploy — READ BEFORE giving any build/run instruction
+
+This project is developed on a **Windows host with no Mac/Xcode**. Do NOT instruct the user to run `expo run:ios` / `expo run:android` for native builds — there is no local Xcode. **All iOS builds go through EAS cloud** (`eas build`).
+
+- **iOS dev build** (needed for native modules like `react-native-purchases`, deep links — anything Expo Go sandboxes):
+  - Dev builds install as a **separate app** via the `.dev` bundle id: `app.config.js` overrides identifiers when `APP_VARIANT=development` (set by the `development` profile in `eas.json`). This keeps the App Store build's local SQLite data untouched.
+  - One-time per device: `eas device:create` → register via the QR/website profile.
+  - Build: `eas build --profile development --platform ios` → install on phone via the QR code.
+- **Daily dev loop:** `npx expo start --dev-client`, then open the **dev** app icon (not Expo Go).
+- **`EXPO_PUBLIC_*` env vars — how they reach a build:**
+  - **Dev builds run JS from local Metro.** Metro inlines `EXPO_PUBLIC_*` at bundle time from the local **`.env.development`** (gitignored). So for dev/Test-Store work the local `.env.development` is all that's needed — nothing goes in `eas.json`.
+  - **Production builds bake JS in the cloud** (no Metro). Gitignored `.env*` files are NOT uploaded to EAS, so production `EXPO_PUBLIC_*` values must come from **EAS environment variables** (dashboard / `eas env`) or an `eas.json` `build.<profile>.env` block — `.env.production` alone won't reach a cloud-baked build.
+- These are **public** SDK keys (`EXPO_PUBLIC_*` is embedded in the client by design), not secrets.
 
 ## Architecture
 

@@ -7,23 +7,36 @@ import Toast from 'react-native-toast-message';
 
 import { useWeatherStore } from '@/src/store/weatherStore';
 import { useAuthStore } from '@/src/store/authStore';
+import { useSubscriptionStore } from '@/src/store/subscriptionStore';
 import { authClient } from '@/src/services/authClient';
 
 export default function RootLayout() {
   const loadWeather = useWeatherStore((s) => s.load);
+  const initSubscriptions = useSubscriptionStore((s) => s.init);
+
   useEffect(() => {
     loadWeather().catch(() => {});
-  }, [loadWeather]);
+    // Configure RevenueCat once at startup and seed the entitlement/offering.
+    initSubscriptions().catch(() => {});
+  }, [loadWeather, initSubscriptions]);
 
   // Mirror the better-auth session into the store. The Expo client fires one
   // /get-session per launch on mount; useSession reads that result (and any
   // later sign-in/out) — we do NOT add a second getSession() call.
   const setSession = useAuthStore((s) => s.setSession);
+  const identify = useSubscriptionStore((s) => s.identify);
+  const forget = useSubscriptionStore((s) => s.forget);
   const { data: session, isPending } = authClient.useSession();
+
   useEffect(() => {
     if (isPending) return;
     setSession(session ?? null);
-  }, [session, isPending, setSession]);
+    // Keep RevenueCat's app_user_id in lockstep with the auth session so a
+    // purchase attributes to the right user (and the server can match it).
+    const userId = session?.user?.id;
+    if (userId) identify(userId).catch(() => {});
+    else forget().catch(() => {});
+  }, [session, isPending, setSession, identify, forget]);
 
   return (
     <SafeAreaProvider>
