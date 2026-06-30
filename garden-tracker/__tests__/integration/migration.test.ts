@@ -22,6 +22,14 @@ import { createTestAdapter } from '../setup';
 // The synced tables exactly as the shipped build created them — i.e. without
 // deleted_at. Foreign keys are omitted so the fixture can seed each table in
 // isolation; the migration is purely additive and FK-agnostic.
+//
+// This fixture is the real-data gate. The shipped App Store build (tag v1.0.0)
+// ships NO migrations, so every production DB is at user_version 0 with this
+// exact schema — and these column lists were verified column-for-column
+// identical to v1.0.0's src/db/schema.ts. Because runMigrations is additive and
+// never reads an existing row's value, real user rows behave identically to the
+// seeded rows below. Migrating this fixture v0 → v2 therefore IS the dry run
+// against real shipped data; no physical device DB pull is required.
 const OLD_SCHEMA_SQL = `
   CREATE TABLE locations (
     id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, order_index INTEGER NOT NULL DEFAULT 0
@@ -137,10 +145,11 @@ describe('runMigrations — v0 → v1 deleted_at', () => {
     expect(note.content).toBe('Looking healthy');
   });
 
-  it('bumps user_version to 1', async () => {
+  it('bumps user_version to the current schema version', async () => {
     const db = makeOldDb();
     await runMigrations(createTestAdapter(db));
-    expect(db.pragma('user_version', { simple: true }) as number).toBe(1);
+    // runMigrations is cumulative: a v0 DB runs through every step to current.
+    expect(db.pragma('user_version', { simple: true }) as number).toBe(2);
   });
 
   it('is idempotent — running twice does not error or duplicate columns', async () => {
@@ -167,6 +176,152 @@ describe('runMigrations — v0 → v1 deleted_at', () => {
     }
 
     await expect(runMigrations(createTestAdapter(db))).resolves.toBeUndefined();
-    expect(db.pragma('user_version', { simple: true }) as number).toBe(1);
+    expect(db.pragma('user_version', { simple: true }) as number).toBe(2);
+  });
+});
+
+// The v1 shipped schema: deleted_at on all 8 (Slice A), updated_at only on
+// crop_instances + notes, no uuid. This is the real on-device shape the
+// v1→v2 migration must upgrade.
+const V1_SCHEMA_SQL = `
+  CREATE TABLE locations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, order_index INTEGER NOT NULL DEFAULT 0, deleted_at TEXT
+  );
+  CREATE TABLE gardens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, location_id INTEGER NOT NULL, name TEXT NOT NULL,
+    record_type TEXT NOT NULL DEFAULT 'plant', order_index INTEGER NOT NULL DEFAULT 0, deleted_at TEXT
+  );
+  CREATE TABLE sections (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, garden_id INTEGER NOT NULL, name TEXT NOT NULL,
+    order_index INTEGER NOT NULL DEFAULT 0, deleted_at TEXT
+  );
+  CREATE TABLE crop_instances (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, section_id INTEGER NOT NULL, name TEXT NOT NULL,
+    plant_count INTEGER NOT NULL DEFAULT 1, start_date TEXT NOT NULL,
+    record_type TEXT NOT NULL DEFAULT 'plant', archived INTEGER NOT NULL DEFAULT 0, notes TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), deleted_at TEXT
+  );
+  CREATE TABLE crop_stages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, crop_instance_id INTEGER NOT NULL,
+    stage_definition_id INTEGER NOT NULL, duration_weeks INTEGER NOT NULL, order_index INTEGER NOT NULL DEFAULT 0, deleted_at TEXT
+  );
+  CREATE TABLE tasks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, crop_instance_id INTEGER NOT NULL, task_type_id INTEGER NOT NULL,
+    day_of_week INTEGER NOT NULL, frequency_weeks INTEGER NOT NULL DEFAULT 1,
+    start_offset_weeks INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')), deleted_at TEXT
+  );
+  CREATE TABLE task_completions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, task_id INTEGER NOT NULL, completed_date TEXT NOT NULL,
+    deleted_at TEXT, UNIQUE(task_id, completed_date)
+  );
+  CREATE TABLE notes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, entity_type TEXT NOT NULL, entity_id INTEGER, week_date TEXT,
+    crop_instance_id INTEGER, content TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')), deleted_at TEXT
+  );
+`;
+
+const TABLES_GAINING_UPDATED_AT = [
+  'locations',
+  'gardens',
+  'sections',
+  'crop_stages',
+  'tasks',
+  'task_completions',
+];
+
+function makeV1Db() {
+  const db = new BetterSqlite3(':memory:');
+  db.exec(V1_SCHEMA_SQL);
+  seedOldDb(db); // one row per table; inserts don't touch uuid/updated_at
+  db.pragma('user_version = 1');
+  return db;
+}
+
+describe('runMigrations — v1 → v2 uuid + updated_at', () => {
+  it('adds a uuid column to every synced table, backfilled non-null and unique', async () => {
+    const db = makeV1Db();
+    await runMigrations(createTestAdapter(db));
+
+    const allUuids: string[] = [];
+    for (const table of SYNCED_TABLES) {
+      const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+      expect(cols.map((c) => c.name)).toContain('uuid');
+
+      const rows = db.prepare(`SELECT uuid FROM ${table}`).all() as { uuid: string | null }[];
+      expect(rows).toHaveLength(1);
+      expect(rows[0].uuid).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+      );
+      allUuids.push(rows[0].uuid as string);
+    }
+    // Every backfilled uuid is distinct across all tables.
+    expect(new Set(allUuids).size).toBe(allUuids.length);
+  });
+
+  it('enforces uuid uniqueness via the per-table index', async () => {
+    const db = makeV1Db();
+    await runMigrations(createTestAdapter(db));
+
+    const existing = (db.prepare('SELECT uuid FROM locations LIMIT 1').get() as { uuid: string })
+      .uuid;
+    expect(() =>
+      db
+        .prepare('INSERT INTO locations (uuid, name, order_index) VALUES (?, ?, 0)')
+        .run(existing, 'Dup'),
+    ).toThrow(/UNIQUE/i);
+  });
+
+  it('adds updated_at to the 6 tables that lacked it, backfilled non-null', async () => {
+    const db = makeV1Db();
+    await runMigrations(createTestAdapter(db));
+
+    for (const table of TABLES_GAINING_UPDATED_AT) {
+      const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+      expect(cols.map((c) => c.name)).toContain('updated_at');
+
+      const rows = db.prepare(`SELECT updated_at FROM ${table}`).all() as {
+        updated_at: string | null;
+      }[];
+      expect(rows[0].updated_at).toEqual(expect.any(String));
+    }
+  });
+
+  it('preserves existing row data (no data loss)', async () => {
+    const db = makeV1Db();
+    await runMigrations(createTestAdapter(db));
+
+    const loc = db.prepare('SELECT * FROM locations WHERE id = 1').get() as any;
+    expect(loc.name).toBe('Backyard');
+    const crop = db.prepare('SELECT * FROM crop_instances WHERE id = 1').get() as any;
+    expect(crop.name).toBe('Tomato');
+    expect(crop.plant_count).toBe(6);
+    const note = db.prepare('SELECT * FROM notes WHERE id = 1').get() as any;
+    expect(note.content).toBe('Looking healthy');
+  });
+
+  it('bumps user_version to 2', async () => {
+    const db = makeV1Db();
+    await runMigrations(createTestAdapter(db));
+    expect(db.pragma('user_version', { simple: true }) as number).toBe(2);
+  });
+
+  it('is idempotent — a second run is a no-op and uuids stay stable', async () => {
+    const db = makeV1Db();
+    const adapter = createTestAdapter(db);
+
+    await runMigrations(adapter);
+    const before = db.prepare('SELECT uuid FROM crop_instances WHERE id = 1').get() as {
+      uuid: string;
+    };
+
+    await expect(runMigrations(adapter)).resolves.toBeUndefined();
+
+    const cols = db.prepare('PRAGMA table_info(crop_instances)').all() as { name: string }[];
+    expect(cols.filter((c) => c.name === 'uuid')).toHaveLength(1);
+    const after = db.prepare('SELECT uuid FROM crop_instances WHERE id = 1').get() as {
+      uuid: string;
+    };
+    expect(after.uuid).toBe(before.uuid);
   });
 });
