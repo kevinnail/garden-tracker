@@ -5,6 +5,7 @@ import {
   upsertNote,
 } from '@/src/db/queries/noteQueries';
 import { getDb } from '@/src/db/database';
+import { TS_NOW } from '@/src/db/schema';
 
 jest.mock('@/src/db/database', () => ({
   getDb: jest.fn(),
@@ -103,7 +104,7 @@ describe('deleteNote', () => {
     await deleteNote(4);
 
     expect(mockDb.runAsync).toHaveBeenCalledWith(
-      expect.stringContaining("UPDATE notes SET deleted_at = datetime('now')"),
+      expect.stringContaining(`UPDATE notes SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW}`),
       4,
     );
   });
