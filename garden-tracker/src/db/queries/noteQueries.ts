@@ -1,4 +1,5 @@
 import { getDb } from '@/src/db/database';
+import { TS_NOW, UUID4_SQL } from '@/src/db/schema';
 import { Note } from '@/src/types';
 
 const WEEK_CELL_ENTITY = 'week_cell';
@@ -31,11 +32,11 @@ export async function upsertNote(
   // Atomic upsert against the partial unique index on
   // (entity_type, crop_instance_id, week_date). No pre-read race possible.
   await db.runAsync(
-    `INSERT INTO notes (entity_type, crop_instance_id, week_date, content)
-     VALUES (?, ?, ?, ?)
+    `INSERT INTO notes (uuid, entity_type, crop_instance_id, week_date, content, updated_at)
+     VALUES ((${UUID4_SQL}), ?, ?, ?, ?, ${TS_NOW})
      ON CONFLICT(entity_type, crop_instance_id, week_date)
      WHERE entity_type = 'week_cell' AND crop_instance_id IS NOT NULL AND week_date IS NOT NULL
-     DO UPDATE SET content = excluded.content, updated_at = datetime('now'), deleted_at = NULL`,
+     DO UPDATE SET content = excluded.content, updated_at = ${TS_NOW}, deleted_at = NULL`,
     WEEK_CELL_ENTITY,
     cropInstanceId,
     weekDate,
@@ -53,7 +54,7 @@ export async function upsertNote(
 export async function deleteNote(id: number): Promise<void> {
   const db = await getDb();
   await db.runAsync(
-    `UPDATE notes SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
+    `UPDATE notes SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW} WHERE id = ?`,
     id,
   );
 }
