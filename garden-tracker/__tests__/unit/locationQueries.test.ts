@@ -22,6 +22,7 @@ import {
   updateSectionName,
 } from '@/src/db/queries/locationQueries';
 import { getDb } from '@/src/db/database';
+import { TS_NOW } from '@/src/db/schema';
 
 jest.mock('@/src/db/database', () => ({
   getDb: jest.fn(),
@@ -317,7 +318,9 @@ describe('deleteSection', () => {
     await deleteSection(1);
 
     expect(mockDb.runAsync).toHaveBeenCalledWith(
-      expect.stringContaining("UPDATE sections SET deleted_at = datetime('now') WHERE id = ?"),
+      expect.stringContaining(
+        `UPDATE sections SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW} WHERE id = ?`,
+      ),
       1,
     );
   });
@@ -335,12 +338,14 @@ describe('deleteGarden', () => {
 
     expect(mockDb.runAsync).toHaveBeenCalledWith(
       expect.stringContaining(
-        "UPDATE sections SET deleted_at = datetime('now') WHERE garden_id = ?",
+        `UPDATE sections SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW} WHERE garden_id = ?`,
       ),
       1,
     );
     expect(mockDb.runAsync).toHaveBeenCalledWith(
-      expect.stringContaining("UPDATE gardens SET deleted_at = datetime('now') WHERE id = ?"),
+      expect.stringContaining(
+        `UPDATE gardens SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW} WHERE id = ?`,
+      ),
       1,
     );
   });
@@ -358,12 +363,14 @@ describe('deleteLocation', () => {
 
     expect(mockDb.runAsync).toHaveBeenCalledWith(
       expect.stringContaining(
-        "UPDATE gardens SET deleted_at = datetime('now') WHERE location_id = ?",
+        `UPDATE gardens SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW} WHERE location_id = ?`,
       ),
       1,
     );
     expect(mockDb.runAsync).toHaveBeenCalledWith(
-      expect.stringContaining("UPDATE locations SET deleted_at = datetime('now') WHERE id = ?"),
+      expect.stringContaining(
+        `UPDATE locations SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW} WHERE id = ?`,
+      ),
       1,
     );
   });
