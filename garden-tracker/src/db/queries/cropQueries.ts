@@ -1,5 +1,6 @@
 import { type SQLiteDatabase } from 'expo-sqlite';
 import { getDb } from '@/src/db/database';
+import { TS_NOW, UUID4_SQL } from '@/src/db/schema';
 import { CropInstance, CropStage, StageDefinition } from '@/src/types';
 import { formatDateKey, parseDateKey, toSunday } from '@/src/utils/dateUtils';
 
@@ -93,7 +94,7 @@ export async function insertCropInstance(
   const db = await getDb();
   const normalizedStartDate = normalizeStartDate(startDate);
   const result = await db.runAsync(
-    `INSERT INTO crop_instances (section_id, name, plant_count, start_date, record_type) VALUES (?, ?, ?, ?, ?)`,
+    `INSERT INTO crop_instances (uuid, section_id, name, plant_count, start_date, record_type, updated_at) VALUES ((${UUID4_SQL}), ?, ?, ?, ?, ?, ${TS_NOW})`,
     sectionId,
     name,
     plantCount,
@@ -111,7 +112,7 @@ export async function insertCropStage(
 ): Promise<void> {
   const db = await getDb();
   await db.runAsync(
-    `INSERT INTO crop_stages (crop_instance_id, stage_definition_id, duration_weeks, order_index) VALUES (?, ?, ?, ?)`,
+    `INSERT INTO crop_stages (uuid, crop_instance_id, stage_definition_id, duration_weeks, order_index, updated_at) VALUES ((${UUID4_SQL}), ?, ?, ?, ?, ${TS_NOW})`,
     cropInstanceId,
     stageDefinitionId,
     durationWeeks,
@@ -132,7 +133,7 @@ export async function insertCropWithStages(
   let cropId = 0;
   await db.withTransactionAsync(async () => {
     const result = await db.runAsync(
-      `INSERT INTO crop_instances (section_id, name, plant_count, start_date, record_type) VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO crop_instances (uuid, section_id, name, plant_count, start_date, record_type, updated_at) VALUES ((${UUID4_SQL}), ?, ?, ?, ?, ?, ${TS_NOW})`,
       sectionId,
       name,
       plantCount,
@@ -142,7 +143,7 @@ export async function insertCropWithStages(
     cropId = result.lastInsertRowId;
     for (let i = 0; i < stages.length; i++) {
       await db.runAsync(
-        `INSERT INTO crop_stages (crop_instance_id, stage_definition_id, duration_weeks, order_index) VALUES (?, ?, ?, ?)`,
+        `INSERT INTO crop_stages (uuid, crop_instance_id, stage_definition_id, duration_weeks, order_index, updated_at) VALUES ((${UUID4_SQL}), ?, ?, ?, ?, ${TS_NOW})`,
         cropId,
         stages[i].stage_definition_id,
         stages[i].duration_weeks,
@@ -183,7 +184,7 @@ export async function updateCropInstance(
   const sets = entries.map(([k]) => `${k} = ?`).join(', ');
   const values = entries.map(([, v]) => v);
   await db.runAsync(
-    `UPDATE crop_instances SET ${sets}, updated_at = datetime('now') WHERE id = ?`,
+    `UPDATE crop_instances SET ${sets}, updated_at = ${TS_NOW} WHERE id = ?`,
     ...values,
     id,
   );
@@ -200,13 +201,13 @@ export async function replaceCropStages(
     // removal propagates to other devices on sync. New stages are inserted fresh
     // below; the old tombstoned rows stay invisible via the deleted_at filter.
     await db.runAsync(
-      `UPDATE crop_stages SET deleted_at = datetime('now') WHERE crop_instance_id = ? AND deleted_at IS NULL`,
+      `UPDATE crop_stages SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW} WHERE crop_instance_id = ? AND deleted_at IS NULL`,
       cropInstanceId,
     );
 
     for (let i = 0; i < stages.length; i++) {
       await db.runAsync(
-        `INSERT INTO crop_stages (crop_instance_id, stage_definition_id, duration_weeks, order_index) VALUES (?, ?, ?, ?)`,
+        `INSERT INTO crop_stages (uuid, crop_instance_id, stage_definition_id, duration_weeks, order_index, updated_at) VALUES ((${UUID4_SQL}), ?, ?, ?, ?, ${TS_NOW})`,
         cropInstanceId,
         stages[i].stage_definition_id,
         stages[i].duration_weeks,
@@ -219,7 +220,7 @@ export async function replaceCropStages(
 export async function archiveCrop(id: number): Promise<void> {
   const db = await getDb();
   await db.runAsync(
-    `UPDATE crop_instances SET archived = 1, updated_at = datetime('now') WHERE id = ?`,
+    `UPDATE crop_instances SET archived = 1, updated_at = ${TS_NOW} WHERE id = ?`,
     id,
   );
 }
@@ -237,25 +238,25 @@ export async function softDeleteCrops(db: SQLiteDatabase, cropIds: number[]): Pr
   const ph = cropIds.map(() => '?').join(',');
 
   await db.runAsync(
-    `UPDATE task_completions SET deleted_at = datetime('now')
+    `UPDATE task_completions SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW}
      WHERE task_id IN (SELECT id FROM tasks WHERE crop_instance_id IN (${ph})) AND deleted_at IS NULL`,
     ...cropIds,
   );
   await db.runAsync(
-    `UPDATE tasks SET deleted_at = datetime('now') WHERE crop_instance_id IN (${ph}) AND deleted_at IS NULL`,
+    `UPDATE tasks SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW} WHERE crop_instance_id IN (${ph}) AND deleted_at IS NULL`,
     ...cropIds,
   );
   await db.runAsync(
-    `UPDATE crop_stages SET deleted_at = datetime('now') WHERE crop_instance_id IN (${ph}) AND deleted_at IS NULL`,
+    `UPDATE crop_stages SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW} WHERE crop_instance_id IN (${ph}) AND deleted_at IS NULL`,
     ...cropIds,
   );
   await db.runAsync(
-    `UPDATE notes SET deleted_at = datetime('now'), updated_at = datetime('now')
+    `UPDATE notes SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW}
      WHERE crop_instance_id IN (${ph}) AND deleted_at IS NULL`,
     ...cropIds,
   );
   await db.runAsync(
-    `UPDATE crop_instances SET deleted_at = datetime('now'), updated_at = datetime('now')
+    `UPDATE crop_instances SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW}
      WHERE id IN (${ph}) AND deleted_at IS NULL`,
     ...cropIds,
   );
