@@ -16,6 +16,20 @@ import { PRESET_STAGES } from '@/src/constants/stages';
 import { PRESET_TASK_TYPES } from '@/src/constants/taskTypes';
 import { SCHEMA_SQL, UUID4_SQL } from '@/src/db/schema';
 
+// Kept in step with SYNCED_TABLES in src/db/database.ts. Inlined rather than
+// imported because some suites jest.mock the database module (which would make
+// the export undefined here).
+const SYNCED_TABLES = [
+  'locations',
+  'gardens',
+  'sections',
+  'crop_instances',
+  'crop_stages',
+  'tasks',
+  'task_completions',
+  'notes',
+] as const;
+
 // Known seed values — import these in integration tests for assertions
 export const SEED = {
   SECTION_ID: 1,
@@ -56,6 +70,14 @@ export function setupTestDb() {
 
   db.pragma('foreign_keys = ON');
   db.exec(SCHEMA_SQL);
+
+  // Mirror the migration-created uuid unique indexes (they live in runMigrations,
+  // not SCHEMA_SQL, because CREATE TABLE IF NOT EXISTS can't add the column on an
+  // existing DB). Create them directly so the test schema matches a migrated one;
+  // no uuid backfill on purpose, so seed rows keep NULL uuids.
+  for (const table of SYNCED_TABLES) {
+    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_${table}_uuid ON ${table}(uuid)`);
+  }
 
   // Stage definitions (all 7 presets)
   for (const s of PRESET_STAGES) {

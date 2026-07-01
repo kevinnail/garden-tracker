@@ -138,14 +138,8 @@ export const SCHEMA_SQL = `
     ON notes(entity_type, crop_instance_id, week_date)
     WHERE entity_type = 'week_cell' AND crop_instance_id IS NOT NULL AND week_date IS NOT NULL;
 
-  -- Cross-device sync key (D1). Unique per table; nullable-unique tolerates the
-  -- brief pre-backfill window on a migrating DB (multiple NULLs are allowed).
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_locations_uuid        ON locations(uuid);
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_gardens_uuid          ON gardens(uuid);
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_sections_uuid         ON sections(uuid);
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_crop_instances_uuid   ON crop_instances(uuid);
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_crop_stages_uuid      ON crop_stages(uuid);
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_uuid            ON tasks(uuid);
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_task_completions_uuid ON task_completions(uuid);
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_notes_uuid            ON notes(uuid);
+  -- NOTE: the per-table unique uuid indexes (idx_<table>_uuid) are intentionally
+  -- NOT created here. This block runs via CREATE TABLE IF NOT EXISTS, which is a
+  -- no-op on an existing (pre-uuid) DB, so the uuid column may not exist yet when
+  -- this SQL runs. runMigrations creates those indexes after ALTER-adding uuid.
 `;

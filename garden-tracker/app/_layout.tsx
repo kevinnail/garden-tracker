@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { AppState } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -8,6 +9,7 @@ import Toast from 'react-native-toast-message';
 import { useWeatherStore } from '@/src/store/weatherStore';
 import { useAuthStore } from '@/src/store/authStore';
 import { useSubscriptionStore } from '@/src/store/subscriptionStore';
+import { useSyncStore } from '@/src/store/syncStore';
 import { authClient } from '@/src/services/authClient';
 
 export default function RootLayout() {
@@ -26,6 +28,7 @@ export default function RootLayout() {
   const setSession = useAuthStore((s) => s.setSession);
   const identify = useSubscriptionStore((s) => s.identify);
   const forget = useSubscriptionStore((s) => s.forget);
+  const syncNow = useSyncStore((s) => s.syncNow);
   const { data: session, isPending } = authClient.useSession();
 
   useEffect(() => {
@@ -34,9 +37,22 @@ export default function RootLayout() {
     // Keep RevenueCat's app_user_id in lockstep with the auth session so a
     // purchase attributes to the right user (and the server can match it).
     const userId = session?.user?.id;
-    if (userId) identify(userId).catch(() => {});
-    else forget().catch(() => {});
-  }, [session, isPending, setSession, identify, forget]);
+    if (userId) {
+      identify(userId).catch(() => {});
+      // Post-login sync. Self-gates on subscription, so it no-ops until the
+      // entitlement is seeded; the foreground trigger below then catches up.
+      syncNow();
+    } else forget().catch(() => {});
+  }, [session, isPending, setSession, identify, forget, syncNow]);
+
+  // Sync when the app returns to the foreground (self-gates on signed-in +
+  // subscribed, so it's a no-op for free/signed-out users).
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') syncNow();
+    });
+    return () => subscription.remove();
+  }, [syncNow]);
 
   return (
     <SafeAreaProvider>
