@@ -18,6 +18,7 @@ import {
   archiveCrop,
 } from '@/src/db/queries/cropQueries';
 import { getDb } from '@/src/db/database';
+import { TS_NOW } from '@/src/db/schema';
 
 jest.mock('@/src/db/database', () => ({
   getDb: jest.fn(),
@@ -142,7 +143,7 @@ describe('updateCropInstance', () => {
     await updateCropInstance(1, { name: 'Basil' });
 
     const sql: string = mockDb.runAsync.mock.calls[0][0];
-    expect(sql).toContain("updated_at = datetime('now')");
+    expect(sql).toContain(`updated_at = ${TS_NOW}`);
   });
 
   it('passes field values followed by id', async () => {
@@ -199,7 +200,7 @@ describe('replaceCropStages', () => {
     expect(mockDb.runAsync).toHaveBeenNthCalledWith(
       1,
       expect.stringContaining(
-        "UPDATE crop_stages SET deleted_at = datetime('now') WHERE crop_instance_id = ?",
+        `UPDATE crop_stages SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW} WHERE crop_instance_id = ?`,
       ),
       7,
     );
@@ -227,7 +228,7 @@ describe('replaceCropStages', () => {
     expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
     expect(mockDb.runAsync).toHaveBeenCalledWith(
       expect.stringContaining(
-        "UPDATE crop_stages SET deleted_at = datetime('now') WHERE crop_instance_id = ?",
+        `UPDATE crop_stages SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW} WHERE crop_instance_id = ?`,
       ),
       7,
     );
@@ -256,7 +257,7 @@ describe('archiveCrop', () => {
     await archiveCrop(3);
 
     const sql: string = mockDb.runAsync.mock.calls[0][0];
-    expect(sql).toContain("updated_at = datetime('now')");
+    expect(sql).toContain(`updated_at = ${TS_NOW}`);
   });
 
   it('resolves without a return value', async () => {

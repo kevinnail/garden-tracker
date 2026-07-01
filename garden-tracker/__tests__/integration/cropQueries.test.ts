@@ -52,6 +52,7 @@ describe('getCropsForSection', () => {
       record_type: 'plant',
       archived: false,
       notes: null,
+      uuid: expect.any(String),
       created_at: expect.any(String),
       updated_at: expect.any(String),
       deleted_at: null,

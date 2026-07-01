@@ -21,6 +21,7 @@ import {
   getTodayAndOverdue,
 } from '@/src/db/queries/taskQueries';
 import { getDb } from '@/src/db/database';
+import { TS_NOW } from '@/src/db/schema';
 
 jest.mock('@/src/db/database', () => ({
   getDb: jest.fn(),
@@ -214,7 +215,9 @@ describe('deleteCompletion', () => {
 
     expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
     expect(mockDb.runAsync).toHaveBeenCalledWith(
-      expect.stringContaining("UPDATE task_completions SET deleted_at = datetime('now')"),
+      expect.stringContaining(
+        `UPDATE task_completions SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW}`,
+      ),
       1,
       '2025-03-02',
     );
@@ -241,12 +244,14 @@ describe('deleteTask', () => {
 
     expect(mockDb.runAsync).toHaveBeenCalledWith(
       expect.stringContaining(
-        "UPDATE task_completions SET deleted_at = datetime('now') WHERE task_id = ?",
+        `UPDATE task_completions SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW} WHERE task_id = ?`,
       ),
       5,
     );
     expect(mockDb.runAsync).toHaveBeenCalledWith(
-      expect.stringContaining("UPDATE tasks SET deleted_at = datetime('now') WHERE id = ?"),
+      expect.stringContaining(
+        `UPDATE tasks SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW} WHERE id = ?`,
+      ),
       5,
     );
   });

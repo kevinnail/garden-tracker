@@ -1,14 +1,14 @@
 import * as SQLite from 'expo-sqlite';
 import { PRESET_STAGES, PRESET_MUSHROOM_STAGES } from '@/src/constants/stages';
 import { PRESET_TASK_TYPES, PRESET_MUSHROOM_TASK_TYPES } from '@/src/constants/taskTypes';
-import { SCHEMA_SQL } from '@/src/db/schema';
+import { SCHEMA_SQL, TS_NOW, UUID4_SQL } from '@/src/db/schema';
 import { formatDateKey, parseDateKey, toSunday } from '@/src/utils/dateUtils';
 
 let _db: SQLite.SQLiteDatabase | null = null;
 let _dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
 // Current local schema version. Bump when adding a migration step.
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 // Tables that will be synced to the cloud (Slices E/F). Each needs a nullable
 // `deleted_at` tombstone column. `note_images` is created with the column in
@@ -22,6 +22,18 @@ export const SYNCED_TABLES = [
   'tasks',
   'task_completions',
   'notes',
+] as const;
+
+// Synced tables that shipped without an `updated_at` column. `crop_instances`
+// and `notes` already had it. v1→v2 adds it to these so uniform server LWW
+// (D2) has a comparator on every table.
+const TABLES_NEEDING_UPDATED_AT = [
+  'locations',
+  'gardens',
+  'sections',
+  'crop_stages',
+  'tasks',
+  'task_completions',
 ] as const;
 
 // Minimal surface of the SQLite handle the migrations need. The real expo
@@ -41,19 +53,47 @@ async function columnExists(db: MigrationDb, table: string, column: string): Pro
  * Forward-only schema migrations, gated by SQLite's `user_version`.
  *
  * v0 → v1: add nullable `deleted_at` to every synced table (cloud-sync
- * tombstones). Additive and idempotent — each column is guarded so the step is
- * a no-op on fresh DBs already created with it (via SCHEMA_SQL), and applies it
- * to existing App Store DBs that predate the column. No existing data changes.
+ * tombstones).
+ *
+ * v1 → v2: cloud-sync foundation (D1/D2). Add `uuid` (client-generated sync
+ * key) + a unique index to every synced table, backfilling existing rows; add
+ * `updated_at` to the 6 tables that lacked it (LWW comparator), backfilling
+ * existing rows.
+ *
+ * All steps are additive, idempotent, and forward-only — column guards make
+ * each a no-op on DBs already carrying it (fresh installs built via SCHEMA_SQL,
+ * or a re-run), and they apply to existing App Store DBs that predate the
+ * columns. No existing data is reshaped.
  */
 export async function runMigrations(db: MigrationDb): Promise<void> {
   const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
   const version = row?.user_version ?? 0;
   if (version >= SCHEMA_VERSION) return;
 
+  // v0 → v1: deleted_at tombstones
   for (const table of SYNCED_TABLES) {
     if (!(await columnExists(db, table, 'deleted_at'))) {
       await db.execAsync(`ALTER TABLE ${table} ADD COLUMN deleted_at TEXT`);
     }
+  }
+
+  // v1 → v2: uuid sync key (all 8) + updated_at (the 6 that lacked it)
+  for (const table of SYNCED_TABLES) {
+    if (!(await columnExists(db, table, 'uuid'))) {
+      await db.execAsync(`ALTER TABLE ${table} ADD COLUMN uuid TEXT`);
+    }
+    // randomblob is re-evaluated per row, so each NULL gets a distinct uuid.
+    await db.execAsync(`UPDATE ${table} SET uuid = (${UUID4_SQL}) WHERE uuid IS NULL`);
+    await db.execAsync(`CREATE UNIQUE INDEX IF NOT EXISTS idx_${table}_uuid ON ${table}(uuid)`);
+  }
+
+  for (const table of TABLES_NEEDING_UPDATED_AT) {
+    if (!(await columnExists(db, table, 'updated_at'))) {
+      // Nullable on ALTER (SQLite forbids a dynamic default there); the backfill
+      // below fills it and every insert/edit sets it explicitly.
+      await db.execAsync(`ALTER TABLE ${table} ADD COLUMN updated_at TEXT`);
+    }
+    await db.execAsync(`UPDATE ${table} SET updated_at = ${TS_NOW} WHERE updated_at IS NULL`);
   }
 
   await db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);

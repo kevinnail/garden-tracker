@@ -1,4 +1,5 @@
 import { getDb } from '@/src/db/database';
+import { TS_NOW, UUID4_SQL } from '@/src/db/schema';
 import { Task, TaskCompletion, TaskType, TodayTaskItem } from '@/src/types';
 import { formatDateKey, parseDateKey, toSunday } from '@/src/utils/dateUtils';
 
@@ -278,7 +279,7 @@ export async function insertTask(
 ): Promise<number> {
   const db = await getDb();
   const result = await db.runAsync(
-    `INSERT INTO tasks (crop_instance_id, task_type_id, day_of_week, frequency_weeks, start_offset_weeks) VALUES (?, ?, ?, ?, ?)`,
+    `INSERT INTO tasks (uuid, crop_instance_id, task_type_id, day_of_week, frequency_weeks, start_offset_weeks, updated_at) VALUES ((${UUID4_SQL}), ?, ?, ?, ?, ?, ${TS_NOW})`,
     cropInstanceId,
     taskTypeId,
     dayOfWeek,
@@ -294,8 +295,8 @@ export async function insertCompletion(taskId: number, weekDate: string): Promis
   // occupies the UNIQUE(task_id, completed_date) slot, so INSERT OR IGNORE would
   // silently no-op. Clearing deleted_at restores the completion.
   await db.runAsync(
-    `INSERT INTO task_completions (task_id, completed_date) VALUES (?, ?)
-     ON CONFLICT(task_id, completed_date) DO UPDATE SET deleted_at = NULL`,
+    `INSERT INTO task_completions (uuid, task_id, completed_date, updated_at) VALUES ((${UUID4_SQL}), ?, ?, ${TS_NOW})
+     ON CONFLICT(task_id, completed_date) DO UPDATE SET deleted_at = NULL, updated_at = ${TS_NOW}`,
     taskId,
     weekDate,
   );
@@ -304,7 +305,7 @@ export async function insertCompletion(taskId: number, weekDate: string): Promis
 export async function deleteCompletion(taskId: number, weekDate: string): Promise<void> {
   const db = await getDb();
   await db.runAsync(
-    `UPDATE task_completions SET deleted_at = datetime('now')
+    `UPDATE task_completions SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW}
      WHERE task_id = ? AND completed_date = ? AND deleted_at IS NULL`,
     taskId,
     weekDate,
@@ -315,16 +316,23 @@ export async function deleteTask(id: number): Promise<void> {
   const db = await getDb();
   await db.withTransactionAsync(async () => {
     await db.runAsync(
-      `UPDATE task_completions SET deleted_at = datetime('now') WHERE task_id = ? AND deleted_at IS NULL`,
+      `UPDATE task_completions SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW} WHERE task_id = ? AND deleted_at IS NULL`,
       id,
     );
-    await db.runAsync(`UPDATE tasks SET deleted_at = datetime('now') WHERE id = ?`, id);
+    await db.runAsync(
+      `UPDATE tasks SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW} WHERE id = ?`,
+      id,
+    );
   });
 }
 
 export async function updateTaskDay(id: number, dayOfWeek: number): Promise<void> {
   const db = await getDb();
-  await db.runAsync(`UPDATE tasks SET day_of_week = ? WHERE id = ?`, dayOfWeek, id);
+  await db.runAsync(
+    `UPDATE tasks SET day_of_week = ?, updated_at = ${TS_NOW} WHERE id = ?`,
+    dayOfWeek,
+    id,
+  );
 }
 
 export async function getTodayAndOverdue(

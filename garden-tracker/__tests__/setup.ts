@@ -14,7 +14,7 @@
 import BetterSqlite3 from 'better-sqlite3';
 import { PRESET_STAGES } from '@/src/constants/stages';
 import { PRESET_TASK_TYPES } from '@/src/constants/taskTypes';
-import { SCHEMA_SQL } from '@/src/db/schema';
+import { SCHEMA_SQL, UUID4_SQL } from '@/src/db/schema';
 
 // Known seed values — import these in integration tests for assertions
 export const SEED = {
@@ -85,9 +85,10 @@ export function setupTestDb() {
   );
   // → section_id = 1 = SEED.SECTION_ID
 
-  // One known crop
+  // One known crop. uuid is set the same way the query layer does (inline
+  // SQLite-generated v4) so seeded fixtures match real inserted rows.
   db.prepare(
-    'INSERT INTO crop_instances (section_id, name, plant_count, start_date) VALUES (?, ?, ?, ?)',
+    `INSERT INTO crop_instances (uuid, section_id, name, plant_count, start_date) VALUES ((${UUID4_SQL}), ?, ?, ?, ?)`,
   ).run(SEED.SECTION_ID, SEED.CROP_NAME, SEED.PLANT_COUNT, SEED.START_DATE);
   // → crop id = 1 = SEED.CROP_ID
 
