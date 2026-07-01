@@ -5,6 +5,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuthStore } from '@/src/store/authStore';
 import { useSubscriptionStore } from '@/src/store/subscriptionStore';
+import { useSyncStore } from '@/src/store/syncStore';
+
+function formatLastSynced(timestamp: string | null): string {
+  if (!timestamp) return 'Not synced yet';
+  const parsed = new Date(timestamp);
+  if (Number.isNaN(parsed.getTime())) return 'Not synced yet';
+  return `Last synced ${parsed.toLocaleString()}`;
+}
 
 export default function CloudBackupModal() {
   const status = useAuthStore((s) => s.status);
@@ -16,6 +24,11 @@ export default function CloudBackupModal() {
   const subError = useSubscriptionStore((s) => s.error);
   const subscribe = useSubscriptionStore((s) => s.subscribe);
   const restore = useSubscriptionStore((s) => s.restore);
+
+  const syncStatus = useSyncStore((s) => s.status);
+  const lastSyncedAt = useSyncStore((s) => s.lastSyncedAt);
+  const syncError = useSyncStore((s) => s.error);
+  const syncNow = useSyncStore((s) => s.syncNow);
 
   const pkg = offering?.annual ?? offering?.availablePackages[0];
   const price = pkg?.product?.priceString;
@@ -39,6 +52,21 @@ export default function CloudBackupModal() {
               <View style={styles.activeBox}>
                 <Text style={styles.activeTitle}>Cloud backup is active ✓</Text>
                 <Text style={styles.activeSub}>Your data syncs across your devices.</Text>
+                <Text style={styles.syncStatus}>
+                  {syncStatus === 'syncing' ? 'Syncing…' : formatLastSynced(lastSyncedAt)}
+                </Text>
+                <Pressable
+                  style={[styles.primaryBtn, syncStatus === 'syncing' && styles.btnDisabled]}
+                  onPress={() => syncNow()}
+                  disabled={syncStatus === 'syncing'}
+                  accessibilityRole="button"
+                  accessibilityLabel="Sync now"
+                >
+                  <Text style={styles.primaryBtnText}>
+                    {syncStatus === 'syncing' ? 'Syncing…' : 'Sync now'}
+                  </Text>
+                </Pressable>
+                {syncError ? <Text style={styles.errorText}>{syncError}</Text> : null}
               </View>
             ) : (
               <View style={styles.paywallBox}>
@@ -150,6 +178,8 @@ const styles = StyleSheet.create({
   },
   activeTitle: { color: '#7dcea0', fontSize: 15, fontWeight: '700' },
   activeSub: { color: '#9bbfa8', fontSize: 13 },
+  syncStatus: { color: '#9bbfa8', fontSize: 12, marginTop: 6, marginBottom: 8 },
+  btnDisabled: { opacity: 0.6 },
 
   paywallBox: {
     marginTop: 12,
