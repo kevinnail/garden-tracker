@@ -39,6 +39,8 @@ Assign each file:
 - **sub** — e.g. `"branch <name> · <N> changes"`.
 - **mentalModel** — the single unifying idea that makes the whole change set legible (HTML allowed, use `<code>`). This is what the reader sees first.
 - **fastPath** — 3–5 strings naming the files that hold the real logic (so a time-pressed reviewer knows what to prioritize vs. wiring/tests).
+- **prTitle** — a concise, imperative PR title (e.g. `Add note image cloud sync (S3)`).
+- **prBody** — the full PR description as a **markdown string**, built with `[...].join("\n")` so backticks inside the markdown don't collide with JS string delimiters. Follow the standard shape: `## Summary` (2–3 sentences, what + why), `## What changed` (bulleted, grouped by the same sections as the files), `## Test plan` (which tests cover it + any manual verification), `## Notes` (risks/gotchas a reviewer should know). This renders on the final screen with a Copy button so the user pastes it straight into GitHub — write real, paste-ready prose, not a placeholder.
 
 ## Step 4 — emit the file
 
@@ -48,8 +50,9 @@ Write `CHANGE-GUIDE.html` using the template below **verbatim**, replacing only 
 - `j`/`k` + arrow nav, `r`/space to mark reviewed, progress persisted in localStorage
 - the collapsible **Deeper detail** section fed by each file's `details` array
 - a **completion sequence** that fires once when the last file is marked reviewed: a matrix-rain backdrop with a terminal that streams the reviewed files like a passing CI run, then decrypts a `REVIEW COMPLETE` headline. It self-dismisses (or on click) and does not replay on reload. This is intentional and load-bearing — reproduce it exactly.
+- a final **PR description** screen (`prTitle` + the markdown `prBody`, each with a Copy button) that the completion sequence lands on and that's reachable anytime from the sidebar. Rendered only when `META.prBody` is set.
 
-After writing, tell the user the path, that progress is saved per-file in their browser, the keyboard shortcuts (`j`/`k` move, `r`/space mark reviewed), that there's a skippable "Deeper detail" panel under each file, and that it's disposable — delete when done.
+After writing, tell the user the path, that progress is saved per-file in their browser, the keyboard shortcuts (`j`/`k` move, `r`/space mark reviewed), that there's a skippable "Deeper detail" panel under each file, that finishing the review reveals a ready-to-paste **PR description** (with a Copy button), and that it's disposable — delete when done.
 
 ```html
 <!doctype html>
@@ -134,6 +137,18 @@ After writing, tell the user the path, that progress is saved per-file in their 
   .overview .mental { background: #10241c; border: 1px solid #1f4636; border-radius: 8px; padding: 14px 16px; margin: 12px 0 22px; font-size: 14px; }
   .overview ul { padding-left: 18px; }
   .overview li { margin: 4px 0; }
+  /* PR description screen */
+  .pr-item .num { color: var(--accent); }
+  .pr-title-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .pr-title-row code { font-size: 13px; }
+  .copy-btn { padding: 4px 10px; font-size: 12px; }
+  .pr-body {
+    background: #0b0f16; border: 1px solid var(--line); border-radius: 8px;
+    padding: 14px 16px; margin: 4px 0 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12.5px; line-height: 1.6; color: #c4ccd6;
+    white-space: pre-wrap; word-break: break-word; max-height: 52vh; overflow-y: auto;
+  }
   /* Completion celebration — terminal "review compiled" over matrix rain */
   #celebrate { position: fixed; inset: 0; z-index: 50; background: #05070a; transition: opacity .5s ease; }
   #celebrate.fading { opacity: 0; }
@@ -183,6 +198,20 @@ const META = {
   sub: "branch <name> · <N> changes",
   mentalModel: "REPLACE — the single unifying idea (HTML/<code> allowed).",
   fastPath: [ "REPLACE — 3–5 files that hold the real logic" ],
+  prTitle: "REPLACE — concise imperative PR title",
+  prBody: [
+    "## Summary",
+    "REPLACE — 2–3 sentences: what changed and why.",
+    "",
+    "## What changed",
+    "- REPLACE — bulleted, grouped by the same sections as the files.",
+    "",
+    "## Test plan",
+    "- REPLACE — which tests cover it + any manual verification.",
+    "",
+    "## Notes",
+    "- REPLACE — risks/gotchas a reviewer should know (or drop this section).",
+  ].join("\n"),
 };
 
 const FILES = [
@@ -199,6 +228,7 @@ const FILES = [
 const STORAGE = "changeguide:" + META.title;
 const reviewed = new Set(JSON.parse(localStorage.getItem(STORAGE) || "[]"));
 const items = [{ type: "overview" }, ...FILES.map((file, index) => ({ type: "file", i: index, ...file }))];
+if (META.prBody) items.push({ type: "pr" });
 let current = 0;
 // Seed as already-complete so a reload at 100% doesn't replay the celebration.
 let wasComplete = FILES.length > 0 && FILES.every((file) => reviewed.has(file.path));
@@ -241,6 +271,15 @@ function buildSidebar() {
     element.onclick = () => select(idx);
     nav.appendChild(element);
   });
+
+  if (META.prBody) {
+    const prNav = document.createElement("div");
+    prNav.className = "item pr-item";
+    prNav.dataset.idx = items.length - 1;
+    prNav.innerHTML = '<span class="num">❯</span><span class="name">PR description</span>';
+    prNav.onclick = () => select(items.length - 1);
+    nav.appendChild(prNav);
+  }
   refresh();
 }
 
@@ -295,6 +334,28 @@ function renderDetail() {
       "</div>";
     return;
   }
+  if (item.type === "pr") {
+    detail.innerHTML =
+      '<div class="card">' +
+      '<div class="kicker">Ready to ship</div>' +
+      "<h2>PR description</h2>" +
+      '<div class="field"><div class="label">Title</div>' +
+        '<div class="pr-title-row"><code id="pr-title-text"></code>' +
+        '<button class="copy-btn" id="copy-title">Copy title</button></div></div>' +
+      '<div class="field"><div class="label">Body — paste into the GitHub PR description box</div>' +
+        '<pre class="pr-body" id="pr-body-text"></pre></div>' +
+      '<div class="nav-buttons">' +
+        '<button class="primary" id="copy-body">Copy PR description</button>' +
+        '<button onclick="select(1)">← Back to files</button>' +
+      "</div>" +
+      '<div class="hint">GitHub renders this markdown. Title and body copy as plain text.</div>' +
+      "</div>";
+    document.getElementById("pr-title-text").textContent = META.prTitle || "";
+    document.getElementById("pr-body-text").textContent = META.prBody;
+    document.getElementById("copy-title").onclick = (event) => copyText(META.prTitle || "", event.currentTarget);
+    document.getElementById("copy-body").onclick = (event) => copyText(META.prBody, event.currentTarget);
+    return;
+  }
   const isDone = reviewed.has(item.path);
   const fileNo = item.i + 1;
   const deeper = item.details && item.details.length
@@ -325,6 +386,32 @@ function markAndNext() {
   if (item.type === "file") reviewed.add(item.path);
   save();
   if (current < items.length - 1) select(current + 1); else refresh();
+}
+
+function copyText(text, button) {
+  const confirm = () => {
+    const label = button.textContent;
+    button.textContent = "Copied ✓";
+    setTimeout(() => { button.textContent = label; }, 1600);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(confirm).catch(() => fallbackCopy(text, confirm));
+  } else {
+    fallbackCopy(text, confirm);
+  }
+}
+
+// file:// pages often can't reach the async clipboard API — fall back to a hidden textarea.
+function fallbackCopy(text, confirm) {
+  const area = document.createElement("textarea");
+  area.value = text;
+  area.style.position = "fixed";
+  area.style.opacity = "0";
+  document.body.appendChild(area);
+  area.focus();
+  area.select();
+  try { document.execCommand("copy"); confirm(); } catch (error) { /* leave selected for manual copy */ }
+  area.remove();
 }
 
 document.getElementById("reset").onclick = () => { reviewed.clear(); save(); refresh(); renderDetail(); };
@@ -453,6 +540,7 @@ function runCelebration() {
     clearInterval(printTimer);
     window.removeEventListener("resize", resize);
     overlay.remove();
+    if (META.prBody) select(items.length - 1);   // land on the ready-to-paste PR description
   }
 
   let rainTick = 0;
