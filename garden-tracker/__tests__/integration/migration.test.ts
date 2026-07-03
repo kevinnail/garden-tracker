@@ -149,7 +149,7 @@ describe('runMigrations — v0 → v1 deleted_at', () => {
     const db = makeOldDb();
     await runMigrations(createTestAdapter(db));
     // runMigrations is cumulative: a v0 DB runs through every step to current.
-    expect(db.pragma('user_version', { simple: true }) as number).toBe(2);
+    expect(db.pragma('user_version', { simple: true }) as number).toBe(3);
   });
 
   it('is idempotent — running twice does not error or duplicate columns', async () => {
@@ -176,7 +176,7 @@ describe('runMigrations — v0 → v1 deleted_at', () => {
     }
 
     await expect(runMigrations(createTestAdapter(db))).resolves.toBeUndefined();
-    expect(db.pragma('user_version', { simple: true }) as number).toBe(2);
+    expect(db.pragma('user_version', { simple: true }) as number).toBe(3);
   });
 });
 
@@ -300,10 +300,10 @@ describe('runMigrations — v1 → v2 uuid + updated_at', () => {
     expect(note.content).toBe('Looking healthy');
   });
 
-  it('bumps user_version to 2', async () => {
+  it('bumps user_version to current (3)', async () => {
     const db = makeV1Db();
     await runMigrations(createTestAdapter(db));
-    expect(db.pragma('user_version', { simple: true }) as number).toBe(2);
+    expect(db.pragma('user_version', { simple: true }) as number).toBe(3);
   });
 
   it('is idempotent — a second run is a no-op and uuids stay stable', async () => {
@@ -323,5 +323,88 @@ describe('runMigrations — v1 → v2 uuid + updated_at', () => {
       uuid: string;
     };
     expect(after.uuid).toBe(before.uuid);
+  });
+});
+
+// A faithful v2 on-device shape: v1 + uuid (unique) on all 8 + updated_at on the
+// 6 that lacked it. Built explicitly (not by running the code under test) so the
+// v2 → v3 step is exercised in isolation.
+function makeV2Db() {
+  const db = new BetterSqlite3(':memory:');
+  db.exec(V1_SCHEMA_SQL);
+  seedOldDb(db);
+  for (const table of SYNCED_TABLES) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN uuid TEXT`);
+    db.exec(`UPDATE ${table} SET uuid = lower(hex(randomblob(16)))`);
+    db.exec(`CREATE UNIQUE INDEX idx_${table}_uuid ON ${table}(uuid)`);
+  }
+  for (const table of TABLES_GAINING_UPDATED_AT) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN updated_at TEXT`);
+    db.exec(`UPDATE ${table} SET updated_at = '2025-01-01 00:00:00.000'`);
+  }
+  db.pragma('user_version = 2');
+  return db;
+}
+
+const NOTE_IMAGES_COLUMNS = [
+  'id',
+  'uuid',
+  'note_id',
+  's3_key',
+  'local_uri',
+  'created_at',
+  'updated_at',
+  'deleted_at',
+];
+
+describe('runMigrations — v2 → v3 note_images', () => {
+  it('creates the note_images table with every sync column', async () => {
+    const db = makeV2Db();
+    await runMigrations(createTestAdapter(db));
+
+    const cols = db.prepare('PRAGMA table_info(note_images)').all() as { name: string }[];
+    expect(cols.map((c) => c.name).sort()).toEqual([...NOTE_IMAGES_COLUMNS].sort());
+  });
+
+  it('enforces uuid uniqueness on note_images', async () => {
+    const db = makeV2Db();
+    await runMigrations(createTestAdapter(db));
+
+    db.prepare('INSERT INTO note_images (uuid, note_id, s3_key) VALUES (?, 1, ?)').run(
+      'img-uuid-1',
+      'note-images/u/img-uuid-1.jpg',
+    );
+    expect(() =>
+      db.prepare('INSERT INTO note_images (uuid, note_id) VALUES (?, 1)').run('img-uuid-1'),
+    ).toThrow(/UNIQUE/i);
+  });
+
+  it('preserves existing row data (no data loss)', async () => {
+    const db = makeV2Db();
+    await runMigrations(createTestAdapter(db));
+
+    const note = db.prepare('SELECT * FROM notes WHERE id = 1').get() as any;
+    expect(note.content).toBe('Looking healthy');
+    const crop = db.prepare('SELECT * FROM crop_instances WHERE id = 1').get() as any;
+    expect(crop.name).toBe('Tomato');
+  });
+
+  it('bumps user_version to 3', async () => {
+    const db = makeV2Db();
+    await runMigrations(createTestAdapter(db));
+    expect(db.pragma('user_version', { simple: true }) as number).toBe(3);
+  });
+
+  it('is idempotent — a second run does not error or duplicate the table', async () => {
+    const db = makeV2Db();
+    const adapter = createTestAdapter(db);
+
+    await runMigrations(adapter);
+    await expect(runMigrations(adapter)).resolves.toBeUndefined();
+
+    const tables = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='note_images'")
+      .all();
+    expect(tables).toHaveLength(1);
   });
 });
