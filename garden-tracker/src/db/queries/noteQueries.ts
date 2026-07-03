@@ -1,5 +1,6 @@
 import { getDb } from '@/src/db/database';
 import { TS_NOW, UUID4_SQL } from '@/src/db/schema';
+import { tombstoneNoteImagesForNotes } from '@/src/db/queries/noteImageQueries';
 import { Note } from '@/src/types';
 
 const WEEK_CELL_ENTITY = 'week_cell';
@@ -53,10 +54,15 @@ export async function upsertNote(
 
 export async function deleteNote(id: number): Promise<void> {
   const db = await getDb();
-  await db.runAsync(
-    `UPDATE notes SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW} WHERE id = ?`,
-    id,
-  );
+  // Cascade-tombstone the note's images too, so their removal (and the server's
+  // S3 delete) propagates on sync — a JSON-only drop would leak the objects.
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      `UPDATE notes SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW} WHERE id = ?`,
+      id,
+    );
+    await tombstoneNoteImagesForNotes(db, [id]);
+  });
 }
 
 export async function getAllNotesForCrop(cropInstanceId: number): Promise<Note[]> {

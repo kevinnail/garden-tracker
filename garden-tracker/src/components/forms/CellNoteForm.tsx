@@ -31,7 +31,12 @@ import {
   serializeWeeklyNoteEntries,
   updateWeeklyNoteEntry,
 } from '@/src/utils/noteUtils';
-import { copyImageToAppStorage, createNoteImage, deleteImageFile } from '@/src/utils/imageStorage';
+import {
+  copyImageToAppStorage,
+  createNoteImage,
+  deleteImageFile,
+  resolveNoteImageUri,
+} from '@/src/utils/imageStorage';
 import NoteImageStrip from '@/src/components/notes/NoteImageStrip';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -71,6 +76,7 @@ export default function CellNoteForm({
   const rows = usePlannerStore((s) => s.rows);
   const saveCellNote = usePlannerStore((s) => s.saveCellNote);
   const deleteNote = usePlannerStore((s) => s.deleteNote);
+  const noteImageUris = usePlannerStore((s) => s.noteImageUris);
 
   const cropRow = rows.find((row) => row.type === 'crop_row' && row.crop.id === cropId);
   const isMushroomCrop = cropRow?.type === 'crop_row' && cropRow.crop.record_type === 'mushroom';
@@ -535,7 +541,7 @@ export default function CellNoteForm({
                     {pendingImages.map((img) => (
                       <View key={img.id} style={styles.pendingThumb}>
                         <Image
-                          source={{ uri: img.uri }}
+                          source={{ uri: resolveNoteImageUri(img, noteImageUris) }}
                           style={styles.pendingThumbImage}
                           contentFit="cover"
                         />

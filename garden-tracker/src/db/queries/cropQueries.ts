@@ -1,6 +1,7 @@
 import { type SQLiteDatabase } from 'expo-sqlite';
 import { getDb } from '@/src/db/database';
 import { TS_NOW, UUID4_SQL } from '@/src/db/schema';
+import { tombstoneNoteImagesForNotes } from '@/src/db/queries/noteImageQueries';
 import { CropInstance, CropStage, StageDefinition } from '@/src/types';
 import { formatDateKey, parseDateKey, toSunday } from '@/src/utils/dateUtils';
 
@@ -235,29 +236,39 @@ export async function archiveCrop(id: number): Promise<void> {
  */
 export async function softDeleteCrops(db: SQLiteDatabase, cropIds: number[]): Promise<void> {
   if (cropIds.length === 0) return;
-  const ph = cropIds.map(() => '?').join(',');
+  const cropIdPlaceholders = cropIds.map(() => '?').join(',');
 
   await db.runAsync(
     `UPDATE task_completions SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW}
-     WHERE task_id IN (SELECT id FROM tasks WHERE crop_instance_id IN (${ph})) AND deleted_at IS NULL`,
+     WHERE task_id IN (SELECT id FROM tasks WHERE crop_instance_id IN (${cropIdPlaceholders})) AND deleted_at IS NULL`,
     ...cropIds,
   );
   await db.runAsync(
-    `UPDATE tasks SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW} WHERE crop_instance_id IN (${ph}) AND deleted_at IS NULL`,
+    `UPDATE tasks SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW} WHERE crop_instance_id IN (${cropIdPlaceholders}) AND deleted_at IS NULL`,
     ...cropIds,
   );
   await db.runAsync(
-    `UPDATE crop_stages SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW} WHERE crop_instance_id IN (${ph}) AND deleted_at IS NULL`,
+    `UPDATE crop_stages SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW} WHERE crop_instance_id IN (${cropIdPlaceholders}) AND deleted_at IS NULL`,
     ...cropIds,
+  );
+  // Cascade to note images before their parent notes are tombstoned, so their
+  // S3 objects get cleaned up on sync (same discipline as the note-level delete).
+  const noteRows = await db.getAllAsync<{ id: number }>(
+    `SELECT id FROM notes WHERE crop_instance_id IN (${cropIdPlaceholders}) AND deleted_at IS NULL`,
+    ...cropIds,
+  );
+  await tombstoneNoteImagesForNotes(
+    db,
+    noteRows.map((row) => row.id),
   );
   await db.runAsync(
     `UPDATE notes SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW}
-     WHERE crop_instance_id IN (${ph}) AND deleted_at IS NULL`,
+     WHERE crop_instance_id IN (${cropIdPlaceholders}) AND deleted_at IS NULL`,
     ...cropIds,
   );
   await db.runAsync(
     `UPDATE crop_instances SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW}
-     WHERE id IN (${ph}) AND deleted_at IS NULL`,
+     WHERE id IN (${cropIdPlaceholders}) AND deleted_at IS NULL`,
     ...cropIds,
   );
 }

@@ -112,6 +112,10 @@ export interface Note {
 
 export interface NoteImage {
   id: string;
+  // Cross-device sync key (Slice F). Optional because notes written by pre-Slice-F
+  // builds have no uuid until the first-sync backfill mints one. Display resolves
+  // the on-disk file by joining this against `note_images.local_uri`.
+  uuid?: string;
   uri: string;
   created_at: string;
 }

@@ -13,9 +13,16 @@
 // *
 // * ==================================================
 
-import { collectChanges, applyPull, runSync, PullResponse } from '@/src/services/syncClient';
+import {
+  collectChanges,
+  applyPull,
+  runSync,
+  backfillNoteImages,
+  PullResponse,
+} from '@/src/services/syncClient';
 import { insertLocation, insertGarden, insertSection } from '@/src/db/queries/locationQueries';
 import { insertCropWithStages, deleteCropInstance } from '@/src/db/queries/cropQueries';
+import { upsertNote } from '@/src/db/queries/noteQueries';
 import { getDb } from '@/src/db/database';
 import { setupTestDb } from '../setup';
 import type BetterSqlite3 from 'better-sqlite3';
@@ -24,12 +31,21 @@ jest.mock('@/src/db/database', () => ({ getDb: jest.fn() }));
 jest.mock('@/src/services/authClient', () => ({
   authClient: { getCookie: jest.fn(() => 'better-auth.session_token=test-cookie') },
 }));
+// runSync now imports imageSync → expo-file-system (native). These suites create
+// no image bytes, so a stub keeps the module graph loadable without a device.
+jest.mock('expo-file-system', () => ({
+  File: class {},
+  Directory: class {},
+  Paths: { document: 'file:///documents' },
+}));
 
 let rawDb: BetterSqlite3.Database;
+let testAdapter: ReturnType<typeof setupTestDb>['adapter'];
 
 beforeEach(() => {
   const { db, adapter } = setupTestDb();
   rawDb = db;
+  testAdapter = adapter;
   (getDb as jest.Mock).mockResolvedValue(adapter);
 });
 
@@ -117,9 +133,37 @@ const emptyPull = (overrides: Partial<PullResponse>): PullResponse => ({
   tasks: [],
   task_completions: [],
   notes: [],
+  note_images: [],
   last_sync_at: '2026-06-30T00:00:00.000Z',
   ...overrides,
 });
+
+// Insert a note_images row directly, bypassing the query layer, so tests can pin
+// s3_key / local_uri / updated_at exactly.
+function insertImageRow(fields: {
+  uuid: string;
+  note_id: number;
+  s3_key?: string | null;
+  local_uri?: string | null;
+  updated_at?: string;
+  deleted_at?: string | null;
+}): void {
+  rawDb
+    .prepare(
+      `INSERT INTO note_images (uuid, note_id, s3_key, local_uri, created_at, updated_at, deleted_at)
+       VALUES (@uuid, @note_id, @s3_key, @local_uri, '2026-01-01 00:00:00.000', @updated_at, @deleted_at)`,
+    )
+    .run({
+      s3_key: null,
+      local_uri: null,
+      updated_at: '2026-06-01 10:00:00.000',
+      deleted_at: null,
+      ...fields,
+    });
+}
+
+const SEED_CROP_ID = 1;
+const SEED_WEEK = '2025-03-02';
 
 describe('applyPull', () => {
   it('inserts new rows and resolves parent uuids to local integer ids', async () => {
@@ -234,6 +278,185 @@ describe('applyPull', () => {
         localUuid,
       ).deleted_at,
     ).toBeNull();
+  });
+});
+
+// ── note_images (Slice F) ──────────────────────────────────────────────────────
+
+describe('note_images sync', () => {
+  it('collects the wire shape (note_uuid FK, s3_key) for uploaded rows and tombstones, but not pending uploads', async () => {
+    const noteId = await upsertNote(SEED_CROP_ID, SEED_WEEK, 'weekly');
+    const noteUuid = uuidOf('notes', 'id', noteId);
+
+    insertImageRow({ uuid: 'img-pending', note_id: noteId, local_uri: 'file:///p.jpg' }); // s3_key null
+    insertImageRow({
+      uuid: 'img-up',
+      note_id: noteId,
+      s3_key: 'note-images/u/img-up.jpg',
+      local_uri: 'file:///u.jpg',
+    });
+    insertImageRow({
+      uuid: 'img-tomb',
+      note_id: noteId,
+      s3_key: 'note-images/u/img-tomb.jpg',
+      deleted_at: '2026-06-02 10:00:00.000',
+    });
+
+    const { changed } = await collectChanges('');
+    const imageRows = changed.find((entry) => entry.table === 'note_images')!.rows;
+    const byUuid = new Set(imageRows.map((entry) => entry.uuid));
+
+    expect(byUuid.has('img-up')).toBe(true);
+    expect(byUuid.has('img-tomb')).toBe(true);
+    expect(byUuid.has('img-pending')).toBe(false); // still awaiting its S3 upload
+
+    const uploaded = imageRows.find((entry) => entry.uuid === 'img-up')!;
+    expect(uploaded.note_uuid).toBe(noteUuid);
+    expect(uploaded.s3_key).toBe('note-images/u/img-up.jpg');
+    expect(uploaded).not.toHaveProperty('note_id');
+    expect(uploaded).not.toHaveProperty('local_uri'); // device-local, never on the wire
+  });
+
+  it('omits a tombstone that never got an s3_key (never uploaded → nothing to GC; would 400 the batch)', async () => {
+    const noteId = await upsertNote(SEED_CROP_ID, SEED_WEEK, 'weekly');
+    // Image added then its note deleted before any sync uploaded it: tombstoned
+    // with s3_key still NULL. The server never knew this row, so it must not push
+    // (a NULL s3_key fails the server's validation and rejects the whole batch).
+    insertImageRow({
+      uuid: 'img-tomb-nokey',
+      note_id: noteId,
+      deleted_at: '2026-06-02 10:00:00.000',
+    });
+
+    const { changed } = await collectChanges('');
+    const imageEntry = changed.find((entry) => entry.table === 'note_images');
+    const collected = imageEntry?.rows.map((entry) => entry.uuid) ?? [];
+    expect(collected).not.toContain('img-tomb-nokey');
+  });
+
+  it('applyPull inserts a note_images row (note_uuid → local id) with local_uri left NULL for download', async () => {
+    const noteId = await upsertNote(SEED_CROP_ID, SEED_WEEK, 'weekly');
+    const noteUuid = uuidOf('notes', 'id', noteId);
+
+    await applyPull(
+      emptyPull({
+        note_images: [
+          {
+            uuid: 'img-remote',
+            note_uuid: noteUuid,
+            s3_key: 'note-images/u/img-remote.jpg',
+            created_at: '2026-06-01 10:00:00.000',
+            updated_at: '2026-06-01 10:00:00.000',
+            deleted_at: null,
+          },
+        ],
+      }),
+      '2026-06-30 00:00:00.000',
+    );
+
+    const imageRow = row<{ note_id: number; s3_key: string; local_uri: string | null }>(
+      `SELECT note_id, s3_key, local_uri FROM note_images WHERE uuid = 'img-remote'`,
+    );
+    expect(imageRow.note_id).toBe(noteId);
+    expect(imageRow.s3_key).toBe('note-images/u/img-remote.jpg');
+    expect(imageRow.local_uri).toBeNull(); // triggers the download pass
+  });
+
+  it('pull sweep reaps an absent uploaded row but spares an absent pending-upload row', async () => {
+    const noteId = await upsertNote(SEED_CROP_ID, SEED_WEEK, 'weekly');
+    // Both old enough to be "previously synced" relative to syncStartedAt below.
+    insertImageRow({
+      uuid: 'img-old',
+      note_id: noteId,
+      s3_key: 'note-images/u/img-old.jpg',
+      local_uri: 'file:///o.jpg',
+      updated_at: '2000-01-01 00:00:00.000',
+    });
+    insertImageRow({
+      uuid: 'img-pending',
+      note_id: noteId,
+      local_uri: 'file:///p.jpg',
+      updated_at: '2000-01-01 00:00:00.000',
+    });
+
+    await applyPull(emptyPull({ note_images: [] }), '9999-12-31 00:00:00.000');
+
+    // Server-known row absent from pull → deleted.
+    expect(
+      row<{ deleted_at: string | null }>(
+        `SELECT deleted_at FROM note_images WHERE uuid = 'img-old'`,
+      ).deleted_at,
+    ).not.toBeNull();
+    // Never-uploaded row → spared (its absence is expected, not a server delete).
+    expect(
+      row<{ deleted_at: string | null }>(
+        `SELECT deleted_at FROM note_images WHERE uuid = 'img-pending'`,
+      ).deleted_at,
+    ).toBeNull();
+  });
+});
+
+// ── backfillNoteImages (Slice F, existing-user upgrade) ─────────────────────────
+
+describe('backfillNoteImages', () => {
+  const legacyContent = JSON.stringify({
+    version: 1,
+    entries: [
+      {
+        id: 'entry-1',
+        day_of_week: 2,
+        text: 'planted',
+        images: [
+          { id: 'local-1', uri: 'file:///legacy.jpg', created_at: '2026-01-01T00:00:00.000Z' },
+        ],
+        created_at: '2026-01-01T00:00:00.000Z',
+        updated_at: '2026-01-01T00:00:00.000Z',
+      },
+    ],
+  });
+
+  it('mints a uuid into each pre-Slice-F image and creates its note_images row', async () => {
+    const noteId = await upsertNote(SEED_CROP_ID, SEED_WEEK, legacyContent);
+
+    await backfillNoteImages(testAdapter);
+
+    const content = row<{ content: string }>(
+      `SELECT content FROM notes WHERE id = ?`,
+      noteId,
+    ).content;
+    const mintedUuid = JSON.parse(content).entries[0].images[0].uuid as string;
+    expect(mintedUuid).toBeTruthy();
+
+    const imageRow = row<{ uuid: string; local_uri: string; s3_key: string | null }>(
+      `SELECT uuid, local_uri, s3_key FROM note_images WHERE note_id = ?`,
+      noteId,
+    );
+    // The row is keyed by the same uuid now embedded in the content (the join key).
+    expect(imageRow.uuid).toBe(mintedUuid);
+    expect(imageRow.local_uri).toBe('file:///legacy.jpg');
+    expect(imageRow.s3_key).toBeNull(); // upload pending
+  });
+
+  it('is a no-op on a second run — no new rows, uuid stays stable', async () => {
+    const noteId = await upsertNote(SEED_CROP_ID, SEED_WEEK, legacyContent);
+    await backfillNoteImages(testAdapter);
+    const firstUuid = row<{ content: string }>(
+      `SELECT content FROM notes WHERE id = ?`,
+      noteId,
+    ).content.match(/"uuid":"([^"]+)"/)?.[1];
+
+    await backfillNoteImages(testAdapter);
+
+    const count = row<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM note_images WHERE note_id = ?`,
+      noteId,
+    ).n;
+    expect(count).toBe(1);
+    const secondUuid = row<{ content: string }>(
+      `SELECT content FROM notes WHERE id = ?`,
+      noteId,
+    ).content.match(/"uuid":"([^"]+)"/)?.[1];
+    expect(secondUuid).toBe(firstUuid);
   });
 });
 

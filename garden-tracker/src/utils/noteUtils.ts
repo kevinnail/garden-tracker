@@ -1,5 +1,6 @@
 import { Note, NoteImage, WeeklyNoteEntry } from '@/src/types';
 import { parseDateKey } from '@/src/utils/dateUtils';
+import { uuid } from '@/src/utils/uuid';
 
 const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -52,6 +53,42 @@ export function parseWeeklyNoteEntries(
         (entry.images?.length ?? 0) > 0,
     )
     .sort(compareWeeklyNoteEntries);
+}
+
+// Mint a `uuid` on every image that lacks one (pre-Slice-F content), preserving
+// the payload structure exactly (no filter/sort — unlike serialize). Returns the
+// re-serialized content when anything changed, or null when every image already
+// had a uuid, so the first-sync backfill can skip untouched notes.
+export function backfillNoteImageUuids(content: string): string | null {
+  const payload = parseWeeklyNotePayload(content);
+  if (!payload) return null;
+
+  let changed = false;
+  for (const entry of payload.entries) {
+    for (const image of entry.images ?? []) {
+      if (!image.uuid) {
+        image.uuid = uuid();
+        changed = true;
+      }
+    }
+  }
+  return changed ? JSON.stringify(payload) : null;
+}
+
+// Flatten every image across a serialized note's entries down to the pairs the
+// note_images reconcile needs. Only images carrying a `uuid` are returned —
+// pre-Slice-F images without one are left for the first-sync backfill to mint.
+export function collectSyncedNoteImages(content: string): { uuid: string; uri: string }[] {
+  const payload = parseWeeklyNotePayload(content);
+  if (!payload) return [];
+
+  const collected: { uuid: string; uri: string }[] = [];
+  for (const entry of payload.entries) {
+    for (const image of entry.images ?? []) {
+      if (image.uuid) collected.push({ uuid: image.uuid, uri: image.uri });
+    }
+  }
+  return collected;
 }
 
 export function serializeWeeklyNoteEntries(entries: WeeklyNoteEntry[]): string {

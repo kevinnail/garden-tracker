@@ -14,6 +14,30 @@ export const UUID4_SQL =
   "substr(hex(randomblob(2)), 2) || '-' || substr('89ab', abs(random()) % 4 + 1, 1) || " +
   "substr(hex(randomblob(2)), 2) || '-' || hex(randomblob(6)))";
 
+// The 9th synced table (Slice F). Image binaries live in S3; this row carries
+// only the cross-device `s3_key` reference plus the sync columns. `local_uri` is
+// device-local (the on-disk path the picker/download wrote to) and is NEVER put
+// on the wire — display resolves an image's on-disk file by joining the `uuid`
+// stamped into notes.content against this table's `local_uri`. Created fresh
+// (with all sync columns) via SCHEMA_SQL on new installs and via the v2→v3
+// migration on existing ones, so — unlike the other tables — its unique uuid
+// index is safe to declare here: the column always exists at creation time.
+export const NOTE_IMAGES_SQL = `
+  CREATE TABLE IF NOT EXISTS note_images (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    uuid       TEXT,
+    note_id    INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+    s3_key     TEXT,
+    local_uri  TEXT,
+    created_at TEXT NOT NULL DEFAULT (${TS_NOW}),
+    updated_at TEXT NOT NULL DEFAULT (${TS_NOW}),
+    deleted_at TEXT
+  );
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_note_images_uuid    ON note_images(uuid);
+  CREATE INDEX        IF NOT EXISTS idx_note_images_note_id ON note_images(note_id);
+`;
+
 export const SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
@@ -124,6 +148,8 @@ export const SCHEMA_SQL = `
     updated_at       TEXT NOT NULL DEFAULT (${TS_NOW}),
     deleted_at       TEXT
   );
+
+  ${NOTE_IMAGES_SQL}
 
   CREATE INDEX IF NOT EXISTS idx_crop_instances_section_id  ON crop_instances(section_id);
   CREATE INDEX IF NOT EXISTS idx_crop_instances_archived     ON crop_instances(archived);

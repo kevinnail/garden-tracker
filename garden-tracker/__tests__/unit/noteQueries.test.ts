@@ -15,6 +15,7 @@ const mockDb = {
   getAllAsync: jest.fn(),
   getFirstAsync: jest.fn(),
   runAsync: jest.fn(),
+  withTransactionAsync: jest.fn(async (fn: () => Promise<void>) => fn()),
 };
 
 beforeEach(() => {

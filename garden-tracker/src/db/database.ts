@@ -1,14 +1,14 @@
 import * as SQLite from 'expo-sqlite';
 import { PRESET_STAGES, PRESET_MUSHROOM_STAGES } from '@/src/constants/stages';
 import { PRESET_TASK_TYPES, PRESET_MUSHROOM_TASK_TYPES } from '@/src/constants/taskTypes';
-import { SCHEMA_SQL, TS_NOW, UUID4_SQL } from '@/src/db/schema';
+import { NOTE_IMAGES_SQL, SCHEMA_SQL, TS_NOW, UUID4_SQL } from '@/src/db/schema';
 import { formatDateKey, parseDateKey, toSunday } from '@/src/utils/dateUtils';
 
 let _db: SQLite.SQLiteDatabase | null = null;
 let _dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
 // Current local schema version. Bump when adding a migration step.
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 // Tables that will be synced to the cloud (Slices E/F). Each needs a nullable
 // `deleted_at` tombstone column. `note_images` is created with the column in
@@ -60,6 +60,9 @@ async function columnExists(db: MigrationDb, table: string, column: string): Pro
  * `updated_at` to the 6 tables that lacked it (LWW comparator), backfilling
  * existing rows.
  *
+ * v2 → v3: note image sync (Slice F). Create the `note_images` table (9th synced
+ * table) fresh with all sync columns. No existing table is touched.
+ *
  * All steps are additive, idempotent, and forward-only — column guards make
  * each a no-op on DBs already carrying it (fresh installs built via SCHEMA_SQL,
  * or a re-run), and they apply to existing App Store DBs that predate the
@@ -95,6 +98,9 @@ export async function runMigrations(db: MigrationDb): Promise<void> {
     }
     await db.execAsync(`UPDATE ${table} SET updated_at = ${TS_NOW} WHERE updated_at IS NULL`);
   }
+
+  // v2 → v3: note_images table (idempotent — CREATE TABLE/INDEX IF NOT EXISTS).
+  await db.execAsync(NOTE_IMAGES_SQL);
 
   await db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
 }

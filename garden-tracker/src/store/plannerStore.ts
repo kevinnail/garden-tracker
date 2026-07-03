@@ -67,6 +67,8 @@ import {
   getNotesForCrops,
   upsertNote,
 } from '@/src/db/queries/noteQueries';
+import { reconcileNoteImages, getNoteImageUriMap } from '@/src/db/queries/noteImageQueries';
+import { collectSyncedNoteImages } from '@/src/utils/noteUtils';
 import { resetDatabase, getCalendarStart, getDb } from '@/src/db/database';
 
 interface PlannerState {
@@ -79,6 +81,10 @@ interface PlannerState {
   stageDefinitions: StageDefinition[];
   taskTypes: TaskType[];
   notes: Note[];
+  // uuid → on-disk file path for every synced image with local bytes. Display
+  // resolves an image by its uuid rather than trusting the (device-local) uri
+  // baked into notes.content, which is meaningless on another device.
+  noteImageUris: Record<string, string>;
   todayDueTasks: TodayTaskItem[];
   todayOverdueTasks: TodayTaskItem[];
   showArchivedRows: boolean;
@@ -150,6 +156,7 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
   stageDefinitions: [],
   taskTypes: [],
   notes: [],
+  noteImageUris: {},
   todayDueTasks: [],
   todayOverdueTasks: [],
   showArchivedRows: false,
@@ -387,6 +394,9 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
   saveCellNote: async (cropInstanceId, weekDate, content) => {
     try {
       const noteId = await upsertNote(cropInstanceId, weekDate, content);
+      // Keep the note's image rows in step with the saved content: new images get
+      // a row (upload pending), removed ones get tombstoned (S3 delete on sync).
+      await reconcileNoteImages(noteId, collectSyncedNoteImages(content));
       const newNote: Note = {
         id: noteId,
         entity_type: 'week_cell',
@@ -536,11 +546,12 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
 
       // Batch-fetch all per-crop data in parallel (fixes N+1 query pattern)
       const cropIds = allCrops.map((c) => c.id);
-      const [allStages, allTasks, allCompletions, allCellNotes] = await Promise.all([
+      const [allStages, allTasks, allCompletions, allCellNotes, noteImageUris] = await Promise.all([
         getCropStagesForCrops(cropIds),
         getTasksForCrops(cropIds),
         getCompletionsForCrops(cropIds),
         getNotesForCrops(cropIds),
+        getNoteImageUriMap(),
       ]);
 
       // Pre-index everything by parent key for O(1) lookup in the render loop
@@ -726,6 +737,7 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
         sections,
         allTaskLines,
         notes,
+        noteImageUris,
         todayDueTasks,
         todayOverdueTasks,
         stageDefinitions: stageDefs,
