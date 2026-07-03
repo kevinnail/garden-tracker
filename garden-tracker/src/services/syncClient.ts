@@ -92,14 +92,17 @@ const COLLECT_SQL: Record<string, string> = {
            notes.created_at, notes.updated_at, notes.deleted_at
     FROM notes LEFT JOIN crop_instances ON crop_instances.id = notes.crop_instance_id
     WHERE notes.uuid IS NOT NULL AND notes.updated_at > ?`,
-  // Only push rows the server can actually use: an uploaded row (has s3_key) or a
-  // tombstone (deleted_at). An active row still pending its S3 upload waits.
+  // Only push rows the server can actually use: those with an s3_key — whether
+  // active or a tombstone. s3_key is only ever set, never cleared, so a row
+  // without one was never uploaded and never pushed; the server has no record of
+  // it, its tombstone has nothing to GC, and sending it (s3_key NULL) would fail
+  // the server's non-null s3_key validation and 400 the whole batch.
   note_images: `
     SELECT note_images.uuid, notes.uuid AS note_uuid, note_images.s3_key,
            note_images.created_at, note_images.updated_at, note_images.deleted_at
     FROM note_images JOIN notes ON notes.id = note_images.note_id
     WHERE note_images.uuid IS NOT NULL AND note_images.updated_at > ?
-      AND (note_images.s3_key IS NOT NULL OR note_images.deleted_at IS NOT NULL)`,
+      AND note_images.s3_key IS NOT NULL`,
 };
 
 interface ForeignKey {
