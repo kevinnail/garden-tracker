@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
 
 import { NoteImage } from '@/src/types';
+import { usePlannerStore } from '@/src/store/plannerStore';
+import { resolveNoteImageUri } from '@/src/utils/imageStorage';
 import NoteImageViewer from './NoteImageViewer';
 
 interface Props {
@@ -11,8 +13,16 @@ interface Props {
 
 export default function NoteImageStrip({ images }: Props) {
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const noteImageUris = usePlannerStore((state) => state.noteImageUris);
 
-  if (images.length === 0) return null;
+  // Point every image at its on-disk file by uuid; the viewer inherits the
+  // resolved uris, so both thumbnail and full view work post-sync.
+  const resolvedImages = useMemo(
+    () => images.map((image) => ({ ...image, uri: resolveNoteImageUri(image, noteImageUris) })),
+    [images, noteImageUris],
+  );
+
+  if (resolvedImages.length === 0) return null;
 
   return (
     <>
@@ -22,7 +32,7 @@ export default function NoteImageStrip({ images }: Props) {
         style={styles.strip}
         contentContainerStyle={styles.stripContent}
       >
-        {images.map((img, index) => (
+        {resolvedImages.map((img, index) => (
           <Pressable key={img.id} onPress={() => setViewerIndex(index)} style={styles.thumb}>
             <Image source={{ uri: img.uri }} style={styles.thumbImage} contentFit="cover" />
           </Pressable>
@@ -31,7 +41,7 @@ export default function NoteImageStrip({ images }: Props) {
 
       {viewerIndex !== null && (
         <NoteImageViewer
-          images={images}
+          images={resolvedImages}
           initialIndex={viewerIndex}
           onClose={() => setViewerIndex(null)}
         />
