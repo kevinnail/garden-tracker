@@ -317,6 +317,23 @@ describe('note_images sync', () => {
     expect(uploaded).not.toHaveProperty('local_uri'); // device-local, never on the wire
   });
 
+  it('omits a tombstone that never got an s3_key (never uploaded → nothing to GC; would 400 the batch)', async () => {
+    const noteId = await upsertNote(SEED_CROP_ID, SEED_WEEK, 'weekly');
+    // Image added then its note deleted before any sync uploaded it: tombstoned
+    // with s3_key still NULL. The server never knew this row, so it must not push
+    // (a NULL s3_key fails the server's validation and rejects the whole batch).
+    insertImageRow({
+      uuid: 'img-tomb-nokey',
+      note_id: noteId,
+      deleted_at: '2026-06-02 10:00:00.000',
+    });
+
+    const { changed } = await collectChanges('');
+    const imageEntry = changed.find((entry) => entry.table === 'note_images');
+    const collected = imageEntry?.rows.map((entry) => entry.uuid) ?? [];
+    expect(collected).not.toContain('img-tomb-nokey');
+  });
+
   it('applyPull inserts a note_images row (note_uuid → local id) with local_uri left NULL for download', async () => {
     const noteId = await upsertNote(SEED_CROP_ID, SEED_WEEK, 'weekly');
     const noteUuid = uuidOf('notes', 'id', noteId);
