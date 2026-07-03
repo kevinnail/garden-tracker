@@ -6,8 +6,15 @@
 
 import { getDb } from '@/src/db/database';
 import { TS_NOW } from '@/src/db/schema';
+import { reconcileNoteImages } from '@/src/db/queries/noteImageQueries';
 import { requestJson } from '@/src/services/apiClient';
 import { authClient } from '@/src/services/authClient';
+import {
+  uploadPendingImages,
+  downloadPendingImages,
+  cleanupTombstonedImages,
+} from '@/src/services/imageSync';
+import { backfillNoteImageUuids, collectSyncedNoteImages } from '@/src/utils/noteUtils';
 
 type WireRow = Record<string, unknown>;
 
@@ -85,6 +92,14 @@ const COLLECT_SQL: Record<string, string> = {
            notes.created_at, notes.updated_at, notes.deleted_at
     FROM notes LEFT JOIN crop_instances ON crop_instances.id = notes.crop_instance_id
     WHERE notes.uuid IS NOT NULL AND notes.updated_at > ?`,
+  // Only push rows the server can actually use: an uploaded row (has s3_key) or a
+  // tombstone (deleted_at). An active row still pending its S3 upload waits.
+  note_images: `
+    SELECT note_images.uuid, notes.uuid AS note_uuid, note_images.s3_key,
+           note_images.created_at, note_images.updated_at, note_images.deleted_at
+    FROM note_images JOIN notes ON notes.id = note_images.note_id
+    WHERE note_images.uuid IS NOT NULL AND note_images.updated_at > ?
+      AND (note_images.s3_key IS NOT NULL OR note_images.deleted_at IS NOT NULL)`,
 };
 
 interface ForeignKey {
@@ -101,6 +116,11 @@ interface TableConfig {
   dataColumns: string[];
   hasCreatedAt: boolean;
   foreignKey?: ForeignKey;
+  // Extra predicate restricting which local rows the pull sweep may tombstone
+  // when they're absent from the server response. Used by note_images to spare
+  // rows still pending their S3 upload (s3_key IS NULL) — those were never
+  // pushed, so their absence from pull is expected, not a server-side delete.
+  pullDeleteFilter?: string;
 }
 
 // Parents before children — the order the server processes push in, and the
@@ -166,6 +186,16 @@ const TABLE_CONFIGS: TableConfig[] = [
       nullable: true,
     },
   },
+  {
+    table: 'note_images',
+    dataColumns: ['s3_key'],
+    hasCreatedAt: true,
+    foreignKey: { wireField: 'note_uuid', localColumn: 'note_id', parentTable: 'notes' },
+    // local_uri is device-local (not a dataColumn), so pull never clobbers it and
+    // a freshly pulled row lands with local_uri = NULL → the download pass fetches
+    // its bytes. Only server-known rows (s3_key set) are eligible for pull-delete.
+    pullDeleteFilter: 's3_key IS NOT NULL',
+  },
 ];
 
 const TABLE_ORDER = TABLE_CONFIGS.map((config) => config.table);
@@ -187,6 +217,31 @@ async function setSetting(db: SyncDb, key: string, value: string): Promise<void>
     key,
     value,
   );
+}
+
+// ── Existing-image backfill ───────────────────────────────────────────────────
+
+/**
+ * One-time-per-note upgrade for images created before Slice F: they live in
+ * notes.content with a local `uri` but no `uuid` and no `note_images` row. Mint a
+ * `uuid` into each such image (bumping the note's `updated_at` so the uuid
+ * reaches other devices) and create its `note_images` row (upload pending). Runs
+ * at the top of every sync; a no-op once every image is keyed.
+ */
+export async function backfillNoteImages(db: SyncDb): Promise<void> {
+  const notes = await db.getAllAsync<{ id: number; content: string }>(
+    `SELECT id, content FROM notes WHERE deleted_at IS NULL AND content IS NOT NULL`,
+  );
+  for (const note of notes) {
+    const updated = backfillNoteImageUuids(note.content);
+    if (updated == null) continue;
+    await db.runAsync(
+      `UPDATE notes SET content = ?, updated_at = ${TS_NOW} WHERE id = ?`,
+      updated,
+      note.id,
+    );
+    await reconcileNoteImages(note.id, collectSyncedNoteImages(updated));
+  }
 }
 
 // ── Push ────────────────────────────────────────────────────────────────────
@@ -280,8 +335,10 @@ async function applyTable(
   // Soft-delete rows the server no longer returns. Guard on `updated_at <=
   // syncStartedAt` so a row created locally during this sync (not yet pushed,
   // so legitimately absent from the pull) is left alone rather than deleted.
+  const extraFilter = config.pullDeleteFilter ? ` AND ${config.pullDeleteFilter}` : '';
   const localActive = await db.getAllAsync<{ uuid: string; updated_at: string }>(
-    `SELECT uuid, updated_at FROM ${config.table} WHERE deleted_at IS NULL AND uuid IS NOT NULL`,
+    `SELECT uuid, updated_at FROM ${config.table}
+     WHERE deleted_at IS NULL AND uuid IS NOT NULL${extraFilter}`,
   );
   for (const local of localActive) {
     if (!incomingUuids.has(local.uuid) && local.updated_at <= syncStartedAt) {
@@ -317,14 +374,26 @@ function authHeaders(): Record<string, string> {
  * reconcile. Push-then-pull so the server has applied this device's changes
  * under LWW before we overwrite the local view. The checkpoint advances only
  * after the push succeeds, so a failed push is retried next time (no data loss).
+ *
+ * Image bytes bracket the row sync: backfill legacy images and upload pending
+ * bytes *before* the push (so their rows are pushable in the same event), then
+ * download newly-pulled bytes and clean up tombstoned files *after* the pull.
  */
 export async function runSync(): Promise<{ lastSyncAt: string }> {
   const db = (await getDb()) as unknown as SyncDb;
+
+  // Key any pre-Slice-F images and mint their rows before we snapshot the clock,
+  // so the content/updated_at bump lands under this sync's checkpoint.
+  await backfillNoteImages(db);
 
   // Capture the sync-start instant from SQLite so it is byte-identical in format
   // to every row timestamp we compare it against.
   const startRow = await db.getFirstAsync<{ now: string }>(`SELECT ${TS_NOW} AS now`);
   const syncStartedAt = startRow!.now;
+
+  // Upload before collecting: a successful upload sets s3_key + stamps updated_at
+  // to syncStartedAt, so the row is picked up by this same push.
+  await uploadPendingImages(syncStartedAt);
 
   const lastPushedAt = (await getSetting(db, 'last_pushed_at')) ?? '';
   const payload = await collectChanges(lastPushedAt);
@@ -345,6 +414,10 @@ export async function runSync(): Promise<{ lastSyncAt: string }> {
   });
   await applyPull(pull, syncStartedAt);
   await setSetting(db, 'last_sync_at', pull.last_sync_at);
+
+  // Fetch bytes for rows just pulled, and drop files for rows just tombstoned.
+  await downloadPendingImages();
+  await cleanupTombstonedImages();
 
   return { lastSyncAt: pull.last_sync_at };
 }
