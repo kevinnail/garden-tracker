@@ -20,18 +20,23 @@ export async function getCropsForSection(
   includeArchived = false,
 ): Promise<CropInstance[]> {
   const db = await getDb();
+  // uuid is the tiebreaker so same-start_date crops sort identically on every
+  // device — local `id` (SQLite rowid) is assigned per-device and would order the
+  // grid differently on each one.
   const sql = includeArchived
-    ? `SELECT * FROM crop_instances WHERE section_id = ? AND deleted_at IS NULL ORDER BY start_date`
-    : `SELECT * FROM crop_instances WHERE section_id = ? AND archived = 0 AND deleted_at IS NULL ORDER BY start_date`;
+    ? `SELECT * FROM crop_instances WHERE section_id = ? AND deleted_at IS NULL ORDER BY start_date, uuid`
+    : `SELECT * FROM crop_instances WHERE section_id = ? AND archived = 0 AND deleted_at IS NULL ORDER BY start_date, uuid`;
   const rows = await db.getAllAsync<any>(sql, sectionId);
   return rows.map((r) => ({ ...r, archived: r.archived === 1 }));
 }
 
 export async function getAllCrops(includeArchived = false): Promise<CropInstance[]> {
   const db = await getDb();
+  // uuid tiebreaks same-start_date crops so the grid order is identical across
+  // devices (local `id` is per-device and must not drive display order).
   const sql = includeArchived
-    ? `SELECT * FROM crop_instances WHERE deleted_at IS NULL ORDER BY section_id, start_date`
-    : `SELECT * FROM crop_instances WHERE archived = 0 AND deleted_at IS NULL ORDER BY section_id, start_date`;
+    ? `SELECT * FROM crop_instances WHERE deleted_at IS NULL ORDER BY section_id, start_date, uuid`
+    : `SELECT * FROM crop_instances WHERE archived = 0 AND deleted_at IS NULL ORDER BY section_id, start_date, uuid`;
   const rows = await db.getAllAsync<any>(sql);
   return rows.map((r) => ({ ...r, archived: r.archived === 1 }));
 }
