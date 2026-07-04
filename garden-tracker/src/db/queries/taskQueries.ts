@@ -171,7 +171,7 @@ async function getDashboardTasks(): Promise<DashboardTaskRow[]> {
       AND s.deleted_at IS NULL
       AND g.deleted_at IS NULL
       AND l.deleted_at IS NULL
-    ORDER BY l.order_index, g.order_index, s.order_index, ci.start_date, ci.id, t.id
+    ORDER BY l.order_index, g.order_index, s.order_index, ci.start_date, ci.uuid, t.uuid
   `);
 }
 
