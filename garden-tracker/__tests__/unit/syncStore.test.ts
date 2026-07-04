@@ -84,3 +84,53 @@ describe('syncStore.syncNow when entitled', () => {
     expect(useSyncStore.getState().error).toMatch(/network/i);
   });
 });
+
+describe('syncStore.syncNow silent (background triggers)', () => {
+  beforeEach(() => {
+    useAuthStore.setState({ status: 'signed-in', email: 'a@b.co' });
+    useSubscriptionStore.setState({ isPremium: true });
+    jest.useFakeTimers();
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('retries a transient 401 and succeeds without ever showing an error', async () => {
+    // The post-login race: cookie not attached on the first attempt, then it is.
+    runSyncMock
+      .mockRejectedValueOnce(new ApiClientError('Unauthorized', 'unauthorized', 401))
+      .mockResolvedValueOnce({ lastSyncAt: '2026-07-03T16:00:00.000Z' });
+
+    const pending = useSyncStore.getState().syncNow({ silent: true });
+    await jest.runAllTimersAsync();
+    await pending;
+
+    expect(runSyncMock).toHaveBeenCalledTimes(2);
+    expect(useSyncStore.getState().status).toBe('idle');
+    expect(useSyncStore.getState().lastSyncedAt).toBe('2026-07-03T16:00:00.000Z');
+    expect(useSyncStore.getState().error).toBeNull();
+  });
+
+  it('gives up quietly (no error text) when a transient failure persists', async () => {
+    runSyncMock.mockRejectedValue(new ApiClientError('Subscription required', 'forbidden', 403));
+
+    const pending = useSyncStore.getState().syncNow({ silent: true });
+    await jest.runAllTimersAsync();
+    await pending;
+
+    expect(runSyncMock).toHaveBeenCalledTimes(3);
+    expect(useSyncStore.getState().status).toBe('idle');
+    expect(useSyncStore.getState().error).toBeNull();
+  });
+
+  it('still surfaces a non-transient failure even when silent', async () => {
+    runSyncMock.mockRejectedValue(new ApiClientError('boom', 'server', 500));
+
+    const pending = useSyncStore.getState().syncNow({ silent: true });
+    await jest.runAllTimersAsync();
+    await pending;
+
+    expect(runSyncMock).toHaveBeenCalledTimes(1);
+    expect(useSyncStore.getState().status).toBe('error');
+  });
+});
