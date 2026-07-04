@@ -41,7 +41,9 @@ export default function RootLayout() {
       identify(userId).catch(() => {});
       // Post-login sync. Self-gates on subscription, so it no-ops until the
       // entitlement is seeded; the foreground trigger below then catches up.
-      syncNow();
+      // Silent: right after sign-in the client can race ahead of the backend
+      // (cookie/entitlement not ready) — retry quietly rather than flash an error.
+      syncNow({ silent: true });
     } else forget().catch(() => {});
   }, [session, isPending, setSession, identify, forget, syncNow]);
 
@@ -49,7 +51,7 @@ export default function RootLayout() {
   // subscribed, so it's a no-op for free/signed-out users).
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') syncNow();
+      if (state === 'active') syncNow({ silent: true });
     });
     return () => subscription.remove();
   }, [syncNow]);
