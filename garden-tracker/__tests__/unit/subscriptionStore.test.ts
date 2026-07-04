@@ -122,6 +122,25 @@ describe('subscriptionStore.forget', () => {
     expect(logOutMock).toHaveBeenCalled();
     expect(useSubscriptionStore.getState().isPremium).toBe(false);
   });
+
+  it('serializes overlapping calls so logOut runs once (no anonymous-user error)', async () => {
+    // The root-layout session effect can fire forget() twice on one sign-out.
+    // isAnonymous reports the identified user first, then anonymous after the
+    // first logOut lands — the second call must see that and skip logOut.
+    let identified = true;
+    isAnonymousMock.mockImplementation(async () => !identified);
+    logOutMock.mockImplementation(async () => {
+      identified = false;
+      return freeInfo;
+    });
+
+    await Promise.all([
+      useSubscriptionStore.getState().forget(),
+      useSubscriptionStore.getState().forget(),
+    ]);
+
+    expect(logOutMock).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('subscriptionStore.subscribe', () => {
