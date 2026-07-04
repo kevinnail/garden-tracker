@@ -45,6 +45,19 @@ interface SubscriptionState {
 // (getCustomerInfo/getOfferings) run on every init so a re-init still refreshes.
 let configured = false;
 
+// Serializes identify/forget so overlapping session-effect fires can't issue two
+// concurrent logIn/logOut calls. The root layout's `useSession` effect can fire
+// forget() more than once on a single sign-out (the session ref changes and
+// `isPending` toggles); without serialization both calls read isAnonymous() ===
+// false before either logOut() lands, and the second logOut() hits the now-
+// anonymous user — which the native SDK logs as an error a JS catch can't
+// suppress. Chaining onto the tail makes each op see the prior op's final state.
+let identityQueue: Promise<void> = Promise.resolve();
+function serializeIdentity(operation: () => Promise<void>): Promise<void> {
+  identityQueue = identityQueue.then(operation, operation);
+  return identityQueue;
+}
+
 export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   isPremium: false,
   offering: null,
@@ -76,27 +89,30 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
     }
   },
 
-  identify: async (userId) => {
-    try {
-      const { customerInfo } = await Purchases.logIn(userId);
-      get().applyCustomerInfo(customerInfo);
-    } catch (error) {
-      set({ error: messageFromPurchaseError(error) });
-    }
-  },
+  identify: (userId) =>
+    serializeIdentity(async () => {
+      try {
+        const { customerInfo } = await Purchases.logIn(userId);
+        get().applyCustomerInfo(customerInfo);
+      } catch (error) {
+        set({ error: messageFromPurchaseError(error) });
+      }
+    }),
 
-  forget: async () => {
-    try {
-      // No identified user to drop. Calling logOut while anonymous makes the
-      // SDK log an error on every signed-out launch (session is briefly null
-      // before it restores), so skip it.
-      if (await Purchases.isAnonymous()) return;
-      const info = await Purchases.logOut();
-      get().applyCustomerInfo(info);
-    } catch {
-      // isAnonymous/logOut throw if configure hasn't run yet — safe to ignore.
-    }
-  },
+  forget: () =>
+    serializeIdentity(async () => {
+      try {
+        // No identified user to drop. Calling logOut while anonymous makes the
+        // SDK log an error on every signed-out launch (session is briefly null
+        // before it restores), so skip it. Serialization above guarantees a
+        // second overlapping forget() sees the first's logOut() already applied.
+        if (await Purchases.isAnonymous()) return;
+        const info = await Purchases.logOut();
+        get().applyCustomerInfo(info);
+      } catch {
+        // isAnonymous/logOut throw if configure hasn't run yet — safe to ignore.
+      }
+    }),
 
   applyCustomerInfo: (info) => {
     set({ isPremium: hasPremium(info) });
