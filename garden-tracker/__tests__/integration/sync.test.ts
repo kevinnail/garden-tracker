@@ -22,9 +22,10 @@ import {
 } from '@/src/services/syncClient';
 import { insertLocation, insertGarden, insertSection } from '@/src/db/queries/locationQueries';
 import { insertCropWithStages, deleteCropInstance } from '@/src/db/queries/cropQueries';
+import { insertTask, insertCompletion } from '@/src/db/queries/taskQueries';
 import { upsertNote } from '@/src/db/queries/noteQueries';
 import { getDb } from '@/src/db/database';
-import { setupTestDb } from '../setup';
+import { SEED, setupTestDb } from '../setup';
 import type BetterSqlite3 from 'better-sqlite3';
 
 jest.mock('@/src/db/database', () => ({ getDb: jest.fn() }));
@@ -119,6 +120,76 @@ describe('collectChanges', () => {
     );
     expect(locationNames.has('New')).toBe(true);
     expect(locationNames.has('Old')).toBe(false);
+  });
+});
+
+// ── touch-parent on task-child mutation ────────────────────────────────────────
+//
+// Sync is pure per-row LWW with no cascade, so a crop only survives a remote
+// tombstone if the client re-pushes the crop_instances row itself. A task-level
+// child mutation must therefore bump the parent crop's updated_at so it rides the
+// next push batch (deleted_at null → resurrect) — unless the crop is tombstoned
+// on THIS device, in which case the parent must stay untouched.
+
+describe('touch-parent on task-child mutation', () => {
+  // A realistic past checkpoint: a "now" touch clears it, an untouched old row
+  // does not. (A future checkpoint would swallow the real wall-clock bump.)
+  const SINCE = '2020-01-01 00:00:00.000';
+  const PARKED = '2000-01-01 00:00:00.000';
+
+  const collectedCrop = (
+    changed: Awaited<ReturnType<typeof collectChanges>>['changed'],
+    cropUuid: string,
+  ) =>
+    changed
+      .find((entry) => entry.table === 'crop_instances')
+      ?.rows.find((r) => r.uuid === cropUuid);
+
+  it('enqueues the parent crop (deleted_at null) when a task is added after the checkpoint', async () => {
+    const cropUuid = uuidOf('crop_instances', 'id', SEED.CROP_ID);
+    // Park the crop before the checkpoint so only a child-driven touch surfaces it.
+    rawDb
+      .prepare(`UPDATE crop_instances SET updated_at = ? WHERE id = ?`)
+      .run(PARKED, SEED.CROP_ID);
+
+    const before = await collectChanges(SINCE);
+    expect(collectedCrop(before.changed, cropUuid)).toBeUndefined();
+
+    await insertTask(SEED.CROP_ID, SEED.TASK_TYPE_ID, SEED.TASK_DAY_OF_WEEK, 1, 0);
+
+    const after = await collectChanges(SINCE);
+    const cropRow = collectedCrop(after.changed, cropUuid);
+    expect(cropRow).toBeDefined();
+    expect(cropRow!.deleted_at).toBeNull();
+    // The new task rides the same batch, keyed to the same crop.
+    const taskRows = after.changed.find((entry) => entry.table === 'tasks')?.rows ?? [];
+    expect(taskRows.some((r) => r.crop_instance_uuid === cropUuid)).toBe(true);
+  });
+
+  it('enqueues the parent crop when a task completion is added', async () => {
+    const cropUuid = uuidOf('crop_instances', 'id', SEED.CROP_ID);
+    rawDb
+      .prepare(`UPDATE crop_instances SET updated_at = ? WHERE id = ?`)
+      .run(PARKED, SEED.CROP_ID);
+
+    await insertCompletion(SEED.TASK_ID, SEED.START_DATE);
+
+    const cropRow = collectedCrop((await collectChanges(SINCE)).changed, cropUuid);
+    expect(cropRow).toBeDefined();
+    expect(cropRow!.deleted_at).toBeNull();
+  });
+
+  it('does NOT resurrect a crop tombstoned on this device when a task is added', async () => {
+    const cropUuid = uuidOf('crop_instances', 'id', SEED.CROP_ID);
+    // Deleted on THIS device: tombstoned and parked before the checkpoint.
+    rawDb
+      .prepare(`UPDATE crop_instances SET deleted_at = ?, updated_at = ? WHERE id = ?`)
+      .run(PARKED, PARKED, SEED.CROP_ID);
+
+    await insertTask(SEED.CROP_ID, SEED.TASK_TYPE_ID, SEED.TASK_DAY_OF_WEEK, 1, 0);
+
+    // Guard held: updated_at was not bumped, so the crop stays below the checkpoint.
+    expect(collectedCrop((await collectChanges(SINCE)).changed, cropUuid)).toBeUndefined();
   });
 });
 
