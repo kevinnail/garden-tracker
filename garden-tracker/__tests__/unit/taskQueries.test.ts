@@ -160,7 +160,7 @@ describe('insertTask', () => {
     const id = await insertTask(1, 1, 3, 1, 0);
 
     expect(id).toBe(7);
-    expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
+    expect(mockDb.runAsync).toHaveBeenCalledTimes(2);
     expect(mockDb.runAsync).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO tasks'),
       1,
@@ -168,6 +168,11 @@ describe('insertTask', () => {
       3,
       1,
       0,
+    );
+    // Bumps the parent crop so the crop_instances row rides the next push batch.
+    expect(mockDb.runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE crop_instances SET updated_at'),
+      1,
     );
   });
 
@@ -184,13 +189,18 @@ describe('insertCompletion', () => {
   it('upserts a completion, reviving any soft-deleted row on conflict', async () => {
     await insertCompletion(1, '2025-03-02');
 
-    expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
+    expect(mockDb.runAsync).toHaveBeenCalledTimes(2);
     expect(mockDb.runAsync).toHaveBeenCalledWith(
       expect.stringContaining(
         'ON CONFLICT(task_id, completed_date) DO UPDATE SET deleted_at = NULL',
       ),
       1,
       '2025-03-02',
+    );
+    // Bumps the parent crop (resolved via the task) so it re-pushes under LWW.
+    expect(mockDb.runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE crop_instances SET updated_at'),
+      1,
     );
   });
 
@@ -213,13 +223,18 @@ describe('deleteCompletion', () => {
   it('soft-deletes the completion matching task_id and completed_date', async () => {
     await deleteCompletion(1, '2025-03-02');
 
-    expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
+    expect(mockDb.runAsync).toHaveBeenCalledTimes(2);
     expect(mockDb.runAsync).toHaveBeenCalledWith(
       expect.stringContaining(
         `UPDATE task_completions SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW}`,
       ),
       1,
       '2025-03-02',
+    );
+    // Bumps the parent crop (resolved via the task) so it re-pushes under LWW.
+    expect(mockDb.runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE crop_instances SET updated_at'),
+      1,
     );
   });
 
@@ -252,6 +267,11 @@ describe('deleteTask', () => {
       expect.stringContaining(
         `UPDATE tasks SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW} WHERE id = ?`,
       ),
+      5,
+    );
+    // Bumps the parent crop (resolved via the task) so it re-pushes under LWW.
+    expect(mockDb.runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE crop_instances SET updated_at'),
       5,
     );
   });
@@ -420,10 +440,15 @@ describe('updateTaskDay', () => {
 
     await updateTaskDay(5, 1);
 
-    expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
+    expect(mockDb.runAsync).toHaveBeenCalledTimes(2);
     expect(mockDb.runAsync).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE tasks SET day_of_week'),
       1,
+      5,
+    );
+    // Bumps the parent crop (resolved via the task) so it re-pushes under LWW.
+    expect(mockDb.runAsync).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE crop_instances SET updated_at'),
       5,
     );
   });
