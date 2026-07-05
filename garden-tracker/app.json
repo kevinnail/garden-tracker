@@ -76,7 +76,7 @@
       "router": {},
       "backendTarget": "local",
       "apiBaseUrlLocal": "http://localhost:7890",
-      "apiBaseUrlRailway": "crop-planner-server-production.up.railway.app",
+      "apiBaseUrlRailway": "https://crop-planner-server-production.up.railway.app",
       "eas": {
         "projectId": "632ef928-b06a-4b1b-a803-8b65639f1854"
       }

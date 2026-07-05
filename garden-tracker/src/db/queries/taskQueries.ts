@@ -23,6 +23,15 @@ interface DashboardTaskRow {
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
+// Sync uses a pure per-row last-write-wins store keyed on uuid, with no cascade:
+// a crop only survives a remote tombstone if the client re-pushes the
+// crop_instances row itself with a newer updated_at. So when a task-level child
+// changes, bump the parent crop's updated_at too (unless it's locally
+// tombstoned) so it rides the next push batch and resurrects the crop under LWW.
+// This mirrors what editCrop does for stage edits via updateCropInstance.
+const TOUCH_CROP_SQL = `UPDATE crop_instances SET updated_at = ${TS_NOW} WHERE id = ? AND deleted_at IS NULL`;
+const TOUCH_CROP_BY_TASK_SQL = `UPDATE crop_instances SET updated_at = ${TS_NOW} WHERE id = (SELECT crop_instance_id FROM tasks WHERE id = ?) AND deleted_at IS NULL`;
+
 function utcMidnightMs(date: Date): number {
   return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
 }
@@ -278,38 +287,49 @@ export async function insertTask(
   startOffsetWeeks: number,
 ): Promise<number> {
   const db = await getDb();
-  const result = await db.runAsync(
-    `INSERT INTO tasks (uuid, crop_instance_id, task_type_id, day_of_week, frequency_weeks, start_offset_weeks, updated_at) VALUES ((${UUID4_SQL}), ?, ?, ?, ?, ?, ${TS_NOW})`,
-    cropInstanceId,
-    taskTypeId,
-    dayOfWeek,
-    frequencyWeeks,
-    startOffsetWeeks,
-  );
-  return result.lastInsertRowId;
+  let insertedId = 0;
+  await db.withTransactionAsync(async () => {
+    const result = await db.runAsync(
+      `INSERT INTO tasks (uuid, crop_instance_id, task_type_id, day_of_week, frequency_weeks, start_offset_weeks, updated_at) VALUES ((${UUID4_SQL}), ?, ?, ?, ?, ?, ${TS_NOW})`,
+      cropInstanceId,
+      taskTypeId,
+      dayOfWeek,
+      frequencyWeeks,
+      startOffsetWeeks,
+    );
+    insertedId = result.lastInsertRowId;
+    await db.runAsync(TOUCH_CROP_SQL, cropInstanceId);
+  });
+  return insertedId;
 }
 
 export async function insertCompletion(taskId: number, weekDate: string): Promise<void> {
   const db = await getDb();
-  // Revive on conflict: a prior uncomplete soft-deletes the row, which still
-  // occupies the UNIQUE(task_id, completed_date) slot, so INSERT OR IGNORE would
-  // silently no-op. Clearing deleted_at restores the completion.
-  await db.runAsync(
-    `INSERT INTO task_completions (uuid, task_id, completed_date, updated_at) VALUES ((${UUID4_SQL}), ?, ?, ${TS_NOW})
-     ON CONFLICT(task_id, completed_date) DO UPDATE SET deleted_at = NULL, updated_at = ${TS_NOW}`,
-    taskId,
-    weekDate,
-  );
+  await db.withTransactionAsync(async () => {
+    // Revive on conflict: a prior uncomplete soft-deletes the row, which still
+    // occupies the UNIQUE(task_id, completed_date) slot, so INSERT OR IGNORE would
+    // silently no-op. Clearing deleted_at restores the completion.
+    await db.runAsync(
+      `INSERT INTO task_completions (uuid, task_id, completed_date, updated_at) VALUES ((${UUID4_SQL}), ?, ?, ${TS_NOW})
+       ON CONFLICT(task_id, completed_date) DO UPDATE SET deleted_at = NULL, updated_at = ${TS_NOW}`,
+      taskId,
+      weekDate,
+    );
+    await db.runAsync(TOUCH_CROP_BY_TASK_SQL, taskId);
+  });
 }
 
 export async function deleteCompletion(taskId: number, weekDate: string): Promise<void> {
   const db = await getDb();
-  await db.runAsync(
-    `UPDATE task_completions SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW}
-     WHERE task_id = ? AND completed_date = ? AND deleted_at IS NULL`,
-    taskId,
-    weekDate,
-  );
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      `UPDATE task_completions SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW}
+       WHERE task_id = ? AND completed_date = ? AND deleted_at IS NULL`,
+      taskId,
+      weekDate,
+    );
+    await db.runAsync(TOUCH_CROP_BY_TASK_SQL, taskId);
+  });
 }
 
 export async function deleteTask(id: number): Promise<void> {
@@ -323,16 +343,20 @@ export async function deleteTask(id: number): Promise<void> {
       `UPDATE tasks SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW} WHERE id = ?`,
       id,
     );
+    await db.runAsync(TOUCH_CROP_BY_TASK_SQL, id);
   });
 }
 
 export async function updateTaskDay(id: number, dayOfWeek: number): Promise<void> {
   const db = await getDb();
-  await db.runAsync(
-    `UPDATE tasks SET day_of_week = ?, updated_at = ${TS_NOW} WHERE id = ?`,
-    dayOfWeek,
-    id,
-  );
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      `UPDATE tasks SET day_of_week = ?, updated_at = ${TS_NOW} WHERE id = ?`,
+      dayOfWeek,
+      id,
+    );
+    await db.runAsync(TOUCH_CROP_BY_TASK_SQL, id);
+  });
 }
 
 export async function getTodayAndOverdue(
