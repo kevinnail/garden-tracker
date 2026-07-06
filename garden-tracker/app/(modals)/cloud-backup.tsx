@@ -22,6 +22,7 @@ export default function CloudBackupModal() {
   const isPremium = useSubscriptionStore((s) => s.isPremium);
   const offering = useSubscriptionStore((s) => s.offering);
   const subError = useSubscriptionStore((s) => s.error);
+  const purchasePending = useSubscriptionStore((s) => s.purchasePending);
   const subscribe = useSubscriptionStore((s) => s.subscribe);
   const restore = useSubscriptionStore((s) => s.restore);
 
@@ -75,18 +76,24 @@ export default function CloudBackupModal() {
                   Subscribe to back up and sync your garden{price ? ` — ${price}/year` : ''}.
                 </Text>
                 <Pressable
-                  style={styles.primaryBtn}
+                  style={[styles.primaryBtn, purchasePending && styles.btnDisabled]}
                   onPress={() => subscribe()}
+                  disabled={purchasePending}
                   accessibilityRole="button"
                   accessibilityLabel="Subscribe"
                 >
                   <Text style={styles.primaryBtnText}>
-                    {price ? `Subscribe — ${price}/year` : 'Subscribe'}
+                    {purchasePending
+                      ? 'Processing…'
+                      : price
+                        ? `Subscribe — ${price}/year`
+                        : 'Subscribe'}
                   </Text>
                 </Pressable>
                 <Pressable
                   style={styles.linkBtn}
                   onPress={() => restore()}
+                  disabled={purchasePending}
                   accessibilityRole="button"
                   accessibilityLabel="Restore purchases"
                 >
