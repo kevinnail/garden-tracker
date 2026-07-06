@@ -72,7 +72,7 @@ describe('uploadPendingImages', () => {
     });
   });
 
-  it('requests an upload URL with the image uuid + derived content type', async () => {
+  it('requests an upload URL with the uuid, content type, and exact byte length', async () => {
     await uploadPendingImages('2026-07-01 00:00:00.000');
 
     expect(requestJsonMock).toHaveBeenCalledWith(
@@ -80,7 +80,9 @@ describe('uploadPendingImages', () => {
       expect.objectContaining({ method: 'POST' }),
     );
     const body = JSON.parse(requestJsonMock.mock.calls[0][1].body);
-    expect(body).toEqual({ uuid: 'img-a', content_type: 'image/jpeg' });
+    // readImageBytes is mocked to return a 3-byte Uint8Array, so content_length
+    // must be exactly 3 — the value the server signs into the PUT's ContentLength.
+    expect(body).toEqual({ uuid: 'img-a', content_type: 'image/jpeg', content_length: 3 });
   });
 
   it('PUTs the raw bytes to S3 with a Content-Type that matches the presign', async () => {
