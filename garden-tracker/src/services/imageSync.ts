@@ -78,16 +78,23 @@ export async function uploadPendingImages(syncStartedAt: string): Promise<void> 
   for (const image of pending) {
     try {
       const contentType = contentTypeFor(image.local_uri);
+      // Read the bytes first: the server signs the exact content_length into the
+      // PUT (and caps it at MAX_IMAGE_BYTES), so the URL request must declare the
+      // real byte count. bytes.byteLength is the exact body S3 will measure.
+      const bytes = await readImageBytes(image.local_uri);
       const { upload_url, s3_key } = await requestJson<UploadUrlResponse>(
         '/sync/image/upload-url',
         {
           method: 'POST',
           headers: authHeaders(),
-          body: JSON.stringify({ uuid: image.uuid, content_type: contentType }),
+          body: JSON.stringify({
+            uuid: image.uuid,
+            content_type: contentType,
+            content_length: bytes.byteLength,
+          }),
         },
       );
 
-      const bytes = await readImageBytes(image.local_uri);
       // Content-Type must byte-match what the server signed, or S3 rejects the
       // PUT with SignatureDoesNotMatch. Raw bytes (not a Blob) send no implicit
       // Content-Type, so our explicit header is the only one.

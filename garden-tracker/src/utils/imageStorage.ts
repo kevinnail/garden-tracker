@@ -5,6 +5,11 @@ import { Directory, File, Paths } from 'expo-file-system';
 import { NoteImage } from '@/src/types';
 import { uuid } from '@/src/utils/uuid';
 
+// Mirrors the server's MAX_IMAGE_BYTES (crop-planner-server src/lib/s3.ts). The
+// upload form rejects anything larger before it enters a note; the server still
+// enforces the same cap in the presigned URL, since the client check is only UX.
+export const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
+
 function getNoteImagesDir(): Directory {
   const dir = new Directory(Paths.document, 'note-images');
   if (!dir.exists) {
@@ -32,6 +37,13 @@ export function noteImageDestination(fileName: string): File {
 // Raw bytes of a local file — the body for a presigned S3 PUT upload.
 export function readImageBytes(uri: string): Promise<Uint8Array> {
   return new File(uri).bytes();
+}
+
+// Byte size of a local file without reading its contents (form-level upload
+// gate). Falls through to null when the file can't be stat'd, so callers treat
+// an unknown size as "let it through" rather than blocking a valid image.
+export function getImageByteSize(uri: string): number | null {
+  return new File(uri).size;
 }
 
 export function copyImageToAppStorage(tempUri: string): string {
