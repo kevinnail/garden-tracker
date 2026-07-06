@@ -15,6 +15,7 @@ import {
   cleanupTombstonedImages,
 } from '@/src/services/imageSync';
 import { backfillNoteImageUuids, collectSyncedNoteImages } from '@/src/utils/noteUtils';
+import { UUID_SHAPE } from '@/src/utils/uuid';
 
 type WireRow = Record<string, unknown>;
 
@@ -271,7 +272,9 @@ async function applyTable(
 
   for (const row of incomingRows) {
     const uuid = row.uuid as string;
-    if (!uuid) continue;
+    // Reject malformed wire uuids — they later become file names (imageSync)
+    // and every legitimate uuid (SQLite or JS generated) matches this shape.
+    if (!uuid || !UUID_SHAPE.test(uuid)) continue;
     incomingUuids.add(uuid);
 
     // Resolve the wire parent uuid → local integer id. Parents are reconciled
