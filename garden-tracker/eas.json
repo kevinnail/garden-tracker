@@ -17,6 +17,14 @@
         "simulator": true
       }
     },
+    "device-iap": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_BACKEND_TARGET": "railway",
+        "EXPO_PUBLIC_API_BASE_URL_RAILWAY": "https://crop-planner-server-production.up.railway.app",
+        "EXPO_PUBLIC_REVENUECAT_IOS_KEY": "appl_dQFJsEcgMLQHxWEMJevCTNCWtjg"
+      }
+    },
     "production": {
       "autoIncrement": true,
       "env": {
