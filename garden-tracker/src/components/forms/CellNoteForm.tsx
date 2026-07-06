@@ -35,7 +35,9 @@ import {
   copyImageToAppStorage,
   createNoteImage,
   deleteImageFile,
+  getImageByteSize,
   resolveNoteImageUri,
+  MAX_IMAGE_BYTES,
 } from '@/src/utils/imageStorage';
 import NoteImageStrip from '@/src/components/notes/NoteImageStrip';
 
@@ -280,6 +282,24 @@ export default function CellNoteForm({
     setComposerOpen(true);
   };
 
+  // Shared tail for both pickers: reject an over-cap image up front (the server
+  // signs the same MAX_IMAGE_BYTES into the upload URL, so an oversize file would
+  // otherwise fail its S3 PUT forever), then persist and attach it.
+  const attachPickedImage = (asset: ImagePicker.ImagePickerAsset) => {
+    const byteSize = asset.fileSize ?? getImageByteSize(asset.uri);
+    if (byteSize != null && byteSize > MAX_IMAGE_BYTES) {
+      const limitMb = Math.floor(MAX_IMAGE_BYTES / (1024 * 1024));
+      Alert.alert('Image too large', `Please choose an image under ${limitMb} MB.`);
+      return;
+    }
+    try {
+      const persistentUri = copyImageToAppStorage(asset.uri);
+      setPendingImages((prev) => [...prev, createNoteImage(persistentUri)]);
+    } catch {
+      Alert.alert('Error', 'Could not attach photo.');
+    }
+  };
+
   const pickFromCamera = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
@@ -288,12 +308,7 @@ export default function CellNoteForm({
     }
     const result = await ImagePicker.launchCameraAsync({ mediaTypes: 'images', quality: 0.85 });
     if (result.canceled || !result.assets[0]) return;
-    try {
-      const persistentUri = copyImageToAppStorage(result.assets[0].uri);
-      setPendingImages((prev) => [...prev, createNoteImage(persistentUri)]);
-    } catch {
-      Alert.alert('Error', 'Could not attach photo.');
-    }
+    attachPickedImage(result.assets[0]);
   };
 
   const pickFromLibrary = async () => {
@@ -302,12 +317,7 @@ export default function CellNoteForm({
       quality: 0.85,
     });
     if (result.canceled || !result.assets[0]) return;
-    try {
-      const persistentUri = copyImageToAppStorage(result.assets[0].uri);
-      setPendingImages((prev) => [...prev, createNoteImage(persistentUri)]);
-    } catch {
-      Alert.alert('Error', 'Could not attach photo.');
-    }
+    attachPickedImage(result.assets[0]);
   };
 
   const handleRemoveImage = (imageId: string) => {
