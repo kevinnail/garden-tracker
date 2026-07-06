@@ -10,7 +10,12 @@
 
 (global as any).__DEV__ = false;
 
-import { createNoteImage, copyImageToAppStorage, deleteImageFile } from '@/src/utils/imageStorage';
+import {
+  createNoteImage,
+  copyImageToAppStorage,
+  deleteImageFile,
+  getImageByteSize,
+} from '@/src/utils/imageStorage';
 
 // ---------------------------------------------------------------------------
 // Mock expo-file-system
@@ -115,6 +120,26 @@ describe('deleteImageFile', () => {
     }));
 
     expect(deleteImageFile('file:///app/note-images/photo.jpg')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getImageByteSize
+// ---------------------------------------------------------------------------
+
+describe('getImageByteSize', () => {
+  it('returns the file size in bytes reported by the File handle', () => {
+    const { File } = jest.requireMock('expo-file-system');
+    File.mockImplementationOnce((uri: string) => ({ uri, size: 6018901 }));
+
+    expect(getImageByteSize('file:///tmp/photo.heic')).toBe(6018901);
+  });
+
+  it('returns null when the file size is unreadable', () => {
+    const { File } = jest.requireMock('expo-file-system');
+    File.mockImplementationOnce((uri: string) => ({ uri, size: null }));
+
+    expect(getImageByteSize('file:///tmp/missing.jpg')).toBeNull();
   });
 });
 
