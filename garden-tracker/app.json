@@ -2,7 +2,7 @@
   "expo": {
     "name": "Crop Planner",
     "slug": "garden-tracker",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "cropplanner",
@@ -25,8 +25,8 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "permissions": [
-        "android.permission.ACCESS_COARSE_LOCATION",
+      "permissions": ["android.permission.ACCESS_COARSE_LOCATION"],
+      "blockedPermissions": [
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.RECORD_AUDIO"
       ]
@@ -63,7 +63,8 @@
         "expo-image-picker",
         {
           "photosPermission": "Allow Crop Planner to access your photos for note attachments.",
-          "cameraPermission": "Allow Crop Planner to take photos for note attachments."
+          "cameraPermission": "Allow Crop Planner to take photos for note attachments.",
+          "microphonePermission": false
         }
       ],
       "expo-secure-store"

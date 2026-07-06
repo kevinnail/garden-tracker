@@ -21,6 +21,7 @@ import {
   clearLocalUri,
 } from '@/src/db/queries/noteImageQueries';
 import { noteImageDestination, readImageBytes, deleteImageFile } from '@/src/utils/imageStorage';
+import { UUID_SHAPE } from '@/src/utils/uuid';
 
 interface UploadUrlResponse {
   upload_url: string;
@@ -113,6 +114,10 @@ export async function uploadPendingImages(syncStartedAt: string): Promise<void> 
 export async function downloadPendingImages(): Promise<void> {
   const pending = await getPendingDownloads();
   for (const image of pending) {
+    // The uuid becomes an on-disk file name below — never build a path from a
+    // malformed one (defense-in-depth; synced rows are shape-checked on pull,
+    // but uuids can also enter note_images via synced note content).
+    if (!UUID_SHAPE.test(image.uuid)) continue;
     try {
       const { download_url } = await requestJson<DownloadUrlResponse>('/sync/image/download-url', {
         method: 'POST',

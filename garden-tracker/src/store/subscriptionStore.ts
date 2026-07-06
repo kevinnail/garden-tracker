@@ -22,6 +22,11 @@ interface SubscriptionState {
   isPremium: boolean;
   offering: PurchasesOffering | null;
   error: string | null;
+  /** True while a purchase/restore is in flight, so the UI can disable the
+   * buttons and show progress. Without this the Subscribe button stays live
+   * through the multi-second Apple sheet + receipt validation, and a user whose
+   * entitlement hasn't reflected yet taps it again (double-purchase attempt). */
+  purchasePending: boolean;
   /** Configure the SDK once and seed entitlement + offering. Called on app start. */
   init: () => Promise<void>;
   /**
@@ -62,6 +67,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   isPremium: false,
   offering: null,
   error: null,
+  purchasePending: false,
 
   init: async () => {
     const apiKey = process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY;
@@ -119,7 +125,6 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   },
 
   subscribe: async () => {
-    set({ error: null });
     const offering = get().offering;
     const pkg = offering?.annual ?? offering?.availablePackages[0];
     if (!pkg) {
@@ -127,6 +132,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
       return false;
     }
 
+    set({ error: null, purchasePending: true });
     try {
       const { customerInfo } = await Purchases.purchasePackage(pkg);
       const premium = hasPremium(customerInfo);
@@ -137,11 +143,13 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
       if ((error as { userCancelled?: boolean })?.userCancelled) return false;
       set({ error: messageFromPurchaseError(error) });
       return false;
+    } finally {
+      set({ purchasePending: false });
     }
   },
 
   restore: async () => {
-    set({ error: null });
+    set({ error: null, purchasePending: true });
     try {
       const info = await Purchases.restorePurchases();
       const premium = hasPremium(info);
@@ -150,6 +158,8 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
     } catch (error) {
       set({ error: messageFromPurchaseError(error) });
       return false;
+    } finally {
+      set({ purchasePending: false });
     }
   },
 }));
