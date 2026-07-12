@@ -1,5 +1,9 @@
 import { create } from 'zustand';
-import Purchases, { type CustomerInfo, type PurchasesOffering } from 'react-native-purchases';
+import Purchases, {
+  PURCHASES_ERROR_CODE,
+  type CustomerInfo,
+  type PurchasesOffering,
+} from 'react-native-purchases';
 
 /**
  * RevenueCat entitlement that unlocks cloud backup. Must match the entitlement
@@ -14,6 +18,18 @@ function hasPremium(info: CustomerInfo): boolean {
 }
 
 export function messageFromPurchaseError(error: unknown): string {
+  // With RevenueCat's transfer behavior set to "Keep with original App User ID",
+  // a second account trying to buy/restore a subscription that already belongs to
+  // another account gets a receipt-in-use error. The SDK's raw message is
+  // developer-facing, so map it to something the user can act on.
+  const code = (error as { code?: string } | null)?.code;
+  if (
+    code === PURCHASES_ERROR_CODE.RECEIPT_ALREADY_IN_USE_ERROR ||
+    code === PURCHASES_ERROR_CODE.RECEIPT_IN_USE_BY_OTHER_SUBSCRIBER_ERROR
+  ) {
+    return 'This Apple ID already has a subscription linked to another account. Sign in to that account to use cloud backup.';
+  }
+
   const message = (error as { message?: string } | null)?.message;
   return message && message.length > 0 ? message : 'Something went wrong. Please try again.';
 }
