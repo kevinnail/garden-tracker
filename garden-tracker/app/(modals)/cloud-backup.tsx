@@ -77,7 +77,12 @@ export default function CloudBackupModal() {
                 </Text>
                 <Pressable
                   style={[styles.primaryBtn, purchasePending && styles.btnDisabled]}
-                  onPress={() => subscribe()}
+                  onPress={async () => {
+                    // Silent so it rides out the brief window where the client
+                    // has the entitlement but the server hasn't recorded the
+                    // purchase webhook yet — otherwise the first /sync 403s.
+                    if (await subscribe()) syncNow({ silent: true });
+                  }}
                   disabled={purchasePending}
                   accessibilityRole="button"
                   accessibilityLabel="Subscribe"
@@ -92,7 +97,9 @@ export default function CloudBackupModal() {
                 </Pressable>
                 <Pressable
                   style={styles.linkBtn}
-                  onPress={() => restore()}
+                  onPress={async () => {
+                    if (await restore()) syncNow({ silent: true });
+                  }}
                   disabled={purchasePending}
                   accessibilityRole="button"
                   accessibilityLabel="Restore purchases"
