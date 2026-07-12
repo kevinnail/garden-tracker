@@ -18,6 +18,10 @@ jest.mock('react-native-purchases', () => ({
     logOut: jest.fn(),
     isAnonymous: jest.fn(),
   },
+  PURCHASES_ERROR_CODE: {
+    RECEIPT_ALREADY_IN_USE_ERROR: '7',
+    RECEIPT_IN_USE_BY_OTHER_SUBSCRIBER_ERROR: '13',
+  },
 }));
 
 const getCustomerInfoMock = Purchases.getCustomerInfo as unknown as jest.Mock;
@@ -51,6 +55,16 @@ describe('messageFromPurchaseError', () => {
   it('prefers the error message, falls back to a generic one', () => {
     expect(messageFromPurchaseError({ message: 'Network down' })).toBe('Network down');
     expect(messageFromPurchaseError(null)).toBe('Something went wrong. Please try again.');
+  });
+
+  it('maps the receipt-in-use codes to an actionable message (overriding the raw SDK text)', () => {
+    const expected =
+      'This Apple ID already has a subscription linked to another account. Sign in to that account to use cloud backup.';
+    // Code 7 also carries a raw developer-facing message — the mapping must win.
+    expect(messageFromPurchaseError({ code: '7', message: 'The receipt is already in use.' })).toBe(
+      expected,
+    );
+    expect(messageFromPurchaseError({ code: '13' })).toBe(expected);
   });
 });
 
