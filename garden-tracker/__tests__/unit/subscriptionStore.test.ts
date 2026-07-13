@@ -49,6 +49,8 @@ beforeEach(() => {
   jest.clearAllMocks();
   resetStore();
   process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY = 'appl_test_key';
+  // Default to an identified user; the anonymous-guard tests override this.
+  isAnonymousMock.mockResolvedValue(false);
 });
 
 describe('messageFromPurchaseError', () => {
@@ -196,6 +198,21 @@ describe('subscriptionStore.subscribe', () => {
     expect(purchasePackageMock).not.toHaveBeenCalled();
     expect(useSubscriptionStore.getState().error).toMatch(/no subscription/i);
   });
+
+  it('refuses to purchase while RevenueCat still considers the install anonymous', async () => {
+    // Guards the server contract: a purchase made before identify()'s logIn
+    // lands would attach the receipt to an anonymous customer, whose webhooks
+    // the server ignores — the user would pay and unlock nothing.
+    useSubscriptionStore.setState({ offering });
+    isAnonymousMock.mockResolvedValue(true);
+
+    const ok = await useSubscriptionStore.getState().subscribe();
+
+    expect(ok).toBe(false);
+    expect(purchasePackageMock).not.toHaveBeenCalled();
+    expect(useSubscriptionStore.getState().error).toMatch(/still connecting/i);
+    expect(useSubscriptionStore.getState().purchasePending).toBe(false);
+  });
 });
 
 describe('subscriptionStore.restore', () => {
@@ -224,5 +241,16 @@ describe('subscriptionStore.restore', () => {
 
     expect(ok).toBe(false);
     expect(useSubscriptionStore.getState().error).toBe('Restore failed');
+  });
+
+  it('refuses to restore while RevenueCat still considers the install anonymous', async () => {
+    isAnonymousMock.mockResolvedValue(true);
+
+    const ok = await useSubscriptionStore.getState().restore();
+
+    expect(ok).toBe(false);
+    expect(restorePurchasesMock).not.toHaveBeenCalled();
+    expect(useSubscriptionStore.getState().error).toMatch(/still connecting/i);
+    expect(useSubscriptionStore.getState().purchasePending).toBe(false);
   });
 });

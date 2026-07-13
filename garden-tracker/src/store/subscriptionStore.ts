@@ -150,6 +150,14 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
 
     set({ error: null, purchasePending: true });
     try {
+      // Purchasing while the SDK still considers this install anonymous would
+      // attach the receipt to the anonymous customer — the webhook then carries
+      // an id the server can't match and the payment unlocks nothing. Happens
+      // if the buy button is hit before identify()'s logIn has landed.
+      if (await Purchases.isAnonymous()) {
+        set({ error: 'Your account is still connecting. Wait a moment and try again.' });
+        return false;
+      }
       const { customerInfo } = await Purchases.purchasePackage(pkg);
       const premium = hasPremium(customerInfo);
       set({ isPremium: premium });
@@ -167,6 +175,12 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   restore: async () => {
     set({ error: null, purchasePending: true });
     try {
+      // Same guard as subscribe(): a restore by an anonymous customer either
+      // fails or associates the receipt where the server can't see it.
+      if (await Purchases.isAnonymous()) {
+        set({ error: 'Your account is still connecting. Wait a moment and try again.' });
+        return false;
+      }
       const info = await Purchases.restorePurchases();
       const premium = hasPremium(info);
       set({ isPremium: premium });
