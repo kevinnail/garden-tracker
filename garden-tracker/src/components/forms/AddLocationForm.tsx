@@ -93,6 +93,9 @@ export default function AddLocationForm() {
   const createdGardenIds = useRef<Set<number>>(new Set());
   const createdSectionIds = useRef<Set<number>>(new Set());
   const scrollRef = useRef<ScrollView>(null);
+  const gardenInputRef = useRef<TextInput>(null);
+  const sectionInputRef = useRef<TextInput>(null);
+  const pendingFocus = useRef<'garden' | 'section' | null>(null);
 
   const reload = useCallback(async () => {
     const [ls, gs, ss] = await Promise.all([getAllLocations(), getAllGardens(), getAllSections()]);
@@ -138,6 +141,17 @@ export default function AddLocationForm() {
     }
   }, [gardenId, gardens, locationId]);
 
+  // After adding a Location or Garden, steer focus into the next level's input so
+  // the guided Location → Garden → Section chain keeps going instead of leaving
+  // the cursor on the level the user just finished.
+  useEffect(() => {
+    if (!pendingFocus.current) return;
+    const target = pendingFocus.current === 'garden' ? gardenInputRef : sectionInputRef;
+    pendingFocus.current = null;
+    const timeout = setTimeout(() => target.current?.focus(), 50);
+    return () => clearTimeout(timeout);
+  }, [locationId, gardenId]);
+
   const syncCreatedEntityCount = useCallback(() => {
     setCreatedEntityCount(
       createdLocationIds.current.size +
@@ -166,10 +180,27 @@ export default function AddLocationForm() {
   }, [reload, removeGarden, removeLocation, removeSection, syncCreatedEntityCount]);
 
   const openAddCrop = useCallback(() => {
-    allowAndRun(() => {
-      router.replace('/(modals)/add-crop');
-    });
-  }, [allowAndRun]);
+    const navigateToAddCrop = () =>
+      allowAndRun(() => {
+        router.replace('/(modals)/add-crop');
+      });
+    // A garden with no section can't receive a crop, and the crop form silently
+    // omits it — so warn before advancing rather than land the user on a form
+    // that's missing the garden they just made.
+    if (gardenId != null && !sections.some((s) => s.garden_id === gardenId)) {
+      const gardenName = gardens.find((g) => g.id === gardenId)?.name ?? 'This garden / zone';
+      Alert.alert(
+        'Add a section first',
+        `"${gardenName}" has no section yet, so a crop can't be added to it. Add a section to it, or continue to add a crop in another garden.`,
+        [
+          { text: 'Keep editing', style: 'cancel' },
+          { text: 'Continue anyway', onPress: navigateToAddCrop },
+        ],
+      );
+      return;
+    }
+    navigateToAddCrop();
+  }, [allowAndRun, gardenId, gardens, sections]);
 
   const handleExitAttempt = useCallback(
     (onAllowedExit: () => void) => {
@@ -221,12 +252,13 @@ export default function AddLocationForm() {
 
   const handleAddLocation = async () => {
     const trimmed = locationName.trim();
-    if (!trimmed) return Alert.alert('Validation', 'Name is required.');
+    if (!trimmed) return;
     setSubmitting(true);
     try {
       const createdId = await addLocation(trimmed);
       createdLocationIds.current.add(createdId);
       syncCreatedEntityCount();
+      pendingFocus.current = 'garden';
       setLocationId(createdId);
       await reload();
       setLastAdded({ text: trimmed, level: 'location' });
@@ -241,12 +273,13 @@ export default function AddLocationForm() {
   const handleAddGarden = async () => {
     if (locationId == null) return Alert.alert('Validation', 'Select a Location first.');
     const trimmed = gardenName.trim();
-    if (!trimmed) return Alert.alert('Validation', 'Name is required.');
+    if (!trimmed) return;
     setSubmitting(true);
     try {
       const createdId = await addGarden(locationId, trimmed, gardenRecordType);
       createdGardenIds.current.add(createdId);
       syncCreatedEntityCount();
+      pendingFocus.current = 'section';
       setGardenId(createdId);
       setGardenRecordType('plant');
       await reload();
@@ -262,7 +295,7 @@ export default function AddLocationForm() {
   const handleAddSection = async () => {
     if (gardenId == null) return Alert.alert('Validation', 'Select a Garden first.');
     const trimmed = sectionName.trim();
-    if (!trimmed) return Alert.alert('Validation', 'Name is required.');
+    if (!trimmed) return;
     setSubmitting(true);
     try {
       const createdId = await addSection(gardenId, trimmed);
@@ -613,6 +646,7 @@ export default function AddLocationForm() {
 
               <View style={styles.inputRow}>
                 <TextInput
+                  ref={gardenInputRef}
                   style={[styles.input, { flex: 1 }]}
                   value={gardenName}
                   onChangeText={setGardenName}
@@ -699,6 +733,7 @@ export default function AddLocationForm() {
 
               <View style={styles.inputRow}>
                 <TextInput
+                  ref={sectionInputRef}
                   style={[styles.input, { flex: 1 }]}
                   value={sectionName}
                   onChangeText={setSectionName}

@@ -75,6 +75,7 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [page, setPage] = useState<1 | 2>(1);
   const scrollRef = useRef<ScrollView>(null);
+  const nameInputRef = useRef<TextInput>(null);
 
   // Tint the nav header when in mushroom mode.
   // Defer past the modal slide-in: calling setOptions on a header mid-transition
@@ -304,6 +305,21 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
     await submitCrop();
   };
 
+  // Validate before advancing to page 2 so the user is corrected up front (and
+  // the name field re-focused) rather than trapped on page 2 with only Cancel.
+  const handleNext = () => {
+    if (!name.trim()) {
+      Alert.alert('Validation', 'Crop name is required.');
+      nameInputRef.current?.focus();
+      return;
+    }
+    if (sectionId == null) {
+      Alert.alert('Validation', 'Select a section for this crop.');
+      return;
+    }
+    setPage(2);
+  };
+
   const handleArchive = useCallback(() => {
     if (!isEditMode || cropId == null) return;
     Alert.alert(
@@ -400,7 +416,11 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
         </Pressable>
       </View>
 
-      <Text style={styles.label}>Choose garden / section for new crop</Text>
+      <Text style={styles.label}>
+        {isEditMode
+          ? 'Move crop to a different garden / section. Selected Garden/ Zone = ✓ '
+          : 'Choose garden / section for new crop'}
+      </Text>
       <View style={styles.sectionList}>
         {locations.map((location) => {
           const locationGardens = gardens
@@ -446,6 +466,7 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
                       >
                         {sec.name}
                       </Text>
+                      {sectionId === sec.id && <Text style={styles.sectionCheck}>✓</Text>}
                     </Pressable>
                   ))}
                 </View>
@@ -480,6 +501,7 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
 
       <Text style={styles.label}>Crop Name</Text>
       <TextInput
+        ref={nameInputRef}
         style={styles.input}
         value={name}
         onChangeText={setName}
@@ -506,7 +528,7 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
           <Pressable style={styles.cancelBtn} onPress={() => router.back()}>
             <Text style={styles.cancelBtnText}>Cancel</Text>
           </Pressable>
-          <Pressable style={styles.submitBtn} onPress={() => setPage(2)}>
+          <Pressable style={styles.submitBtn} onPress={handleNext}>
             <Text style={styles.submitBtnText}>Next</Text>
           </Pressable>
         </View>
@@ -595,8 +617,8 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
       {!embedded && (
         <>
           <View style={styles.actionRow}>
-            <Pressable style={styles.cancelBtn} onPress={() => router.back()} disabled={submitting}>
-              <Text style={styles.cancelBtnText}>Cancel</Text>
+            <Pressable style={styles.cancelBtn} onPress={() => setPage(1)} disabled={submitting}>
+              <Text style={styles.cancelBtnText}>Back</Text>
             </Pressable>
             <Pressable style={styles.submitBtn} onPress={handleSubmit} disabled={submitting}>
               {submitting ? (
@@ -686,7 +708,6 @@ const styles = StyleSheet.create({
   label: {
     color: '#888',
     fontSize: 11,
-    textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginTop: 16,
     marginBottom: 4,
@@ -750,6 +771,9 @@ const styles = StyleSheet.create({
 
   sectionItems: { paddingHorizontal: 8, paddingBottom: 8, gap: 5 },
   sectionOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 5,
@@ -757,10 +781,11 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
     backgroundColor: '#cdcdcd',
   },
-  sectionSelected: { borderColor: 'transparent', backgroundColor: '#1a9148' },
-  sectionSelectedMushroom: { borderColor: 'transparent', backgroundColor: '#8B4513' },
+  sectionSelected: { borderColor: '#7dffb0', backgroundColor: '#1a9148' },
+  sectionSelectedMushroom: { borderColor: '#e0a060', backgroundColor: '#8B4513' },
   sectionText: { color: '#1a1a1a', fontSize: 13, fontWeight: '600' },
   sectionTextSelected: { color: '#fff', fontWeight: '700' },
+  sectionCheck: { color: '#fff', fontSize: 14, fontWeight: '800', marginLeft: 8 },
 
   emptyStateBox: {
     borderWidth: 1,

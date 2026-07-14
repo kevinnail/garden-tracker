@@ -170,18 +170,18 @@ export default function PlannerToolbar() {
       accessibilityHint="Opens the Today dashboard"
     >
       <View style={styles.todayBannerMain}>
-        <Text style={styles.todayBannerTitle}>Today</Text>
+        <Text style={styles.todayBannerTitle} numberOfLines={1}>
+          <Text style={styles.todayBannerTitleLabel}>{`${todayLabel}`}</Text>
+        </Text>
         {!isLandscape && (
           <Text style={styles.todayBannerText} numberOfLines={1}>
-            {todayCount > 0 ? (
+            {todayCount > 0 && (
               <>
                 <Text style={dueTodayCount > 0 ? styles.todayBannerDueToday : undefined}>
                   {`${dueTodayCount} due today`}
                 </Text>
                 {` · ${overdueCount} overdue`}
               </>
-            ) : (
-              todayLabel
             )}
           </Text>
         )}
@@ -401,8 +401,10 @@ const styles = StyleSheet.create({
   todayBannerActive: { backgroundColor: '#18222e', borderColor: '#35506a' },
   todayBannerOverdue: { backgroundColor: '#2a1c1c', borderColor: '#6a3d3d' },
   todayBannerMain: { flex: 1 },
-  todayBannerTitle: { color: '#edf4ff', fontSize: 14, fontWeight: '700' },
-  todayBannerText: { color: '#a8b6c7', fontSize: 12 },
+  todayBannerTitle: { color: '#edf4ff', fontSize: 14, lineHeight: 18 },
+  todayBannerTitleLabel: { color: '#edf4ff', fontWeight: '700' },
+  todayBannerTitleDate: { color: '#a8b6c7', fontSize: 14, fontWeight: '500' },
+  todayBannerText: { color: '#a8b6c7', fontSize: 14 },
   todayBannerDueToday: { color: '#f5c842', fontWeight: '600' },
   todayBannerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   weatherChip: { flexDirection: 'row', alignItems: 'center', gap: 3 },

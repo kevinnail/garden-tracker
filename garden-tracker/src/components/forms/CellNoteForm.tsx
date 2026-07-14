@@ -217,7 +217,10 @@ export default function CellNoteForm({
     sessionOriginalImageIds.current = new Set();
     setEditingEntryId(null);
     setSelectedDay(defaultDayOfWeek(weekDate));
-    if (initialMode === 'view' && sortedEntries.length > 0) {
+    // Collapse the composer back to the list after any successful save so the
+    // just-saved entry is visibly there — the previous behavior left the empty
+    // composer open in compose mode, which read as "did it save?".
+    if (sortedEntries.length > 0) {
       setComposerOpen(false);
     }
   };
@@ -588,9 +591,7 @@ export default function CellNoteForm({
                 )}
 
                 <Pressable style={styles.primaryBtn} onPress={handleSaveEntry} disabled={saving}>
-                  <Text style={styles.primaryBtnText}>
-                    {editingEntry ? 'Save Note' : 'Add Note'}
-                  </Text>
+                  <Text style={styles.primaryBtnText}>Save Note</Text>
                 </Pressable>
               </View>
             </View>
