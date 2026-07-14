@@ -243,7 +243,7 @@ export default function PlannerGrid() {
             your locations first, then add crops.
           </Text>
           <Text style={styles.emptyHint}>
-            Each row shows a crop&apos;s growing stages across the calendar.
+            Once you add a crop, its growing stages appear here across a 3-year calendar.
           </Text>
         </View>
       </View>
