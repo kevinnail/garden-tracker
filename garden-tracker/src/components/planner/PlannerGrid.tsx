@@ -259,8 +259,7 @@ export default function PlannerGrid() {
           onPress={handleHomePress}
           accessibilityLabel="Home — reset view to today"
         >
-          <Text style={styles.cornerText}>{todayLabel}</Text>
-          <Text style={styles.cornerHint}>⌂ Home</Text>
+          <Text style={styles.cornerText}>⌂ Home</Text>
         </Pressable>
         <View style={styles.columnHeaderClip}>
           <Animated.View style={[{ position: 'absolute', width: totalWidth }, columnHeaderStyle]}>
