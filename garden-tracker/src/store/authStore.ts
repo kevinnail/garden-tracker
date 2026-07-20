@@ -7,6 +7,8 @@ export type AuthStatus = 'signed-out' | 'signed-in';
 interface AuthState {
   status: AuthStatus;
   email: string | null;
+  /** better-auth user id of the signed-in account — the identity sync data belongs to. */
+  userId: string | null;
   error: string | null;
   /** Create an account. Returns true on success, false on failure (error set). */
   signUp: (email: string, password: string) => Promise<boolean>;
@@ -27,7 +29,9 @@ interface AuthState {
    * `authClient.useSession()` subscription so a session restored from SecureStore
    * on launch is reflected without an extra `getSession()` call.
    */
-  setSession: (session: { user?: { email?: string | null } | null } | null) => void;
+  setSession: (
+    session: { user?: { id?: string | null; email?: string | null } | null } | null,
+  ) => void;
 }
 
 /**
@@ -51,6 +55,7 @@ export function messageFromAuthError(
 export const useAuthStore = create<AuthState>((set) => ({
   status: 'signed-out',
   email: null,
+  userId: null,
   error: null,
 
   signUp: async (email, password) => {
@@ -66,11 +71,11 @@ export const useAuthStore = create<AuthState>((set) => ({
     });
 
     if (error || !data) {
-      set({ status: 'signed-out', email: null, error: messageFromAuthError(error) });
+      set({ status: 'signed-out', email: null, userId: null, error: messageFromAuthError(error) });
       return false;
     }
 
-    set({ status: 'signed-in', email: trimmed, error: null });
+    set({ status: 'signed-in', email: trimmed, userId: data.user.id, error: null });
     return true;
   },
 
@@ -81,11 +86,11 @@ export const useAuthStore = create<AuthState>((set) => ({
     const { data, error } = await authClient.signIn.email({ email: trimmed, password });
 
     if (error || !data) {
-      set({ status: 'signed-out', email: null, error: messageFromAuthError(error) });
+      set({ status: 'signed-out', email: null, userId: null, error: messageFromAuthError(error) });
       return false;
     }
 
-    set({ status: 'signed-in', email: trimmed, error: null });
+    set({ status: 'signed-in', email: trimmed, userId: data.user.id, error: null });
     return true;
   },
 
@@ -126,16 +131,16 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
 
     // Local data is intentionally left intact — sign-out only drops the session.
-    set({ status: 'signed-out', email: null });
+    set({ status: 'signed-out', email: null, userId: null });
     return true;
   },
 
   setSession: (session) => {
     const email = session?.user?.email;
     if (email) {
-      set({ status: 'signed-in', email });
+      set({ status: 'signed-in', email, userId: session?.user?.id ?? null });
     } else {
-      set({ status: 'signed-out', email: null });
+      set({ status: 'signed-out', email: null, userId: null });
     }
   },
 }));
