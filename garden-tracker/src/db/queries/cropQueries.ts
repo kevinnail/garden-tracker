@@ -203,21 +203,67 @@ export async function replaceCropStages(
   const db = await getDb();
 
   await db.withTransactionAsync(async () => {
-    // Soft-delete (tombstone) the existing stages instead of hard-deleting so the
-    // removal propagates to other devices on sync. New stages are inserted fresh
-    // below; the old tombstoned rows stay invisible via the deleted_at filter.
-    await db.runAsync(
-      `UPDATE crop_stages SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW} WHERE crop_instance_id = ? AND deleted_at IS NULL`,
+    // Uuid-stable diff keyed by order_index: update existing rows in place,
+    // tombstone surplus rows, insert only genuinely new indices. Stages must
+    // keep their uuids across edits — the old tombstone-everything-and-reinsert
+    // approach minted fresh uuids on every crop edit, so two devices editing the
+    // same crop between syncs each tombstoned only the uuids they knew about and
+    // both generations survived on the server (duplicated stages after sync).
+    // An unchanged stage is not touched at all, so a name-only crop edit no
+    // longer rewrites stages. If an order_index already holds duplicates (data
+    // doubled by the old behavior), the first row by uuid survives and the rest
+    // are tombstoned here — the tombstones sync out and heal the other devices.
+    const existingRows = await db.getAllAsync<{
+      id: number;
+      order_index: number;
+      stage_definition_id: number;
+      duration_weeks: number;
+    }>(
+      `SELECT id, order_index, stage_definition_id, duration_weeks FROM crop_stages
+       WHERE crop_instance_id = ? AND deleted_at IS NULL
+       ORDER BY order_index, uuid`,
       cropInstanceId,
     );
 
-    for (let i = 0; i < stages.length; i++) {
+    const keeperByIndex = new Map<number, (typeof existingRows)[number]>();
+    const surplusIds: number[] = [];
+    for (const row of existingRows) {
+      if (row.order_index < stages.length && !keeperByIndex.has(row.order_index)) {
+        keeperByIndex.set(row.order_index, row);
+      } else {
+        surplusIds.push(row.id);
+      }
+    }
+
+    for (let index = 0; index < stages.length; index++) {
+      const incoming = stages[index];
+      const keeper = keeperByIndex.get(index);
+      if (!keeper) {
+        await db.runAsync(
+          `INSERT INTO crop_stages (uuid, crop_instance_id, stage_definition_id, duration_weeks, order_index, updated_at) VALUES ((${UUID4_SQL}), ?, ?, ?, ?, ${TS_NOW})`,
+          cropInstanceId,
+          incoming.stage_definition_id,
+          incoming.duration_weeks,
+          index,
+        );
+      } else if (
+        keeper.stage_definition_id !== incoming.stage_definition_id ||
+        keeper.duration_weeks !== incoming.duration_weeks
+      ) {
+        await db.runAsync(
+          `UPDATE crop_stages SET stage_definition_id = ?, duration_weeks = ?, updated_at = ${TS_NOW} WHERE id = ?`,
+          incoming.stage_definition_id,
+          incoming.duration_weeks,
+          keeper.id,
+        );
+      }
+    }
+
+    if (surplusIds.length > 0) {
+      const surplusPlaceholders = surplusIds.map(() => '?').join(',');
       await db.runAsync(
-        `INSERT INTO crop_stages (uuid, crop_instance_id, stage_definition_id, duration_weeks, order_index, updated_at) VALUES ((${UUID4_SQL}), ?, ?, ?, ?, ${TS_NOW})`,
-        cropInstanceId,
-        stages[i].stage_definition_id,
-        stages[i].duration_weeks,
-        i,
+        `UPDATE crop_stages SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW} WHERE id IN (${surplusPlaceholders})`,
+        ...surplusIds,
       );
     }
   });
