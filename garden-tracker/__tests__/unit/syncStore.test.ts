@@ -1,10 +1,18 @@
 import { useSyncStore } from '@/src/store/syncStore';
 import { useAuthStore } from '@/src/store/authStore';
 import { useSubscriptionStore } from '@/src/store/subscriptionStore';
-import { runSync } from '@/src/services/syncClient';
+import { runSync, SyncAccountMismatchError } from '@/src/services/syncClient';
 import { ApiClientError } from '@/src/services/apiClient';
 
-jest.mock('@/src/services/syncClient', () => ({ runSync: jest.fn() }));
+jest.mock('@/src/services/syncClient', () => ({
+  runSync: jest.fn(),
+  SyncAccountMismatchError: class SyncAccountMismatchError extends Error {
+    constructor() {
+      super('This device holds data backed up by a different account.');
+      this.name = 'SyncAccountMismatchError';
+    }
+  },
+}));
 // authStore/subscriptionStore only touch these deps inside actions; stubbing at
 // import keeps better-auth / RevenueCat native modules out of the node runtime.
 jest.mock('@/src/services/authClient', () => ({ authClient: {} }));
@@ -20,7 +28,7 @@ const runSyncMock = runSync as unknown as jest.Mock;
 beforeEach(() => {
   jest.clearAllMocks();
   useSyncStore.setState({ status: 'idle', lastSyncedAt: null, error: null });
-  useAuthStore.setState({ status: 'signed-out', email: null, error: null });
+  useAuthStore.setState({ status: 'signed-out', email: null, userId: null, error: null });
   useSubscriptionStore.setState({ isPremium: false });
 });
 
@@ -33,13 +41,21 @@ describe('syncStore.syncNow gating', () => {
   });
 
   it('no-ops when signed in but not subscribed', async () => {
-    useAuthStore.setState({ status: 'signed-in', email: 'a@b.co' });
+    useAuthStore.setState({ status: 'signed-in', email: 'a@b.co', userId: 'user-1' });
     await useSyncStore.getState().syncNow();
     expect(runSyncMock).not.toHaveBeenCalled();
   });
 
+  it('no-ops while the session user id has not loaded yet', async () => {
+    useAuthStore.setState({ status: 'signed-in', email: 'a@b.co', userId: null });
+    useSubscriptionStore.setState({ isPremium: true });
+    await useSyncStore.getState().syncNow();
+    expect(runSyncMock).not.toHaveBeenCalled();
+    expect(useSyncStore.getState().status).toBe('idle');
+  });
+
   it('no-ops when a sync is already in flight', async () => {
-    useAuthStore.setState({ status: 'signed-in', email: 'a@b.co' });
+    useAuthStore.setState({ status: 'signed-in', email: 'a@b.co', userId: 'user-1' });
     useSubscriptionStore.setState({ isPremium: true });
     useSyncStore.setState({ status: 'syncing' });
     await useSyncStore.getState().syncNow();
@@ -49,16 +65,17 @@ describe('syncStore.syncNow gating', () => {
 
 describe('syncStore.syncNow when entitled', () => {
   beforeEach(() => {
-    useAuthStore.setState({ status: 'signed-in', email: 'a@b.co' });
+    useAuthStore.setState({ status: 'signed-in', email: 'a@b.co', userId: 'user-1' });
     useSubscriptionStore.setState({ isPremium: true });
   });
 
-  it('runs the sync, records lastSyncedAt, and refreshes the planner', async () => {
+  it('runs the sync for the signed-in account, records lastSyncedAt, and refreshes the planner', async () => {
     runSyncMock.mockResolvedValue({ lastSyncAt: '2026-06-30T12:00:00.000Z' });
 
     await useSyncStore.getState().syncNow();
 
     expect(runSyncMock).toHaveBeenCalledTimes(1);
+    expect(runSyncMock).toHaveBeenCalledWith('user-1');
     expect(useSyncStore.getState().status).toBe('idle');
     expect(useSyncStore.getState().lastSyncedAt).toBe('2026-06-30T12:00:00.000Z');
     expect(useSyncStore.getState().error).toBeNull();
@@ -83,11 +100,32 @@ describe('syncStore.syncNow when entitled', () => {
     expect(useSyncStore.getState().status).toBe('error');
     expect(useSyncStore.getState().error).toMatch(/network/i);
   });
+
+  it('surfaces the account-mismatch message, flags it, and does not refresh the planner', async () => {
+    runSyncMock.mockRejectedValue(new SyncAccountMismatchError());
+
+    await useSyncStore.getState().syncNow();
+
+    expect(useSyncStore.getState().status).toBe('error');
+    expect(useSyncStore.getState().error).toMatch(/different account/i);
+    expect(useSyncStore.getState().accountMismatch).toBe(true);
+    expect(mockLoadData).not.toHaveBeenCalled();
+  });
+
+  it('clears the account-mismatch flag on a subsequent successful sync', async () => {
+    useSyncStore.setState({ accountMismatch: true });
+    runSyncMock.mockResolvedValue({ lastSyncAt: '2026-07-01T00:00:00.000Z' });
+
+    await useSyncStore.getState().syncNow();
+
+    expect(useSyncStore.getState().status).toBe('idle');
+    expect(useSyncStore.getState().accountMismatch).toBe(false);
+  });
 });
 
 describe('syncStore.syncNow silent (background triggers)', () => {
   beforeEach(() => {
-    useAuthStore.setState({ status: 'signed-in', email: 'a@b.co' });
+    useAuthStore.setState({ status: 'signed-in', email: 'a@b.co', userId: 'user-1' });
     useSubscriptionStore.setState({ isPremium: true });
     jest.useFakeTimers();
   });
