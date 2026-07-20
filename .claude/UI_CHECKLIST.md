@@ -37,3 +37,5 @@ applicable to that platform. Android may sit ⏳ while full QA is deferred.
 | Date | Issue | Fix | iOS | Android | Pattern # |
 |------|-------|-----|-----|---------|-----------|
 | 2026-06-06 | First-run setup crashes app entering Add Crop | Defer `setOptions` header tint via `InteractionManager.runAfterInteractions` (`AddCropForm.tsx`) | ✅ Expo Go + tsc/lint clean | ⏳ pending build+logcat | 2 |
+| 2026-07-18 | Add/Edit Crop garden-section picker: selected row not visually distinct from bright-grey unselected rows | Unselected rows now dim/dark (`#242424` bg, grey text); selected row is the only lit-up one (green/brown + ✓) (`AddCropForm.tsx`) | ✅ pending device check | ⏳ deferred | — |
+| 2026-07-18 | Zoom ± shifts the visible date sideways (scrollX in px, not rescaled for new cellWidth) | Rescale scrollX on cellWidth change so the week at viewport center stays anchored; home-button reset pre-syncs the ref (`PlannerGrid.tsx`) | ✅ pending device check | ⏳ deferred | — |
