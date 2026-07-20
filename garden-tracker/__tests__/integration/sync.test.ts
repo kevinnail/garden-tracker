@@ -19,6 +19,7 @@ import {
   runSync,
   backfillNoteImages,
   PullResponse,
+  SyncAccountMismatchError,
 } from '@/src/services/syncClient';
 import { insertLocation, insertGarden, insertSection } from '@/src/db/queries/locationQueries';
 import { insertCropWithStages, deleteCropInstance } from '@/src/db/queries/cropQueries';
@@ -561,7 +562,7 @@ describe('runSync', () => {
       return jsonResponse(emptyPull({}));
     }) as unknown as typeof global.fetch;
 
-    await runSync();
+    await runSync('user-a');
 
     expect(calls).toEqual(['push', 'pull']);
     const checkpoint = row<{ value: string } | undefined>(
@@ -578,11 +579,50 @@ describe('runSync', () => {
       return jsonResponse(emptyPull({}));
     }) as unknown as typeof global.fetch;
 
-    await expect(runSync()).rejects.toThrow();
+    await expect(runSync('user-a')).rejects.toThrow();
 
     const checkpoint = row<{ value: string } | undefined>(
       `SELECT value FROM settings WHERE key = 'last_pushed_at'`,
     );
     expect(checkpoint).toBeUndefined();
+  });
+
+  it('stamps the account on first sync', async () => {
+    global.fetch = jest.fn(async () =>
+      jsonResponse(emptyPull({})),
+    ) as unknown as typeof global.fetch;
+
+    await runSync('user-a');
+
+    const stamp = row<{ value: string } | undefined>(
+      `SELECT value FROM settings WHERE key = 'sync_account_user_id'`,
+    );
+    expect(stamp?.value).toBe('user-a');
+  });
+
+  it('refuses to sync a different account against existing local data', async () => {
+    global.fetch = jest.fn(async () =>
+      jsonResponse(emptyPull({})),
+    ) as unknown as typeof global.fetch;
+    await runSync('user-a');
+
+    // Local rows that a second account's sync would otherwise push into the
+    // wrong account and then sweep-tombstone.
+    await insertLocation('Real garden data');
+
+    const fetchSpy = jest.fn();
+    global.fetch = fetchSpy as unknown as typeof global.fetch;
+
+    await expect(runSync('user-b')).rejects.toThrow(SyncAccountMismatchError);
+    // Refused before any network traffic — nothing pushed, nothing swept.
+    expect(fetchSpy).not.toHaveBeenCalled();
+    const location = row<{ deleted_at: string | null }>(
+      `SELECT deleted_at FROM locations WHERE name = 'Real garden data'`,
+    );
+    expect(location.deleted_at).toBeNull();
+    const stamp = row<{ value: string }>(
+      `SELECT value FROM settings WHERE key = 'sync_account_user_id'`,
+    );
+    expect(stamp.value).toBe('user-a');
   });
 });
