@@ -283,6 +283,104 @@ describe('replaceCropStages', () => {
     expect(stages[1].duration_weeks).toBe(3);
     expect(stages[1].order_index).toBe(1);
   });
+
+  // Stage uuids must survive edits: regenerating them on every edit made two
+  // devices' edits of the same crop duplicate stages under sync (each device
+  // tombstoned only the uuids it knew about, so both generations stayed active
+  // on the server).
+  it('keeps existing stage uuids when durations change', async () => {
+    const db = await getDb();
+    const before = await db.getAllAsync<{ uuid: string; order_index: number }>(
+      `SELECT uuid, order_index FROM crop_stages WHERE crop_instance_id = ? AND deleted_at IS NULL ORDER BY order_index`,
+      SEED.CROP_ID,
+    );
+    const stageDefs = await getStageDefs();
+    const seedling = stageDefs.find((stage) => stage.name === 'Seedling');
+    const vegetative = stageDefs.find((stage) => stage.name === 'Vegetative');
+
+    await replaceCropStages(SEED.CROP_ID, [
+      { stage_definition_id: seedling!.id, duration_weeks: 4 },
+      { stage_definition_id: vegetative!.id, duration_weeks: 7 },
+    ]);
+
+    const after = await db.getAllAsync<{ uuid: string; order_index: number }>(
+      `SELECT uuid, order_index FROM crop_stages WHERE crop_instance_id = ? AND deleted_at IS NULL ORDER BY order_index`,
+      SEED.CROP_ID,
+    );
+    expect(after.map((row) => row.uuid)).toEqual(before.map((row) => row.uuid));
+
+    const stages = await getCropStages(SEED.CROP_ID);
+    expect(stages.map((stage) => stage.duration_weeks)).toEqual([4, 7]);
+  });
+
+  it('leaves stage rows completely untouched when the replacement set is identical', async () => {
+    const db = await getDb();
+    const before = await db.getAllAsync<{ uuid: string; updated_at: string }>(
+      `SELECT uuid, updated_at FROM crop_stages WHERE crop_instance_id = ? ORDER BY uuid`,
+      SEED.CROP_ID,
+    );
+    const currentStages = await getCropStages(SEED.CROP_ID);
+
+    await replaceCropStages(
+      SEED.CROP_ID,
+      currentStages.map((stage) => ({
+        stage_definition_id: stage.stage_definition_id,
+        duration_weeks: stage.duration_weeks,
+      })),
+    );
+
+    const after = await db.getAllAsync<{ uuid: string; updated_at: string }>(
+      `SELECT uuid, updated_at FROM crop_stages WHERE crop_instance_id = ? ORDER BY uuid`,
+      SEED.CROP_ID,
+    );
+    expect(after).toEqual(before);
+  });
+
+  it('tombstones surplus rows when the replacement set is shorter', async () => {
+    const db = await getDb();
+    const stageDefs = await getStageDefs();
+    const seedling = stageDefs.find((stage) => stage.name === 'Seedling');
+
+    await replaceCropStages(SEED.CROP_ID, [
+      { stage_definition_id: seedling!.id, duration_weeks: 2 },
+    ]);
+
+    const active = await getCropStages(SEED.CROP_ID);
+    expect(active).toHaveLength(1);
+
+    const tombstoned = await db.getAllAsync<{ uuid: string }>(
+      `SELECT uuid FROM crop_stages WHERE crop_instance_id = ? AND deleted_at IS NOT NULL`,
+      SEED.CROP_ID,
+    );
+    expect(tombstoned).toHaveLength(SEED.STAGE_COUNT - 1);
+  });
+
+  it('self-heals duplicated rows at the same order_index (one survivor per index)', async () => {
+    const db = await getDb();
+    const stageDefs = await getStageDefs();
+    const seedling = stageDefs.find((stage) => stage.name === 'Seedling');
+    const vegetative = stageDefs.find((stage) => stage.name === 'Vegetative');
+    // Simulate the doubled state the old remint-on-edit behavior produced under
+    // sync: a second active generation of the same stages.
+    await insertCropStage(SEED.CROP_ID, seedling!.id, 3, 0);
+    await insertCropStage(SEED.CROP_ID, vegetative!.id, 6, 1);
+    expect(await getCropStages(SEED.CROP_ID)).toHaveLength(SEED.STAGE_COUNT * 2);
+
+    await replaceCropStages(SEED.CROP_ID, [
+      { stage_definition_id: seedling!.id, duration_weeks: 3 },
+      { stage_definition_id: vegetative!.id, duration_weeks: 6 },
+    ]);
+
+    const active = await getCropStages(SEED.CROP_ID);
+    expect(active).toHaveLength(SEED.STAGE_COUNT);
+    expect(active.map((stage) => stage.order_index)).toEqual([0, 1]);
+
+    const tombstoned = await db.getAllAsync<{ uuid: string }>(
+      `SELECT uuid FROM crop_stages WHERE crop_instance_id = ? AND deleted_at IS NOT NULL`,
+      SEED.CROP_ID,
+    );
+    expect(tombstoned).toHaveLength(SEED.STAGE_COUNT);
+  });
 });
 
 // ── archiveCrop ────────────────────────────────────────────────────────────────
