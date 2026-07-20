@@ -67,6 +67,12 @@
           "microphonePermission": false
         }
       ],
+      [
+        "expo-media-library",
+        {
+          "savePhotosPermission": "Allow Crop Planner to save photos you take to your photo library."
+        }
+      ],
       "expo-secure-store"
     ],
     "experiments": {
