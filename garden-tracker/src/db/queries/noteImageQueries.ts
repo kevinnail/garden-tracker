@@ -89,7 +89,22 @@ export async function getPendingUploads(): Promise<PendingUpload[]> {
   const db = await getDb();
   return db.getAllAsync<PendingUpload>(
     `SELECT uuid, local_uri FROM note_images
-     WHERE deleted_at IS NULL AND s3_key IS NULL AND local_uri IS NOT NULL`,
+     WHERE deleted_at IS NULL AND s3_key IS NULL AND local_uri IS NOT NULL
+       AND upload_skipped_too_large = 0`,
+  );
+}
+
+/**
+ * Permanently skip an image the server won't accept (over MAX_IMAGE_BYTES).
+ * Local bookkeeping only — deliberately does NOT bump `updated_at`, so it never
+ * becomes a sync-visible edit; the row keeps `s3_key = NULL`, so the collect
+ * query already leaves it off the wire.
+ */
+export async function markImageTooLarge(imageUuid: string): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(
+    `UPDATE note_images SET upload_skipped_too_large = 1 WHERE uuid = ?`,
+    imageUuid,
   );
 }
 
