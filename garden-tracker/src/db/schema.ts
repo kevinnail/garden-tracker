@@ -31,7 +31,10 @@ export const NOTE_IMAGES_SQL = `
     local_uri  TEXT,
     created_at TEXT NOT NULL DEFAULT (${TS_NOW}),
     updated_at TEXT NOT NULL DEFAULT (${TS_NOW}),
-    deleted_at TEXT
+    deleted_at TEXT,
+    -- Device-local, never synced: set to 1 when an image exceeds MAX_IMAGE_BYTES
+    -- and is permanently skipped for cloud upload (keeps it off the retry loop).
+    upload_skipped_too_large INTEGER NOT NULL DEFAULT 0
   );
 
   CREATE UNIQUE INDEX IF NOT EXISTS idx_note_images_uuid    ON note_images(uuid);
