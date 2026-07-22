@@ -10,7 +10,7 @@
 // never aborting the surrounding sync.
 import { File } from 'expo-file-system';
 
-import { requestJson } from '@/src/services/apiClient';
+import { requestJson, ApiClientError } from '@/src/services/apiClient';
 import { authClient } from '@/src/services/authClient';
 import {
   getPendingUploads,
@@ -19,8 +19,14 @@ import {
   setS3Key,
   setLocalUri,
   clearLocalUri,
+  markImageTooLarge,
 } from '@/src/db/queries/noteImageQueries';
-import { noteImageDestination, readImageBytes, deleteImageFile } from '@/src/utils/imageStorage';
+import {
+  noteImageDestination,
+  readImageBytes,
+  deleteImageFile,
+  MAX_IMAGE_BYTES,
+} from '@/src/utils/imageStorage';
 import { UUID_SHAPE } from '@/src/utils/uuid';
 
 interface UploadUrlResponse {
@@ -72,9 +78,16 @@ function logImageSyncError(action: string, imageUuid: string, error: unknown): v
  * Upload every image with local bytes but no S3 object yet. Runs before push so a
  * successful upload makes the row pushable in the same sync. `syncStartedAt` is
  * the sync-start instant used to stamp the row's updated_at (see setS3Key).
+ *
+ * Returns the number of images permanently skipped this pass for exceeding
+ * MAX_IMAGE_BYTES (only non-zero on the sync that first discovers each one — the
+ * skip flag keeps it out of future passes). Pre-cap images can exist because the
+ * shipped v1.0.0 build had no size gate; without the give-up they would re-hit the
+ * server's 400 IMAGE_TOO_LARGE forever.
  */
-export async function uploadPendingImages(syncStartedAt: string): Promise<void> {
+export async function uploadPendingImages(syncStartedAt: string): Promise<number> {
   const pending = await getPendingUploads();
+  let skippedTooLarge = 0;
   for (const image of pending) {
     try {
       const contentType = contentTypeFor(image.local_uri);
@@ -82,6 +95,16 @@ export async function uploadPendingImages(syncStartedAt: string): Promise<void> 
       // PUT (and caps it at MAX_IMAGE_BYTES), so the URL request must declare the
       // real byte count. bytes.byteLength is the exact body S3 will measure.
       const bytes = await readImageBytes(image.local_uri);
+
+      // Local give-up: an oversize image can never be uploaded, so flag it and
+      // move on without a round-trip. (The server 400 below is the authority —
+      // this just spares a doomed request and covers talking to an old server.)
+      if (bytes.byteLength > MAX_IMAGE_BYTES) {
+        await markImageTooLarge(image.uuid);
+        skippedTooLarge += 1;
+        continue;
+      }
+
       const { upload_url, s3_key } = await requestJson<UploadUrlResponse>(
         '/sync/image/upload-url',
         {
@@ -109,9 +132,22 @@ export async function uploadPendingImages(syncStartedAt: string): Promise<void> 
 
       await setS3Key(image.uuid, s3_key, syncStartedAt);
     } catch (error) {
+      // Server-side give-up (the real control): requestJson throws ApiClientError
+      // on the 400, carrying the parsed body. Branch on the stable `code`, not the
+      // message. Any other failure stays best-effort (log + retry next sync).
+      if (
+        error instanceof ApiClientError &&
+        error.status === 400 &&
+        (error.body as { code?: string } | null)?.code === 'IMAGE_TOO_LARGE'
+      ) {
+        await markImageTooLarge(image.uuid);
+        skippedTooLarge += 1;
+        continue;
+      }
       logImageSyncError('upload', image.uuid, error);
     }
   }
+  return skippedTooLarge;
 }
 
 /**
