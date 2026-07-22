@@ -32,6 +32,7 @@ export default function CloudBackupModal() {
   const syncStatus = useSyncStore((s) => s.status);
   const lastSyncedAt = useSyncStore((s) => s.lastSyncedAt);
   const syncError = useSyncStore((s) => s.error);
+  const imagesSkippedTooLarge = useSyncStore((s) => s.imagesSkippedTooLarge);
   const accountMismatch = useSyncStore((s) => s.accountMismatch);
   const syncNow = useSyncStore((s) => s.syncNow);
 
@@ -96,6 +97,13 @@ export default function CloudBackupModal() {
                   </Text>
                 </Pressable>
                 {syncError ? <Text style={styles.errorText}>{syncError}</Text> : null}
+                {imagesSkippedTooLarge > 0 ? (
+                  <Text style={styles.noticeText}>
+                    {imagesSkippedTooLarge === 1
+                      ? "1 photo couldn't be backed up because it's larger than 15 MB. Everything else synced."
+                      : `${imagesSkippedTooLarge} photos couldn't be backed up because they're larger than 15 MB. Everything else synced.`}
+                  </Text>
+                ) : null}
                 {accountMismatch ? (
                   <Pressable
                     style={styles.resetBtn}
@@ -258,6 +266,7 @@ const styles = StyleSheet.create({
   linkBtnText: { color: '#7dcea0', fontSize: 14, fontWeight: '600' },
 
   errorText: { color: '#e06666', fontSize: 13, marginTop: 4 },
+  noticeText: { color: '#d8b45c', fontSize: 13, marginTop: 4 },
 
   resetBtn: {
     marginTop: 12,
