@@ -32,6 +32,14 @@ interface SyncState {
    */
   accountMismatch: boolean;
   /**
+   * Count of images skipped on the last successful sync because they exceed the
+   * 15 MB cap (see uploadPendingImages). Not an error — the sync succeeded and
+   * everything else backed up. Non-zero only on the sync that first discovers an
+   * oversize image (the skip flag makes it a one-time event), and cleared at the
+   * start of the next sync. The cloud-backup screen surfaces it as a notice.
+   */
+  imagesSkippedTooLarge: number;
+  /**
    * Push-then-pull one sync event. No-ops unless signed in AND subscribed (the
    * server gates `/sync/*` on both, so an unentitled call is a guaranteed 403).
    * Safe to call from any trigger — foreground, post-login, or the manual
@@ -73,6 +81,7 @@ export const useSyncStore = create<SyncState>((set, get) => ({
   lastSyncedAt: null,
   error: null,
   accountMismatch: false,
+  imagesSkippedTooLarge: 0,
 
   syncNow: async (options) => {
     if (get().status === 'syncing') return;
@@ -87,11 +96,17 @@ export const useSyncStore = create<SyncState>((set, get) => ({
     const silent = options?.silent ?? false;
     const attempts = silent ? SILENT_SYNC_ATTEMPTS : 1;
 
-    set({ status: 'syncing', error: null, accountMismatch: false });
+    set({ status: 'syncing', error: null, accountMismatch: false, imagesSkippedTooLarge: 0 });
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
       try {
-        const { lastSyncAt } = await runSync(userId);
-        set({ status: 'idle', lastSyncedAt: lastSyncAt, error: null, accountMismatch: false });
+        const { lastSyncAt, imagesSkippedTooLarge } = await runSync(userId);
+        set({
+          status: 'idle',
+          lastSyncedAt: lastSyncAt,
+          error: null,
+          accountMismatch: false,
+          imagesSkippedTooLarge,
+        });
         // Reflect pulled server state in the grid.
         await usePlannerStore.getState().loadData();
         return;
