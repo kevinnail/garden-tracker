@@ -190,7 +190,9 @@ describe('updateCropInstance', () => {
 // ── replaceCropStages ─────────────────────────────────────────────────────────
 
 describe('replaceCropStages', () => {
-  it('replaces all stages for a crop inside a transaction', async () => {
+  it('inserts all stages inside a transaction when none exist yet', async () => {
+    mockDb.getAllAsync.mockResolvedValueOnce([]);
+
     await replaceCropStages(7, [
       { stage_definition_id: 2, duration_weeks: 4 },
       { stage_definition_id: 3, duration_weeks: 8 },
@@ -199,13 +201,6 @@ describe('replaceCropStages', () => {
     expect(mockDb.withTransactionAsync).toHaveBeenCalledTimes(1);
     expect(mockDb.runAsync).toHaveBeenNthCalledWith(
       1,
-      expect.stringContaining(
-        `UPDATE crop_stages SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW} WHERE crop_instance_id = ?`,
-      ),
-      7,
-    );
-    expect(mockDb.runAsync).toHaveBeenNthCalledWith(
-      2,
       expect.stringContaining('INSERT INTO crop_stages'),
       7,
       2,
@@ -213,28 +208,61 @@ describe('replaceCropStages', () => {
       0,
     );
     expect(mockDb.runAsync).toHaveBeenNthCalledWith(
-      3,
+      2,
       expect.stringContaining('INSERT INTO crop_stages'),
       7,
       3,
       8,
       1,
     );
+    expect(mockDb.runAsync).toHaveBeenCalledTimes(2);
   });
 
-  it('supports replacing a crop with zero stages', async () => {
+  it('updates an existing row in place (preserving its uuid) when its values change', async () => {
+    mockDb.getAllAsync.mockResolvedValueOnce([
+      { id: 11, order_index: 0, stage_definition_id: 2, duration_weeks: 4 },
+    ]);
+
+    await replaceCropStages(7, [{ stage_definition_id: 2, duration_weeks: 6 }]);
+
+    expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
+    const [sql, ...params] = mockDb.runAsync.mock.calls[0];
+    expect(sql).toContain('UPDATE crop_stages SET stage_definition_id = ?, duration_weeks = ?');
+    expect(sql).not.toContain('deleted_at');
+    expect(params).toEqual([2, 6, 11]);
+  });
+
+  it('writes nothing when the replacement set matches the existing rows', async () => {
+    mockDb.getAllAsync.mockResolvedValueOnce([
+      { id: 11, order_index: 0, stage_definition_id: 2, duration_weeks: 4 },
+      { id: 12, order_index: 1, stage_definition_id: 3, duration_weeks: 8 },
+    ]);
+
+    await replaceCropStages(7, [
+      { stage_definition_id: 2, duration_weeks: 4 },
+      { stage_definition_id: 3, duration_weeks: 8 },
+    ]);
+
+    expect(mockDb.runAsync).not.toHaveBeenCalled();
+  });
+
+  it('tombstones every existing row when replacing with zero stages', async () => {
+    mockDb.getAllAsync.mockResolvedValueOnce([
+      { id: 11, order_index: 0, stage_definition_id: 2, duration_weeks: 4 },
+      { id: 12, order_index: 1, stage_definition_id: 3, duration_weeks: 8 },
+    ]);
+
     await replaceCropStages(7, []);
 
     expect(mockDb.runAsync).toHaveBeenCalledTimes(1);
-    expect(mockDb.runAsync).toHaveBeenCalledWith(
-      expect.stringContaining(
-        `UPDATE crop_stages SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW} WHERE crop_instance_id = ?`,
-      ),
-      7,
-    );
+    const [sql, ...params] = mockDb.runAsync.mock.calls[0];
+    expect(sql).toContain(`UPDATE crop_stages SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW}`);
+    expect(sql).toContain('WHERE id IN');
+    expect(params).toEqual([11, 12]);
   });
 
   it('handles database errors', async () => {
+    mockDb.getAllAsync.mockResolvedValueOnce([]);
     mockDb.runAsync.mockRejectedValueOnce(new Error('Database error'));
 
     await expect(

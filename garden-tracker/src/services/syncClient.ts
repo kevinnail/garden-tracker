@@ -376,17 +376,50 @@ function authHeaders(): Record<string, string> {
 }
 
 /**
- * One sync event: push local changes, then pull the full active server state and
- * reconcile. Push-then-pull so the server has applied this device's changes
- * under LWW before we overwrite the local view. The checkpoint advances only
- * after the push succeeds, so a failed push is retried next time (no data loss).
+ * The local database already belongs to a different account than the one signed
+ * in. Syncing anyway would merge two people's gardens: push would write this
+ * device's rows into the other account (and 400 on image s3_keys carrying the
+ * original owner's prefix), and the pull sweep would tombstone everything local
+ * that the other account doesn't have — deleting local image files with it. The
+ * only safe transitions are signing back into the stamped account, or resetting
+ * local data and restoring from the new account.
+ */
+export class SyncAccountMismatchError extends Error {
+  constructor() {
+    super(
+      'This device holds data backed up by a different account. Sign in to that account, or reset local data to use this one.',
+    );
+    this.name = 'SyncAccountMismatchError';
+  }
+}
+
+const SYNC_ACCOUNT_KEY = 'sync_account_user_id';
+
+/**
+ * One sync event for the given signed-in account: push local changes, then pull
+ * the full active server state and reconcile. Push-then-pull so the server has
+ * applied this device's changes under LWW before we overwrite the local view.
+ * The checkpoint advances only after the push succeeds, so a failed push is
+ * retried next time (no data loss).
+ *
+ * The first sync stamps `accountUserId` into settings; every later sync must
+ * match it or the whole event is refused (see SyncAccountMismatchError).
+ * `resetDatabase` deletes the stamp with everything else, which is exactly the
+ * "reset local data" escape hatch the error message points at.
  *
  * Image bytes bracket the row sync: backfill legacy images and upload pending
  * bytes *before* the push (so their rows are pushable in the same event), then
  * download newly-pulled bytes and clean up tombstoned files *after* the pull.
  */
-export async function runSync(): Promise<{ lastSyncAt: string }> {
+export async function runSync(accountUserId: string): Promise<{ lastSyncAt: string }> {
   const db = (await getDb()) as unknown as SyncDb;
+
+  const stampedAccountId = await getSetting(db, SYNC_ACCOUNT_KEY);
+  if (stampedAccountId == null) {
+    await setSetting(db, SYNC_ACCOUNT_KEY, accountUserId);
+  } else if (stampedAccountId !== accountUserId) {
+    throw new SyncAccountMismatchError();
+  }
 
   // Key any pre-Slice-F images and mint their rows before we snapshot the clock,
   // so the content/updated_at bump lands under this sync's checkpoint.

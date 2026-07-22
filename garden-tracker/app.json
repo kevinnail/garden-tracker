@@ -2,7 +2,7 @@
   "expo": {
     "name": "Crop Planner",
     "slug": "garden-tracker",
-    "version": "1.0.1",
+    "version": "2.0.0",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "cropplanner",
@@ -65,6 +65,12 @@
           "photosPermission": "Allow Crop Planner to access your photos for note attachments.",
           "cameraPermission": "Allow Crop Planner to take photos for note attachments.",
           "microphonePermission": false
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "savePhotosPermission": "Allow Crop Planner to save photos you take to your photo library."
         }
       ],
       "expo-secure-store"

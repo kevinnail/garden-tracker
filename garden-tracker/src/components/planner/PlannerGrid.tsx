@@ -167,6 +167,24 @@ export default function PlannerGrid() {
     }
   };
 
+  // Zoom anchoring: scrollX is in pixels, so a zoom change (new cellWidth) would
+  // leave the same offset pointing at a different week and the view visibly
+  // jumps sideways. Rescale the offset so the week at the viewport's horizontal
+  // center stays at the center across zoom levels.
+  const previousCellWidth = useRef(cellWidth);
+  useEffect(() => {
+    if (previousCellWidth.current === cellWidth) return;
+    const scale = cellWidth / previousCellWidth.current;
+    previousCellWidth.current = cellWidth;
+
+    const viewWidth = viewDimsRef.current.width;
+    const maxX = Math.max(0, TOTAL_WEEKS * cellWidth - viewWidth);
+    const centerAnchoredX = (scrollX.value + viewWidth / 2) * scale - viewWidth / 2;
+    const nextX = Math.min(Math.max(centerAnchoredX, 0), maxX);
+    scrollX.value = nextX;
+    setRenderScrollX(nextX);
+  }, [cellWidth, scrollX]);
+
   useEffect(() => {
     if (!plannerFocusCropId) return;
     const vd = viewDimsRef.current;
@@ -210,22 +228,15 @@ export default function PlannerGrid() {
     scrollY,
   ]);
 
-  const todayLabel = useMemo(
-    () =>
-      new Date().toLocaleDateString('en-US', {
-        month: 'numeric',
-        day: 'numeric',
-        year: '2-digit',
-      }),
-    [],
-  );
-
   const handleHomePress = useCallback(() => {
     resetViewState();
     const todayCol = todayWeekIndex(calendarStart);
     // Use the default zoom cellWidth directly — resetViewState() resets zoom but
     // the re-render hasn't fired yet, so `cellWidth` is still the old stale value.
     const defaultCellWidth = ZOOM_LEVELS[DEFAULT_ZOOM_LEVEL - 1].cellWidth;
+    // Pre-sync the zoom-anchoring ref so the cellWidth effect doesn't rescale
+    // this already-correct home position after the zoom reset re-renders.
+    previousCellWidth.current = defaultCellWidth;
     const newX = Math.max(0, (todayCol - 3) * defaultCellWidth);
     scrollX.value = newX;
     scrollY.value = 0;

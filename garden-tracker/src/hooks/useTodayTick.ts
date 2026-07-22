@@ -1,9 +1,20 @@
 import { useEffect, useState } from 'react';
 
+function localDateKey(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+}
+
 /**
- * Re-renders the caller at the next local midnight so components that read
- * `new Date()` (today cursor, today label, etc.) advance across the day
- * boundary for a long-running session that never unmounts.
+ * Re-renders the caller when the local calendar date changes, so components
+ * that read `new Date()` (today cursor, today label, due/overdue split)
+ * advance across the day boundary without a manual refresh.
+ *
+ * Polls the date key on a 30s interval rather than aiming a setTimeout at
+ * midnight: JS timers count elapsed time, not wall-clock time, so a single
+ * long timeout never fires when the device clock is changed and drifts when
+ * iOS suspends the app. The interval catches a real midnight, a manual clock
+ * change, and an app resume onto a new day, all within one poll cycle.
  *
  * Returns an opaque tick counter — callers don't need to read it; the act of
  * returning a changed value is what triggers the re-render.
@@ -12,21 +23,16 @@ export function useTodayTick(): number {
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
-    const now = new Date();
-    const nextMidnight = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate() + 1,
-      0,
-      0,
-      0,
-      100, // +100ms cushion so Date() is unambiguously on the new day
-    ).getTime();
-    const delay = Math.max(1000, nextMidnight - now.getTime());
-
-    const timer = setTimeout(() => setTick((t) => t + 1), delay);
-    return () => clearTimeout(timer);
-  }, [tick]);
+    let lastDateKey = localDateKey();
+    const interval = setInterval(() => {
+      const currentDateKey = localDateKey();
+      if (currentDateKey !== lastDateKey) {
+        lastDateKey = currentDateKey;
+        setTick((count) => count + 1);
+      }
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, []);
 
   return tick;
 }

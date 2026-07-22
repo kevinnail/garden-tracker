@@ -16,6 +16,7 @@ import { router } from 'expo-router';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import * as MediaLibrary from 'expo-media-library';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -311,6 +312,20 @@ export default function CellNoteForm({
     }
     const result = await ImagePicker.launchCameraAsync({ mediaTypes: 'images', quality: 0.85 });
     if (result.canceled || !result.assets[0]) return;
+    // launchCameraAsync hands us a private copy that exists nowhere else — if the
+    // app is ever deleted before the photo uploads, the shot is gone. Save it to
+    // the camera roll too (add-only permission). Best-effort: a denied permission
+    // or save failure must never block attaching the photo to the note.
+    try {
+      const { granted } = await MediaLibrary.requestPermissionsAsync(true);
+      if (granted) {
+        await MediaLibrary.saveToLibraryAsync(result.assets[0].uri);
+      }
+    } catch (error) {
+      if (__DEV__) {
+        console.warn('Failed to save camera photo to the photo library.', error);
+      }
+    }
     attachPickedImage(result.assets[0]);
   };
 

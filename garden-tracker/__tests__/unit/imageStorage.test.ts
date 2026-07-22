@@ -15,6 +15,8 @@ import {
   copyImageToAppStorage,
   deleteImageFile,
   getImageByteSize,
+  rebaseNoteImageUri,
+  resolveNoteImageUri,
 } from '@/src/utils/imageStorage';
 
 // ---------------------------------------------------------------------------
@@ -87,6 +89,53 @@ describe('createNoteImage', () => {
 });
 
 // ---------------------------------------------------------------------------
+// rebaseNoteImageUri — iOS moves the app container on every update/reinstall,
+// so a stored absolute path must be re-anchored to the current container.
+// ---------------------------------------------------------------------------
+
+describe('rebaseNoteImageUri', () => {
+  it('re-anchors a stale-container note-images path to the current directory', () => {
+    const staleUri =
+      'file:///var/mobile/Containers/Data/Application/EFFA1952-OLD/Documents/note-images/note-123-abc.jpg';
+    expect(rebaseNoteImageUri(staleUri)).toBe(`${MOCK_IMAGES_DIR_URI}note-123-abc.jpg`);
+  });
+
+  it('passes through uris outside the note-images directory (picker temp files)', () => {
+    const tempUri = 'file:///tmp/ImagePicker/photo.jpg';
+    expect(rebaseNoteImageUri(tempUri)).toBe(tempUri);
+  });
+
+  it('passes through a note-images directory uri with no file name', () => {
+    const dirUri = 'file:///var/mobile/old-container/Documents/note-images/';
+    expect(rebaseNoteImageUri(dirUri)).toBe(dirUri);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveNoteImageUri
+// ---------------------------------------------------------------------------
+
+describe('resolveNoteImageUri', () => {
+  const image = {
+    id: 'entry-image-1',
+    uuid: 'aaaa-bbbb',
+    uri: 'file:///var/mobile/origin-device/Documents/note-images/note-777-xyz.jpg',
+    created_at: '2026-07-01T00:00:00.000Z',
+  };
+
+  it('prefers the uuid-mapped local_uri, rebased to the current container', () => {
+    const uriByUuid = {
+      'aaaa-bbbb': 'file:///var/mobile/old-container/Documents/note-images/aaaa-bbbb.jpg',
+    };
+    expect(resolveNoteImageUri(image, uriByUuid)).toBe(`${MOCK_IMAGES_DIR_URI}aaaa-bbbb.jpg`);
+  });
+
+  it('falls back to the content-embedded uri, rebased, when the uuid is unmapped', () => {
+    expect(resolveNoteImageUri(image, {})).toBe(`${MOCK_IMAGES_DIR_URI}note-777-xyz.jpg`);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // deleteImageFile
 // ---------------------------------------------------------------------------
 
@@ -96,16 +145,26 @@ describe('deleteImageFile', () => {
     expect(deleteImageFile('')).toBe(false);
   });
 
+  // The next two tests use uris outside note-images so the rebase passes them
+  // through and the mockImplementationOnce lands on the delete's File handle.
   it('returns false when the file does not exist', () => {
     const { File } = jest.requireMock('expo-file-system');
     File.mockImplementationOnce((uri: string) => ({ uri, exists: false, delete: mockFileDelete }));
 
-    expect(deleteImageFile('file:///app/note-images/missing.jpg')).toBe(false);
+    expect(deleteImageFile('file:///app/photos/missing.jpg')).toBe(false);
     expect(mockFileDelete).not.toHaveBeenCalled();
   });
 
   it('calls file.delete() and returns true for a valid existing file', () => {
     expect(deleteImageFile('file:///app/note-images/photo.jpg')).toBe(true);
+    expect(mockFileDelete).toHaveBeenCalledTimes(1);
+  });
+
+  it('deletes via the rebased path when given a stale-container uri', () => {
+    const { File } = jest.requireMock('expo-file-system');
+    expect(deleteImageFile('file:///var/old-container/Documents/note-images/photo.jpg')).toBe(true);
+    const lastFileUri = File.mock.results[File.mock.results.length - 1]?.value.uri;
+    expect(lastFileUri).toBe(`${MOCK_IMAGES_DIR_URI}photo.jpg`);
     expect(mockFileDelete).toHaveBeenCalledTimes(1);
   });
 
@@ -119,7 +178,7 @@ describe('deleteImageFile', () => {
       }),
     }));
 
-    expect(deleteImageFile('file:///app/note-images/photo.jpg')).toBe(false);
+    expect(deleteImageFile('file:///app/photos/photo.jpg')).toBe(false);
   });
 });
 

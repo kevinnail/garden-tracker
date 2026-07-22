@@ -770,6 +770,9 @@ const styles = StyleSheet.create({
   gardenGroupLabelMushroom: { color: '#d4a882' },
 
   sectionItems: { paddingHorizontal: 8, paddingBottom: 8, gap: 5 },
+  // Unselected rows are deliberately dim/dark so the selected row is the only
+  // lit-up one — with a short list the old bright-grey unselected rows made it
+  // unclear that anything was selected at all.
   sectionOption: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -778,12 +781,12 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 5,
     borderWidth: 2,
-    borderColor: 'transparent',
-    backgroundColor: '#cdcdcd',
+    borderColor: '#3a3a3a',
+    backgroundColor: '#242424',
   },
   sectionSelected: { borderColor: '#7dffb0', backgroundColor: '#1a9148' },
   sectionSelectedMushroom: { borderColor: '#e0a060', backgroundColor: '#8B4513' },
-  sectionText: { color: '#1a1a1a', fontSize: 13, fontWeight: '600' },
+  sectionText: { color: '#9a9a9a', fontSize: 13, fontWeight: '600' },
   sectionTextSelected: { color: '#fff', fontWeight: '700' },
   sectionCheck: { color: '#fff', fontSize: 14, fontWeight: '800', marginLeft: 8 },
 

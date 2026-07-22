@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 import { ApiClientError } from '@/src/services/apiClient';
-import { runSync } from '@/src/services/syncClient';
+import { runSync, SyncAccountMismatchError } from '@/src/services/syncClient';
 import { useAuthStore } from '@/src/store/authStore';
 import { useSubscriptionStore } from '@/src/store/subscriptionStore';
 import { usePlannerStore } from '@/src/store/plannerStore';
@@ -25,6 +25,12 @@ interface SyncState {
   status: SyncStatus;
   lastSyncedAt: string | null;
   error: string | null;
+  /**
+   * The last sync failed because local data belongs to a different account
+   * (SyncAccountMismatchError). The only safe recovery is resetting local data,
+   * so the cloud-backup screen surfaces a reset button only while this is true.
+   */
+  accountMismatch: boolean;
   /**
    * Push-then-pull one sync event. No-ops unless signed in AND subscribed (the
    * server gates `/sync/*` on both, so an unentitled call is a guaranteed 403).
@@ -66,22 +72,26 @@ export const useSyncStore = create<SyncState>((set, get) => ({
   status: 'idle',
   lastSyncedAt: null,
   error: null,
+  accountMismatch: false,
 
   syncNow: async (options) => {
     if (get().status === 'syncing') return;
 
-    const signedIn = useAuthStore.getState().status === 'signed-in';
+    const { status: authStatus, userId } = useAuthStore.getState();
     const isPremium = useSubscriptionStore.getState().isPremium;
-    if (!signedIn || !isPremium) return;
+    // userId can lag the signed-in flip by a tick while the session loads; a
+    // sync without it can't run the account guard, so it waits for a later
+    // trigger just like an unauthenticated one.
+    if (authStatus !== 'signed-in' || !userId || !isPremium) return;
 
     const silent = options?.silent ?? false;
     const attempts = silent ? SILENT_SYNC_ATTEMPTS : 1;
 
-    set({ status: 'syncing', error: null });
+    set({ status: 'syncing', error: null, accountMismatch: false });
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
       try {
-        const { lastSyncAt } = await runSync();
-        set({ status: 'idle', lastSyncedAt: lastSyncAt, error: null });
+        const { lastSyncAt } = await runSync(userId);
+        set({ status: 'idle', lastSyncedAt: lastSyncAt, error: null, accountMismatch: false });
         // Reflect pulled server state in the grid.
         await usePlannerStore.getState().loadData();
         return;
@@ -96,7 +106,11 @@ export const useSyncStore = create<SyncState>((set, get) => ({
           set({ status: 'idle', error: null });
           return;
         }
-        set({ status: 'error', error: messageForError(error) });
+        set({
+          status: 'error',
+          error: messageForError(error),
+          accountMismatch: error instanceof SyncAccountMismatchError,
+        });
         return;
       }
     }

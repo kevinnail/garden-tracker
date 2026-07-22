@@ -1,11 +1,14 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Alert, Linking } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuthStore } from '@/src/store/authStore';
 import { useSubscriptionStore } from '@/src/store/subscriptionStore';
 import { useSyncStore } from '@/src/store/syncStore';
+import { usePlannerStore } from '@/src/store/plannerStore';
+
+const SUPPORT_URL = 'https://kevinnail.com/crop-planner/support.html';
 
 function formatLastSynced(timestamp: string | null): string {
   if (!timestamp) return 'Not synced yet';
@@ -29,7 +32,32 @@ export default function CloudBackupModal() {
   const syncStatus = useSyncStore((s) => s.status);
   const lastSyncedAt = useSyncStore((s) => s.lastSyncedAt);
   const syncError = useSyncStore((s) => s.error);
+  const accountMismatch = useSyncStore((s) => s.accountMismatch);
   const syncNow = useSyncStore((s) => s.syncNow);
+
+  const resetAllData = usePlannerStore((s) => s.resetAllData);
+
+  const confirmResetLocalData = () => {
+    Alert.alert(
+      'Reset local data',
+      'Delete all data on this device and start fresh? This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await resetAllData();
+              // Local data is gone and its account stamp with it, so this sync
+              // re-stamps to the signed-in account and pulls their backup.
+              await syncNow();
+            } catch {}
+          },
+        },
+      ],
+    );
+  };
 
   const pkg = offering?.annual ?? offering?.availablePackages[0];
   const price = pkg?.product?.priceString;
@@ -68,6 +96,16 @@ export default function CloudBackupModal() {
                   </Text>
                 </Pressable>
                 {syncError ? <Text style={styles.errorText}>{syncError}</Text> : null}
+                {accountMismatch ? (
+                  <Pressable
+                    style={styles.resetBtn}
+                    onPress={confirmResetLocalData}
+                    accessibilityRole="button"
+                    accessibilityLabel="Reset local data"
+                  >
+                    <Text style={styles.resetBtnText}>Reset local data</Text>
+                  </Pressable>
+                ) : null}
               </View>
             ) : (
               <View style={styles.paywallBox}>
@@ -139,6 +177,15 @@ export default function CloudBackupModal() {
             </Pressable>
           </>
         )}
+
+        <Pressable
+          style={styles.supportBtn}
+          onPress={() => Linking.openURL(SUPPORT_URL)}
+          accessibilityRole="link"
+          accessibilityLabel="Help and support"
+        >
+          <Text style={styles.supportBtnText}>Help &amp; Support</Text>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -211,4 +258,18 @@ const styles = StyleSheet.create({
   linkBtnText: { color: '#7dcea0', fontSize: 14, fontWeight: '600' },
 
   errorText: { color: '#e06666', fontSize: 13, marginTop: 4 },
+
+  resetBtn: {
+    marginTop: 12,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#5a2020',
+    backgroundColor: '#2a1717',
+    alignItems: 'center',
+  },
+  resetBtnText: { color: '#e08d8d', fontSize: 14, fontWeight: '700' },
+
+  supportBtn: { marginTop: 28, paddingVertical: 10, alignItems: 'center' },
+  supportBtnText: { color: '#7dcea0', fontSize: 14, fontWeight: '600' },
 });
