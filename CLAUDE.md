@@ -2,7 +2,7 @@
 
 This is the **garden-tracker** iOS app repo (`com.kevinnail.gardentracker`) — a React Native / Expo crop planning app, a VBA Excel workbook translated into a mobile-first app. **The MVP is built and live on the App Store.** Current work is the opt-in cloud backup / sync feature (see "Current work" below).
 
-Read `SPEC.MD` for the product spec and `design/backend-starter/PLAN.md` for the original phased implementation plan (schema, types, architecture).
+Read `design/current-workflow/SPEC.MD` for the product spec and `design/backend-starter/PLAN.md` for the original phased implementation plan (schema, types, architecture).
 
 Keep your replies extremely concise and focus on conveying the key information. No unnecessary fluff, no long code snippets.
 
@@ -19,8 +19,10 @@ garden-tracker/                  <- this git repo (iOS app + planning docs)
 ├── CLAUDE.md                    <- this file (loads for all work in the repo)
 ├── garden-tracker/              <- the Expo app itself (src/, app/, __tests__/, package.json)
 ├── design/                      <- planning + handoff docs (no code)
-│   ├── HANDOFF-TO-IOS.md        <- iOS cloud-sync spec, Slices A–G
-│   ├── PROGRESS.md              <- shared cross-repo status, source of truth
+│   ├── current-workflow/        <- LIVING docs: PROGRESS.md, SYNC-WIRE-CONTRACT.md,
+│   │                               UI-POLISH-TRIAGE.md, E2E-TEST-CHECKLIST.html
+│   ├── archive/                 <- delivered/superseded docs (HANDOFF-TO-IOS, UP-TO-SPEED,
+│   │                               SPEC.MD, Working-Plan.html, old IAP specs, etc.)
 │   └── backend-starter/         <- the crop-planner-server repo's docs, copied in as reference
 │       ├── CLAUDE.md            <- backend's own CLAUDE (only loads when working in that folder)
 │       └── PLAN.md, SPEC.md, SETUP.md
@@ -33,12 +35,12 @@ There is intentionally only one app-side `CLAUDE.md` (this one, at repo root). I
 
 The MVP (offline-first planner, phases below) is **done and shipped**. Active work is the opt-in cloud backup feature, which spans two repos — this iOS app and the backend (**crop-planner-server**) — built in coordinated vertical slices.
 
-- **`design/HANDOFF-TO-IOS.md`** is the iOS-side spec: **Slices A–G**. It opens with a "Why this order" section explaining the dependency chain — read it once and **do not relitigate the ordering or scope**; it's settled.
+- **`design/archive/HANDOFF-TO-IOS.md`** is the iOS-side spec: **Slices A–G** (all delivered — kept for history). It opens with a "Why this order" section explaining the dependency chain; the ordering and scope are settled — do not relitigate them.
 - The backend spec is the server repo's `PLAN.md` (Slices 1–10), mirrored at `design/backend-starter/PLAN.md`.
-- **`design/PROGRESS.md`** is the **shared source of truth** for cross-repo status. It travels between the two repos manually when switching sides.
-- **At the end of every slice, update `design/PROGRESS.md`** (the *At a glance* table + the slice's *Per-feature detail* markers) before wrapping up. Flip "Wired up?" to ✅ only after an end-to-end test across both repos passes.
+- **`design/current-workflow/PROGRESS.md`** is the **shared source of truth** for cross-repo status. It travels between the two repos manually when switching sides.
+- **When a slice's status changes, update `design/current-workflow/PROGRESS.md`** (the *At a glance* table + the slice's *Per-feature detail* markers). Flip "Wired up?" to ✅ only after an end-to-end test across both repos passes.
 
-Current state: backend done through Slice 5 (auth + password reset, not deployed); iOS integration Foundation done (runtime config, typed API client, `/health` button). Next iOS slice: **A** (`deleted_at` migration).
+Current state (2026-07-21): backend Slices 1–10 done and deployed to Railway; iOS Slices A–G done, note-image sync + M3 real-Apple IAP verified E2E. **v2 (auth + IAP + cloud sync) is shipping** — dev→main PR is green; the only outstanding gates are the final **13 · TestFlight** smoke check and the image-cap device E2E (cap is deployed to Railway; over-cap/normal-upload not yet device-verified). See `PROGRESS.md` for the authoritative per-feature status.
 
 ## Development Commands
 
@@ -137,4 +139,4 @@ When any behavior is unclear, read the VBA file. This table maps features to sou
 
 ## Implementation Phases
 
-See `design/backend-starter/PLAN.md § Implementation Phases` for the original phased plan. The current work is cloud backup / sync, tracked in `design/HANDOFF-TO-IOS.md` (Slices A–G). I do not have verified per-phase completion status — do not infer it from this file.
+See `design/backend-starter/PLAN.md § Implementation Phases` for the original phased plan. The cloud backup / sync work (Slices A–G, spec in `design/archive/HANDOFF-TO-IOS.md`) is complete; live status is in `design/current-workflow/PROGRESS.md`. I do not have verified per-phase completion status — do not infer it from this file.
