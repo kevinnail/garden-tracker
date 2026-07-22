@@ -16,7 +16,7 @@ import {
   downloadPendingImages,
   cleanupTombstonedImages,
 } from '@/src/services/imageSync';
-import { requestJson } from '@/src/services/apiClient';
+import { requestJson, ApiClientError } from '@/src/services/apiClient';
 import {
   getPendingUploads,
   getPendingDownloads,
@@ -24,11 +24,22 @@ import {
   setS3Key,
   setLocalUri,
   clearLocalUri,
+  markImageTooLarge,
 } from '@/src/db/queries/noteImageQueries';
-import { noteImageDestination, readImageBytes, deleteImageFile } from '@/src/utils/imageStorage';
+import {
+  noteImageDestination,
+  readImageBytes,
+  deleteImageFile,
+  MAX_IMAGE_BYTES,
+} from '@/src/utils/imageStorage';
 import { File } from 'expo-file-system';
 
-jest.mock('@/src/services/apiClient', () => ({ requestJson: jest.fn() }));
+// Keep the real ApiClientError (the give-up branch does `instanceof` on it);
+// only requestJson is stubbed.
+jest.mock('@/src/services/apiClient', () => ({
+  ...jest.requireActual('@/src/services/apiClient'),
+  requestJson: jest.fn(),
+}));
 jest.mock('@/src/services/authClient', () => ({
   authClient: { getCookie: () => 'better-auth.session_token=cookie' },
 }));
@@ -39,6 +50,7 @@ jest.mock('@/src/db/queries/noteImageQueries', () => ({
   setS3Key: jest.fn(),
   setLocalUri: jest.fn(),
   clearLocalUri: jest.fn(),
+  markImageTooLarge: jest.fn(),
 }));
 jest.mock('@/src/utils/imageStorage', () => ({
   noteImageDestination: jest.fn((name: string) => ({
@@ -46,6 +58,7 @@ jest.mock('@/src/utils/imageStorage', () => ({
   })),
   readImageBytes: jest.fn(async () => new Uint8Array([1, 2, 3])),
   deleteImageFile: jest.fn(),
+  MAX_IMAGE_BYTES: 15 * 1024 * 1024,
 }));
 jest.mock('expo-file-system', () => ({
   File: {
@@ -110,8 +123,73 @@ describe('uploadPendingImages', () => {
       async () => ({ ok: false, status: 403 }) as Response,
     ) as unknown as typeof global.fetch;
 
-    await expect(uploadPendingImages('2026-07-01 00:00:00.000')).resolves.toBeUndefined();
+    // A non-IMAGE_TOO_LARGE failure is logged + retried, not flagged: 0 skipped.
+    await expect(uploadPendingImages('2026-07-01 00:00:00.000')).resolves.toBe(0);
     expect(setS3Key).not.toHaveBeenCalled();
+    expect(markImageTooLarge).not.toHaveBeenCalled();
+  });
+
+  it('gives up locally on an oversize image: flags it, requests no URL, counts it', async () => {
+    // Stub the byte read as one byte over the cap (no real 15 MB allocation).
+    (readImageBytes as jest.Mock).mockResolvedValueOnce({
+      byteLength: MAX_IMAGE_BYTES + 1,
+    } as unknown as Uint8Array);
+
+    const skipped = await uploadPendingImages('2026-07-01 00:00:00.000');
+
+    expect(skipped).toBe(1);
+    expect(markImageTooLarge).toHaveBeenCalledWith('img-a');
+    expect(requestJsonMock).not.toHaveBeenCalled(); // never asked for an upload URL
+    expect(global.fetch).not.toHaveBeenCalled(); // never PUT to S3
+    expect(setS3Key).not.toHaveBeenCalled();
+  });
+
+  it('gives up on a server 400 IMAGE_TOO_LARGE: flags it and counts it', async () => {
+    requestJsonMock.mockRejectedValueOnce(
+      new ApiClientError('Image too large', 'http', 400, {
+        error: 'Image too large',
+        code: 'IMAGE_TOO_LARGE',
+        max_bytes: MAX_IMAGE_BYTES,
+      }),
+    );
+
+    const skipped = await uploadPendingImages('2026-07-01 00:00:00.000');
+
+    expect(skipped).toBe(1);
+    expect(markImageTooLarge).toHaveBeenCalledWith('img-a');
+    expect(setS3Key).not.toHaveBeenCalled();
+  });
+
+  it('does not flag on other 400s (only IMAGE_TOO_LARGE): 0 skipped', async () => {
+    requestJsonMock.mockRejectedValueOnce(
+      new ApiClientError('Bad request', 'http', 400, { error: 'Bad request' }),
+    );
+
+    await expect(uploadPendingImages('2026-07-01 00:00:00.000')).resolves.toBe(0);
+    expect(markImageTooLarge).not.toHaveBeenCalled();
+  });
+
+  it('flags only the oversize row and still uploads the normal one', async () => {
+    (getPendingUploads as jest.Mock).mockResolvedValue([
+      { uuid: 'img-big', local_uri: 'file:///documents/note-images/big.jpg' },
+      { uuid: 'img-ok', local_uri: 'file:///documents/note-images/ok.jpg' },
+    ]);
+    // First row oversize (local give-up), second row normal 3 bytes.
+    (readImageBytes as jest.Mock)
+      .mockResolvedValueOnce({ byteLength: MAX_IMAGE_BYTES + 1 } as unknown as Uint8Array)
+      .mockResolvedValueOnce(new Uint8Array([1, 2, 3]));
+
+    const skipped = await uploadPendingImages('2026-07-01 00:00:00.000');
+
+    expect(skipped).toBe(1);
+    expect(markImageTooLarge).toHaveBeenCalledWith('img-big');
+    expect(markImageTooLarge).toHaveBeenCalledTimes(1);
+    // The normal row still uploaded and recorded its key.
+    expect(setS3Key).toHaveBeenCalledWith(
+      'img-ok',
+      'note-images/user-1/img-a.jpg',
+      '2026-07-01 00:00:00.000',
+    );
   });
 });
 
