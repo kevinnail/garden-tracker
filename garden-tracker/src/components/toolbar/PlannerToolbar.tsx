@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import {
   View,
   Pressable,
@@ -16,6 +16,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useShallow } from 'zustand/react/shallow';
 import { usePlannerStore } from '@/src/store/plannerStore';
 import { useTodayTick } from '@/src/hooks/useTodayTick';
+import { formatDateLabel } from '@/src/utils/dateUtils';
 import { useWeatherStore } from '@/src/store/weatherStore';
 import { wmoEmoji } from '@/src/hooks/useWeather';
 import Toast from 'react-native-toast-message';
@@ -59,8 +60,8 @@ function ViewToggle({
 // Main toolbar
 // ---------------------------------------------------------------------------
 export default function PlannerToolbar() {
-  // Re-render at midnight so `todayLabel` flips.
-  useTodayTick();
+  // Current local day (captured at rollover, not re-read each render).
+  const today = useTodayTick();
 
   const {
     hasSections,
@@ -105,15 +106,10 @@ export default function PlannerToolbar() {
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
 
-  const todayLabel = useMemo(
-    () =>
-      new Date().toLocaleDateString('en-US', {
-        weekday: 'long',
-        month: 'long',
-        day: 'numeric',
-      }),
-    [],
-  );
+  // Format the day captured by useTodayTick (not a render-time `new Date()`) so
+  // it can't catch a value from Hermes' ~1hr timezone-offset-cache wobble near
+  // midnight and freeze there.
+  const todayLabel = formatDateLabel(today);
 
   const handleViewToggle = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -170,8 +166,8 @@ export default function PlannerToolbar() {
       accessibilityHint="Opens the Today dashboard"
     >
       <View style={styles.todayBannerMain}>
-        <Text style={styles.todayBannerTitle} numberOfLines={1}>
-          <Text style={styles.todayBannerTitleLabel}>{`${todayLabel}`}</Text>
+        <Text style={[styles.todayBannerTitle, styles.todayBannerTitleLabel]} numberOfLines={1}>
+          {todayLabel}
         </Text>
         {!isLandscape && (
           <Text style={styles.todayBannerText} numberOfLines={1}>

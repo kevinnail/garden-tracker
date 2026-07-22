@@ -6,6 +6,7 @@ import ReanimatedSwipeable from 'react-native-gesture-handler/Swipeable';
 
 import { usePlannerData } from '@/src/hooks/usePlannerData';
 import { useTodayTick } from '@/src/hooks/useTodayTick';
+import { formatDateLabel } from '@/src/utils/dateUtils';
 import { TodayTaskItem } from '@/src/types';
 import { usePlannerStore } from '@/src/store/plannerStore';
 import {
@@ -388,8 +389,8 @@ function WeatherSection() {
 
 export default function TodayScreen() {
   usePlannerData();
-  // Re-render across local midnight so `todayLabel` advances.
-  useTodayTick();
+  // Current local day (captured at rollover, not re-read each render).
+  const today = useTodayTick();
 
   const todayDueTasks = usePlannerStore((s) => s.todayDueTasks);
   const todayOverdueTasks = usePlannerStore((s) => s.todayOverdueTasks);
@@ -397,11 +398,9 @@ export default function TodayScreen() {
   const dueGroups = useMemo(() => groupByCrop(todayDueTasks), [todayDueTasks]);
   const overdueGroups = useMemo(() => groupByCrop(todayOverdueTasks), [todayOverdueTasks]);
 
-  const todayLabel = new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-  });
+  // Format the day from useTodayTick (captured at rollover), not a render-time
+  // `new Date()`; formatDateLabel uses raw getters (no toLocaleDateString).
+  const todayLabel = formatDateLabel(today);
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>

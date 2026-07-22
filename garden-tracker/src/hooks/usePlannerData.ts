@@ -7,10 +7,10 @@ export function usePlannerData() {
   // Reload when the local date rolls over: the due/overdue split and task-line
   // data are computed inside loadData against "today", so a re-render alone
   // would leave them showing yesterday's state.
-  const dateTick = useTodayTick();
+  const today = useTodayTick();
   useEffect(() => {
     void loadData().catch(() => {
       /* toast shown by store */
     });
-  }, [loadData, dateTick]);
+  }, [loadData, today]);
 }

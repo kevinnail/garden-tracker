@@ -135,3 +135,45 @@ export function defaultCalendarStart(): Date {
   d.setDate(d.getDate() - 365);
   return toSunday(d);
 }
+
+// ---------------------------------------------------------------------------
+// Human date label
+// ---------------------------------------------------------------------------
+
+const WEEKDAY_NAMES = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+];
+
+const MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
+/**
+ * Format a date as e.g. "Tuesday, July 21".
+ *
+ * Pair this with a stable, noon-anchored day from `useTodayTick()` rather than a
+ * render-time `new Date()`: near midnight Hermes' local timezone-offset cache can
+ * lag ~an hour, so `getDay`/`getMonth`/`getDate` briefly report the wrong day.
+ * Noon anchoring keeps the reading hours from any boundary; this helper just
+ * indexes the name tables off whatever Date it is given.
+ */
+export function formatDateLabel(date: Date): string {
+  return `${WEEKDAY_NAMES[date.getDay()]}, ${MONTH_NAMES[date.getMonth()]} ${date.getDate()}`;
+}
