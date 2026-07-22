@@ -149,7 +149,7 @@ describe('runMigrations — v0 → v1 deleted_at', () => {
     const db = makeOldDb();
     await runMigrations(createTestAdapter(db));
     // runMigrations is cumulative: a v0 DB runs through every step to current.
-    expect(db.pragma('user_version', { simple: true }) as number).toBe(3);
+    expect(db.pragma('user_version', { simple: true }) as number).toBe(4);
   });
 
   it('is idempotent — running twice does not error or duplicate columns', async () => {
@@ -176,7 +176,7 @@ describe('runMigrations — v0 → v1 deleted_at', () => {
     }
 
     await expect(runMigrations(createTestAdapter(db))).resolves.toBeUndefined();
-    expect(db.pragma('user_version', { simple: true }) as number).toBe(3);
+    expect(db.pragma('user_version', { simple: true }) as number).toBe(4);
   });
 });
 
@@ -300,10 +300,10 @@ describe('runMigrations — v1 → v2 uuid + updated_at', () => {
     expect(note.content).toBe('Looking healthy');
   });
 
-  it('bumps user_version to current (3)', async () => {
+  it('bumps user_version to current (4)', async () => {
     const db = makeV1Db();
     await runMigrations(createTestAdapter(db));
-    expect(db.pragma('user_version', { simple: true }) as number).toBe(3);
+    expect(db.pragma('user_version', { simple: true }) as number).toBe(4);
   });
 
   it('is idempotent — a second run is a no-op and uuids stay stable', async () => {
@@ -355,6 +355,8 @@ const NOTE_IMAGES_COLUMNS = [
   'created_at',
   'updated_at',
   'deleted_at',
+  // Added by the v3→v4 step; a full runMigrations run reaches it.
+  'upload_skipped_too_large',
 ];
 
 describe('runMigrations — v2 → v3 note_images', () => {
@@ -389,10 +391,10 @@ describe('runMigrations — v2 → v3 note_images', () => {
     expect(crop.name).toBe('Tomato');
   });
 
-  it('bumps user_version to 3', async () => {
+  it('bumps user_version to 4', async () => {
     const db = makeV2Db();
     await runMigrations(createTestAdapter(db));
-    expect(db.pragma('user_version', { simple: true }) as number).toBe(3);
+    expect(db.pragma('user_version', { simple: true }) as number).toBe(4);
   });
 
   it('is idempotent — a second run does not error or duplicate the table', async () => {
@@ -406,5 +408,61 @@ describe('runMigrations — v2 → v3 note_images', () => {
       .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='note_images'")
       .all();
     expect(tables).toHaveLength(1);
+  });
+});
+
+// A faithful v3 on-device shape: v2 + a note_images table WITHOUT the v4
+// upload_skipped_too_large column, so the v3 → v4 step is exercised in isolation.
+function makeV3Db() {
+  const db = makeV2Db();
+  db.exec(`
+    CREATE TABLE note_images (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid       TEXT,
+      note_id    INTEGER NOT NULL,
+      s3_key     TEXT,
+      local_uri  TEXT,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%f','now')),
+      updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%f','now')),
+      deleted_at TEXT
+    );
+    CREATE UNIQUE INDEX idx_note_images_uuid ON note_images(uuid);
+  `);
+  db.pragma('user_version = 3');
+  return db;
+}
+
+describe('runMigrations — v3 → v4 upload_skipped_too_large', () => {
+  it('adds the column defaulting to 0 and preserves existing note_images rows', async () => {
+    const db = makeV3Db();
+    db.prepare('INSERT INTO note_images (uuid, note_id, s3_key) VALUES (?, 1, ?)').run(
+      'img-uuid-1',
+      'note-images/u/img-uuid-1.jpg',
+    );
+
+    await runMigrations(createTestAdapter(db));
+
+    const cols = db.prepare('PRAGMA table_info(note_images)').all() as { name: string }[];
+    expect(cols.some((c) => c.name === 'upload_skipped_too_large')).toBe(true);
+    const row = db.prepare('SELECT * FROM note_images WHERE uuid = ?').get('img-uuid-1') as any;
+    expect(row.s3_key).toBe('note-images/u/img-uuid-1.jpg');
+    expect(row.upload_skipped_too_large).toBe(0);
+  });
+
+  it('bumps user_version to 4', async () => {
+    const db = makeV3Db();
+    await runMigrations(createTestAdapter(db));
+    expect(db.pragma('user_version', { simple: true }) as number).toBe(4);
+  });
+
+  it('is idempotent — a second run does not re-add the column or error', async () => {
+    const db = makeV3Db();
+    const adapter = createTestAdapter(db);
+
+    await runMigrations(adapter);
+    await expect(runMigrations(adapter)).resolves.toBeUndefined();
+
+    const cols = db.prepare('PRAGMA table_info(note_images)').all() as { name: string }[];
+    expect(cols.filter((c) => c.name === 'upload_skipped_too_large')).toHaveLength(1);
   });
 });
