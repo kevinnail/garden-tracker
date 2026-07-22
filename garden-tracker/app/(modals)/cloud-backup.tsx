@@ -9,6 +9,8 @@ import { useSyncStore } from '@/src/store/syncStore';
 import { usePlannerStore } from '@/src/store/plannerStore';
 
 const SUPPORT_URL = 'https://kevinnail.com/crop-planner/support.html';
+const PRIVACY_URL = 'https://kevinnail.com/crop-planner/privacy.html';
+const TERMS_URL = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
 
 function formatLastSynced(timestamp: string | null): string {
   if (!timestamp) return 'Not synced yet';
@@ -153,6 +155,28 @@ export default function CloudBackupModal() {
                   <Text style={styles.linkBtnText}>Restore purchases</Text>
                 </Pressable>
                 {subError ? <Text style={styles.errorText}>{subError}</Text> : null}
+                <Text style={styles.legalText}>
+                  Auto-renewing subscription. Billed yearly to your Apple ID and renews
+                  automatically unless canceled at least 24 hours before the period ends. Manage or
+                  cancel in your Apple ID settings.
+                </Text>
+                <View style={styles.legalLinks}>
+                  <Pressable
+                    onPress={() => Linking.openURL(TERMS_URL)}
+                    accessibilityRole="link"
+                    accessibilityLabel="Terms of Use"
+                  >
+                    <Text style={styles.legalLinkText}>Terms of Use</Text>
+                  </Pressable>
+                  <Text style={styles.legalDivider}>·</Text>
+                  <Pressable
+                    onPress={() => Linking.openURL(PRIVACY_URL)}
+                    accessibilityRole="link"
+                    accessibilityLabel="Privacy Policy"
+                  >
+                    <Text style={styles.legalLinkText}>Privacy Policy</Text>
+                  </Pressable>
+                </View>
               </View>
             )}
 
@@ -264,6 +288,11 @@ const styles = StyleSheet.create({
 
   linkBtn: { paddingVertical: 8, alignItems: 'center' },
   linkBtnText: { color: '#7dcea0', fontSize: 14, fontWeight: '600' },
+
+  legalText: { color: '#777', fontSize: 11, lineHeight: 16, marginTop: 10 },
+  legalLinks: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
+  legalLinkText: { color: '#7dcea0', fontSize: 12, fontWeight: '600' },
+  legalDivider: { color: '#666', fontSize: 12 },
 
   errorText: { color: '#e06666', fontSize: 13, marginTop: 4 },
   noticeText: { color: '#d8b45c', fontSize: 13, marginTop: 4 },
