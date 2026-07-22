@@ -411,7 +411,9 @@ const SYNC_ACCOUNT_KEY = 'sync_account_user_id';
  * bytes *before* the push (so their rows are pushable in the same event), then
  * download newly-pulled bytes and clean up tombstoned files *after* the pull.
  */
-export async function runSync(accountUserId: string): Promise<{ lastSyncAt: string }> {
+export async function runSync(
+  accountUserId: string,
+): Promise<{ lastSyncAt: string; imagesSkippedTooLarge: number }> {
   const db = (await getDb()) as unknown as SyncDb;
 
   const stampedAccountId = await getSetting(db, SYNC_ACCOUNT_KEY);
@@ -432,7 +434,7 @@ export async function runSync(accountUserId: string): Promise<{ lastSyncAt: stri
 
   // Upload before collecting: a successful upload sets s3_key + stamps updated_at
   // to syncStartedAt, so the row is picked up by this same push.
-  await uploadPendingImages(syncStartedAt);
+  const imagesSkippedTooLarge = await uploadPendingImages(syncStartedAt);
 
   const lastPushedAt = (await getSetting(db, 'last_pushed_at')) ?? '';
   const payload = await collectChanges(lastPushedAt);
@@ -458,5 +460,5 @@ export async function runSync(accountUserId: string): Promise<{ lastSyncAt: stri
   await downloadPendingImages();
   await cleanupTombstonedImages();
 
-  return { lastSyncAt: pull.last_sync_at };
+  return { lastSyncAt: pull.last_sync_at, imagesSkippedTooLarge };
 }
