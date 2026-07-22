@@ -8,7 +8,7 @@ let _db: SQLite.SQLiteDatabase | null = null;
 let _dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
 // Current local schema version. Bump when adding a migration step.
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 // Tables that will be synced to the cloud (Slices E/F). Each needs a nullable
 // `deleted_at` tombstone column. `note_images` is created with the column in
@@ -63,6 +63,11 @@ async function columnExists(db: MigrationDb, table: string, column: string): Pro
  * v2 → v3: note image sync (Slice F). Create the `note_images` table (9th synced
  * table) fresh with all sync columns. No existing table is touched.
  *
+ * v3 → v4: add device-local `upload_skipped_too_large` to `note_images`. Set to 1
+ * for an image that exceeds MAX_IMAGE_BYTES so the upload pass permanently skips it
+ * instead of re-hitting the server's 400 IMAGE_TOO_LARGE on every sync. Never on
+ * the wire (like `local_uri`).
+ *
  * All steps are additive, idempotent, and forward-only — column guards make
  * each a no-op on DBs already carrying it (fresh installs built via SCHEMA_SQL,
  * or a re-run), and they apply to existing App Store DBs that predate the
@@ -101,6 +106,13 @@ export async function runMigrations(db: MigrationDb): Promise<void> {
 
   // v2 → v3: note_images table (idempotent — CREATE TABLE/INDEX IF NOT EXISTS).
   await db.execAsync(NOTE_IMAGES_SQL);
+
+  // v3 → v4: device-local skip flag for oversize images (never synced).
+  if (!(await columnExists(db, 'note_images', 'upload_skipped_too_large'))) {
+    await db.execAsync(
+      `ALTER TABLE note_images ADD COLUMN upload_skipped_too_large INTEGER NOT NULL DEFAULT 0`,
+    );
+  }
 
   await db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
 }
