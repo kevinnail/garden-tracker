@@ -39,8 +39,18 @@ interface WeekCell {
 // ---------------------------------------------------------------------------
 
 const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ];
 
 /**
@@ -120,7 +130,6 @@ export default function ColumnHeader({ calendarStart }: Props) {
 
   return (
     <View style={[styles.container, { width: totalWidth }]}>
-
       {/* ── Row 1: Year color strip ── */}
       <View style={styles.yearRow}>
         {yearBlocks.map((block) => (
@@ -187,7 +196,6 @@ export default function ColumnHeader({ calendarStart }: Props) {
           </View>
         ))}
       </View>
-
     </View>
   );
 }

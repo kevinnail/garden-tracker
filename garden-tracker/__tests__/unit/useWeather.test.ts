@@ -10,7 +10,13 @@
 // *
 // * ==================================================
 
-import { wmoLabel, wmoEmoji, classifyWeatherError, fetchWeather, localDateStr } from '@/src/utils/weatherUtils';
+import {
+  wmoLabel,
+  wmoEmoji,
+  classifyWeatherError,
+  fetchWeather,
+  localDateStr,
+} from '@/src/utils/weatherUtils';
 
 // ── localDateStr ──────────────────────────────────────────────────────────────
 
@@ -28,10 +34,10 @@ describe('localDateStr', () => {
 
 describe('wmoLabel', () => {
   it.each([
-    [0,  'Clear'],
-    [1,  'Cloudy'],
-    [2,  'Cloudy'],
-    [3,  'Cloudy'],
+    [0, 'Clear'],
+    [1, 'Cloudy'],
+    [2, 'Cloudy'],
+    [3, 'Cloudy'],
     [45, 'Fog'],
     [48, 'Fog'],
     [51, 'Drizzle'],
@@ -158,32 +164,32 @@ describe('classifyWeatherError', () => {
 
 const MOCK_RESPONSE = {
   current: {
-    time:                   '2026-04-13T12:00',
-    temperature_2m:         68.5,
-    relative_humidity_2m:   65,
-    apparent_temperature:   66.2,
-    weather_code:           0,
-    wind_speed_10m:         10.5,
-    precipitation:          0.0,
+    time: '2026-04-13T12:00',
+    temperature_2m: 68.5,
+    relative_humidity_2m: 65,
+    apparent_temperature: 66.2,
+    weather_code: 0,
+    wind_speed_10m: 10.5,
+    precipitation: 0.0,
   },
   hourly: {
-    time:                     ['2026-04-13T12:00', '2026-04-13T13:00', '2026-04-13T14:00'],
-    temperature_2m:           [68.5,               70.1,               71.3              ],
-    relative_humidity_2m:     [65,                 62,                 60                ],
-    precipitation_probability:[0,                  10,                 20                ],
-    precipitation:            [0.0,                0.0,                0.01              ],
-    weather_code:             [0,                  0,                  1                 ],
-    wind_speed_10m:           [10.5,               11.0,               12.3              ],
+    time: ['2026-04-13T12:00', '2026-04-13T13:00', '2026-04-13T14:00'],
+    temperature_2m: [68.5, 70.1, 71.3],
+    relative_humidity_2m: [65, 62, 60],
+    precipitation_probability: [0, 10, 20],
+    precipitation: [0.0, 0.0, 0.01],
+    weather_code: [0, 0, 1],
+    wind_speed_10m: [10.5, 11.0, 12.3],
   },
   daily: {
-    time:                         ['2026-04-13', '2026-04-14', '2026-04-15'],
-    weather_code:                 [0,            61,           95           ],
-    temperature_2m_max:           [72.4,         65.1,         58.9         ],
-    temperature_2m_min:           [52.3,         48.7,         45.0         ],
-    precipitation_sum:            [0.0,          0.34,         1.10         ],
-    precipitation_probability_max:[0,            70,           90           ],
-    uv_index_max:                 [8.2,          4.5,          2.0          ],
-    wind_speed_10m_max:           [10.5,         18.3,         25.0         ],
+    time: ['2026-04-13', '2026-04-14', '2026-04-15'],
+    weather_code: [0, 61, 95],
+    temperature_2m_max: [72.4, 65.1, 58.9],
+    temperature_2m_min: [52.3, 48.7, 45.0],
+    precipitation_sum: [0.0, 0.34, 1.1],
+    precipitation_probability_max: [0, 70, 90],
+    uv_index_max: [8.2, 4.5, 2.0],
+    wind_speed_10m_max: [10.5, 18.3, 25.0],
   },
 };
 
@@ -197,7 +203,9 @@ function mockFetch(body: unknown, status = 200) {
 }
 
 describe('fetchWeather', () => {
-  afterEach(() => { jest.restoreAllMocks(); });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it('zips daily arrays into DayForecast objects', async () => {
     mockFetch(MOCK_RESPONSE);
@@ -206,22 +214,22 @@ describe('fetchWeather', () => {
     expect(days).toHaveLength(3);
 
     expect(days[0]).toMatchObject({
-      date:      '2026-04-13',
-      code:      0,
-      tempMax:   72,
-      tempMin:   52,
-      precipIn:  0.0,
+      date: '2026-04-13',
+      code: 0,
+      tempMax: 72,
+      tempMin: 52,
+      precipIn: 0.0,
       precipPct: 0,
-      uvIndex:   8,
-      windMph:   11,
+      uvIndex: 8,
+      windMph: 11,
     });
 
     expect(days[1]).toMatchObject({
-      date:      '2026-04-14',
-      code:      61,
-      tempMax:   65,
-      tempMin:   49,
-      precipIn:  0.34,
+      date: '2026-04-14',
+      code: 61,
+      tempMax: 65,
+      tempMin: 49,
+      precipIn: 0.34,
       precipPct: 70,
     });
   });
@@ -229,22 +237,22 @@ describe('fetchWeather', () => {
   it('rounds temperatures, UV, and wind', async () => {
     mockFetch(MOCK_RESPONSE);
     const { days } = await fetchWeather(45.0, -93.0);
-    expect(days[0].tempMax).toBe(72);   // Math.round(72.4)
-    expect(days[0].tempMin).toBe(52);   // Math.round(52.3)
-    expect(days[0].uvIndex).toBe(8);    // Math.round(8.2)
-    expect(days[0].windMph).toBe(11);   // Math.round(10.5)
+    expect(days[0].tempMax).toBe(72); // Math.round(72.4)
+    expect(days[0].tempMin).toBe(52); // Math.round(52.3)
+    expect(days[0].uvIndex).toBe(8); // Math.round(8.2)
+    expect(days[0].windMph).toBe(11); // Math.round(10.5)
   });
 
   it('defaults precipIn and precipPct to 0 when null in response', async () => {
     const sparse = {
       current: MOCK_RESPONSE.current,
-      hourly:  MOCK_RESPONSE.hourly,
+      hourly: MOCK_RESPONSE.hourly,
       daily: {
         ...MOCK_RESPONSE.daily,
-        precipitation_sum:            [null, null, null],
-        precipitation_probability_max:[null, null, null],
-        uv_index_max:                 [null, null, null],
-        wind_speed_10m_max:           [null, null, null],
+        precipitation_sum: [null, null, null],
+        precipitation_probability_max: [null, null, null],
+        uv_index_max: [null, null, null],
+        wind_speed_10m_max: [null, null, null],
       },
     };
     mockFetch(sparse);
@@ -280,12 +288,12 @@ describe('fetchWeather', () => {
     mockFetch(MOCK_RESPONSE);
     const { current } = await fetchWeather(45.0, -93.0);
     expect(current).toMatchObject({
-      code:       0,
-      tempF:      69,   // Math.round(68.5)
-      feelsLikeF: 66,   // Math.round(66.2)
-      humidity:   65,
-      windMph:    11,   // Math.round(10.5)
-      precipIn:   0.0,
+      code: 0,
+      tempF: 69, // Math.round(68.5)
+      feelsLikeF: 66, // Math.round(66.2)
+      humidity: 65,
+      windMph: 11, // Math.round(10.5)
+      precipIn: 0.0,
     });
   });
 
@@ -294,7 +302,13 @@ describe('fetchWeather', () => {
     const { hourly } = await fetchWeather(45.0, -93.0);
     expect(hourly).toHaveLength(3); // mock only has 3 hourly entries
     expect(hourly[0].time).toBe('2026-04-13T12:00');
-    expect(hourly[0]).toMatchObject({ code: 0, tempF: 69, humidity: 65, precipPct: 0, windMph: 11 });
+    expect(hourly[0]).toMatchObject({
+      code: 0,
+      tempF: 69,
+      humidity: 65,
+      precipPct: 0,
+      windMph: 11,
+    });
     expect(hourly[2]).toMatchObject({ code: 1, tempF: 71, precipPct: 20 });
   });
 

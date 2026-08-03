@@ -16,6 +16,7 @@ import { router } from 'expo-router';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import * as MediaLibrary from 'expo-media-library';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -31,7 +32,14 @@ import {
   serializeWeeklyNoteEntries,
   updateWeeklyNoteEntry,
 } from '@/src/utils/noteUtils';
-import { copyImageToAppStorage, createNoteImage, deleteImageFile } from '@/src/utils/imageStorage';
+import {
+  copyImageToAppStorage,
+  createNoteImage,
+  deleteImageFile,
+  getImageByteSize,
+  resolveNoteImageUri,
+  MAX_IMAGE_BYTES,
+} from '@/src/utils/imageStorage';
 import NoteImageStrip from '@/src/components/notes/NoteImageStrip';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -59,19 +67,24 @@ function defaultDayOfWeek(weekDate: string): number {
   return 0;
 }
 
-export default function CellNoteForm({ cropId, weekDate, initialMode = 'view' }: CellNoteFormProps) {
+export default function CellNoteForm({
+  cropId,
+  weekDate,
+  initialMode = 'view',
+}: CellNoteFormProps) {
   const headerHeight = useHeaderHeight();
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
 
-  const rows = usePlannerStore(s => s.rows);
-  const saveCellNote = usePlannerStore(s => s.saveCellNote);
-  const deleteNote = usePlannerStore(s => s.deleteNote);
+  const rows = usePlannerStore((s) => s.rows);
+  const saveCellNote = usePlannerStore((s) => s.saveCellNote);
+  const deleteNote = usePlannerStore((s) => s.deleteNote);
+  const noteImageUris = usePlannerStore((s) => s.noteImageUris);
 
-  const cropRow = rows.find(row => row.type === 'crop_row' && row.crop.id === cropId);
+  const cropRow = rows.find((row) => row.type === 'crop_row' && row.crop.id === cropId);
   const isMushroomCrop = cropRow?.type === 'crop_row' && cropRow.crop.record_type === 'mushroom';
 
-  const note = cropRow?.type === 'crop_row' ? cropRow.notesByWeek[weekDate] ?? null : null;
+  const note = cropRow?.type === 'crop_row' ? (cropRow.notesByWeek[weekDate] ?? null) : null;
 
   const [entries, setEntries] = useState<WeeklyNoteEntry[]>([]);
   const [draft, setDraft] = useState('');
@@ -113,26 +126,27 @@ export default function CellNoteForm({ cropId, weekDate, initialMode = 'view' }:
 
   const cropName = cropRow?.type === 'crop_row' ? cropRow.crop.name : 'Weekly note';
   const editingEntry = useMemo(
-    () => entries.find(entry => entry.id === editingEntryId) ?? null,
-    [editingEntryId, entries]
+    () => entries.find((entry) => entry.id === editingEntryId) ?? null,
+    [editingEntryId, entries],
   );
   const entriesByDay = useMemo(
-    () => DAYS
-      .map((day, index) => ({
+    () =>
+      DAYS.map((day, index) => ({
         day,
         index,
         date: dateForWeekEntry(weekDate, index),
-        entries: entries.filter(entry => entry.day_of_week === index),
-      }))
-      .filter(group => group.entries.length > 0),
-    [entries, weekDate]
+        entries: entries.filter((entry) => entry.day_of_week === index),
+      })).filter((group) => group.entries.length > 0),
+    [entries, weekDate],
   );
 
   const persistEntries = async (nextEntries: WeeklyNoteEntry[]) => {
     if (saveInFlight.current) return false;
     saveInFlight.current = true;
 
-    const filtered = nextEntries.filter(entry => entry.text.trim().length > 0 || (entry.images?.length ?? 0) > 0);
+    const filtered = nextEntries.filter(
+      (entry) => entry.text.trim().length > 0 || (entry.images?.length ?? 0) > 0,
+    );
     setSaving(true);
 
     try {
@@ -167,20 +181,32 @@ export default function CellNoteForm({ cropId, weekDate, initialMode = 'view' }:
     // Delete files for pre-existing images the user removed during this edit
     if (editingEntry) {
       for (const originalId of sessionOriginalImageIds.current) {
-        if (!pendingImages.find(i => i.id === originalId)) {
-          const img = editingEntry.images?.find(i => i.id === originalId);
+        if (!pendingImages.find((i) => i.id === originalId)) {
+          const img = editingEntry.images?.find((i) => i.id === originalId);
           if (img) deleteImageFile(img.uri);
         }
       }
     }
 
     const nextEntries = editingEntry
-      ? entries.map(entry => (
+      ? entries.map((entry) =>
           entry.id === editingEntry.id
-            ? updateWeeklyNoteEntry(entry, selectedDay, trimmed, pendingImages.length > 0 ? pendingImages : undefined)
-            : entry
-        ))
-      : [...entries, createWeeklyNoteEntry(selectedDay, trimmed, pendingImages.length > 0 ? pendingImages : undefined)];
+            ? updateWeeklyNoteEntry(
+                entry,
+                selectedDay,
+                trimmed,
+                pendingImages.length > 0 ? pendingImages : undefined,
+              )
+            : entry,
+        )
+      : [
+          ...entries,
+          createWeeklyNoteEntry(
+            selectedDay,
+            trimmed,
+            pendingImages.length > 0 ? pendingImages : undefined,
+          ),
+        ];
 
     const saved = await persistEntries(nextEntries);
     if (!saved) return;
@@ -192,20 +218,23 @@ export default function CellNoteForm({ cropId, weekDate, initialMode = 'view' }:
     sessionOriginalImageIds.current = new Set();
     setEditingEntryId(null);
     setSelectedDay(defaultDayOfWeek(weekDate));
-    if (initialMode === 'view' && sortedEntries.length > 0) {
+    // Collapse the composer back to the list after any successful save so the
+    // just-saved entry is visibly there — the previous behavior left the empty
+    // composer open in compose mode, which read as "did it save?".
+    if (sortedEntries.length > 0) {
       setComposerOpen(false);
     }
   };
 
   const handleDeleteEntry = async (entryId: string) => {
-    const entryToDelete = entries.find(e => e.id === entryId);
+    const entryToDelete = entries.find((e) => e.id === entryId);
     if (entryToDelete?.images) {
       for (const img of entryToDelete.images) {
         deleteImageFile(img.uri);
       }
     }
 
-    const nextEntries = entries.filter(entry => entry.id !== entryId);
+    const nextEntries = entries.filter((entry) => entry.id !== entryId);
     const saved = await persistEntries(nextEntries);
     if (!saved) return;
 
@@ -227,7 +256,7 @@ export default function CellNoteForm({ cropId, weekDate, initialMode = 'view' }:
     setDraft(entry.text);
     setSelectedDay(entry.day_of_week);
     setPendingImages(entry.images ?? []);
-    sessionOriginalImageIds.current = new Set((entry.images ?? []).map(img => img.id));
+    sessionOriginalImageIds.current = new Set((entry.images ?? []).map((img) => img.id));
     setComposerOpen(true);
   };
 
@@ -257,6 +286,24 @@ export default function CellNoteForm({ cropId, weekDate, initialMode = 'view' }:
     setComposerOpen(true);
   };
 
+  // Shared tail for both pickers: reject an over-cap image up front (the server
+  // signs the same MAX_IMAGE_BYTES into the upload URL, so an oversize file would
+  // otherwise fail its S3 PUT forever), then persist and attach it.
+  const attachPickedImage = (asset: ImagePicker.ImagePickerAsset) => {
+    const byteSize = asset.fileSize ?? getImageByteSize(asset.uri);
+    if (byteSize != null && byteSize > MAX_IMAGE_BYTES) {
+      const limitMb = Math.floor(MAX_IMAGE_BYTES / (1024 * 1024));
+      Alert.alert('Image too large', `Please choose an image under ${limitMb} MB.`);
+      return;
+    }
+    try {
+      const persistentUri = copyImageToAppStorage(asset.uri);
+      setPendingImages((prev) => [...prev, createNoteImage(persistentUri)]);
+    } catch {
+      Alert.alert('Error', 'Could not attach photo.');
+    }
+  };
+
   const pickFromCamera = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
@@ -265,33 +312,40 @@ export default function CellNoteForm({ cropId, weekDate, initialMode = 'view' }:
     }
     const result = await ImagePicker.launchCameraAsync({ mediaTypes: 'images', quality: 0.85 });
     if (result.canceled || !result.assets[0]) return;
+    // launchCameraAsync hands us a private copy that exists nowhere else — if the
+    // app is ever deleted before the photo uploads, the shot is gone. Save it to
+    // the camera roll too (add-only permission). Best-effort: a denied permission
+    // or save failure must never block attaching the photo to the note.
     try {
-      const persistentUri = copyImageToAppStorage(result.assets[0].uri);
-      setPendingImages(prev => [...prev, createNoteImage(persistentUri)]);
-    } catch {
-      Alert.alert('Error', 'Could not attach photo.');
+      const { granted } = await MediaLibrary.requestPermissionsAsync(true);
+      if (granted) {
+        await MediaLibrary.saveToLibraryAsync(result.assets[0].uri);
+      }
+    } catch (error) {
+      if (__DEV__) {
+        console.warn('Failed to save camera photo to the photo library.', error);
+      }
     }
+    attachPickedImage(result.assets[0]);
   };
 
   const pickFromLibrary = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', quality: 0.85 });
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: 'images',
+      quality: 0.85,
+    });
     if (result.canceled || !result.assets[0]) return;
-    try {
-      const persistentUri = copyImageToAppStorage(result.assets[0].uri);
-      setPendingImages(prev => [...prev, createNoteImage(persistentUri)]);
-    } catch {
-      Alert.alert('Error', 'Could not attach photo.');
-    }
+    attachPickedImage(result.assets[0]);
   };
 
   const handleRemoveImage = (imageId: string) => {
-    const img = pendingImages.find(i => i.id === imageId);
+    const img = pendingImages.find((i) => i.id === imageId);
     if (!img) return;
     // Only delete file immediately if it's new this session (not yet in DB)
     if (!sessionOriginalImageIds.current.has(imageId)) {
       deleteImageFile(img.uri);
     }
-    setPendingImages(prev => prev.filter(i => i.id !== imageId));
+    setPendingImages((prev) => prev.filter((i) => i.id !== imageId));
   };
 
   const handleSecondaryAction = () => {
@@ -330,9 +384,23 @@ export default function CellNoteForm({ cropId, weekDate, initialMode = 'view' }:
           keyboardDismissMode="interactive"
         >
           {/* Header — collapsed to one line in landscape to save vertical space */}
-          <View style={[styles.header, isMushroomCrop && styles.headerMushroom, isLandscape && styles.headerCompact]}>
+          <View
+            style={[
+              styles.header,
+              isMushroomCrop && styles.headerMushroom,
+              isLandscape && styles.headerCompact,
+            ]}
+          >
             <Text style={styles.cropName}>{cropName}</Text>
-            <Text style={[styles.weekLabel, isMushroomCrop && styles.weekLabelMushroom, isLandscape && styles.weekLabelCompact]}>{formatWeekRangeLabel(weekDate)}</Text>
+            <Text
+              style={[
+                styles.weekLabel,
+                isMushroomCrop && styles.weekLabelMushroom,
+                isLandscape && styles.weekLabelCompact,
+              ]}
+            >
+              {formatWeekRangeLabel(weekDate)}
+            </Text>
           </View>
 
           <View style={styles.sectionHeader}>
@@ -356,12 +424,15 @@ export default function CellNoteForm({ cropId, weekDate, initialMode = 'view' }:
               <View style={styles.emptyCard}>
                 <Text style={styles.emptyCardTitle}>No entries yet</Text>
                 {!isLandscape && (
-                  <Text style={styles.emptyCardText}>Long press a week in the planner to jump right into adding. Once notes exist, a quick tap brings you here to read them first.</Text>
+                  <Text style={styles.emptyCardText}>
+                    Long press a week in the planner to jump right into adding. Once notes exist, a
+                    quick tap brings you here to read them first.
+                  </Text>
                 )}
               </View>
             ) : (
               <View style={styles.weekPanel}>
-                {entriesByDay.map(group => (
+                {entriesByDay.map((group) => (
                   <View key={group.index} style={styles.daySection}>
                     <Text style={styles.daySectionLabel}>
                       {group.date
@@ -383,17 +454,26 @@ export default function CellNoteForm({ cropId, weekDate, initialMode = 'view' }:
                         ]}
                       >
                         <View style={styles.entryHeader}>
-                          <Text style={styles.entryLabel}>{formatWeekEntryLabel(weekDate, entry)}</Text>
+                          <Text style={styles.entryLabel}>
+                            {formatWeekEntryLabel(weekDate, entry)}
+                          </Text>
                           <View style={styles.entryActions}>
                             <Pressable style={styles.inlineBtn} onPress={() => beginEdit(entry)}>
                               <Text style={styles.inlineBtnText}>Edit</Text>
                             </Pressable>
-                            <Pressable style={styles.inlineBtn} onPress={() => handleDeleteEntry(entry.id)}>
-                              <Text style={[styles.inlineBtnText, styles.deleteInlineText]}>Delete</Text>
+                            <Pressable
+                              style={styles.inlineBtn}
+                              onPress={() => handleDeleteEntry(entry.id)}
+                            >
+                              <Text style={[styles.inlineBtnText, styles.deleteInlineText]}>
+                                Delete
+                              </Text>
                             </Pressable>
                           </View>
                         </View>
-                        {entry.text.length > 0 && <Text style={styles.entryBody}>{entry.text}</Text>}
+                        {entry.text.length > 0 && (
+                          <Text style={styles.entryBody}>{entry.text}</Text>
+                        )}
                         <NoteImageStrip images={entry.images ?? []} />
                       </View>
                     ))}
@@ -407,7 +487,9 @@ export default function CellNoteForm({ cropId, weekDate, initialMode = 'view' }:
             <View style={styles.composerCard}>
               <View style={styles.composerHeader}>
                 <View style={styles.composerHeaderText}>
-                  <Text style={styles.composerTitle}>{editingEntry ? 'Edit note' : 'Add note'}</Text>
+                  <Text style={styles.composerTitle}>
+                    {editingEntry ? 'Edit note' : 'Add note'}
+                  </Text>
                   {!keyboardOpen && !draft.trim() && !isLandscape && (
                     <Text style={styles.composerSubtitle}>
                       {editingEntry
@@ -418,14 +500,26 @@ export default function CellNoteForm({ cropId, weekDate, initialMode = 'view' }:
                 </View>
               </View>
 
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dayPicker} keyboardShouldPersistTaps="handled">
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.dayPicker}
+                keyboardShouldPersistTaps="handled"
+              >
                 {DAYS.map((day, index) => (
                   <Pressable
                     key={day}
                     style={[styles.dayChip, selectedDay === index && styles.dayChipSelected]}
                     onPress={() => setSelectedDay(index)}
                   >
-                    <Text style={[styles.dayChipText, selectedDay === index && styles.dayChipTextSelected]}>{day}</Text>
+                    <Text
+                      style={[
+                        styles.dayChipText,
+                        selectedDay === index && styles.dayChipTextSelected,
+                      ]}
+                    >
+                      {day}
+                    </Text>
                   </Pressable>
                 ))}
               </ScrollView>
@@ -443,18 +537,47 @@ export default function CellNoteForm({ cropId, weekDate, initialMode = 'view' }:
               />
 
               <View style={styles.imageAttachRow}>
-                <Pressable style={styles.imagePickerBtn} onPress={pickFromCamera} disabled={pendingImages.length >= 5}>
-                  <Ionicons name="camera-outline" size={18} color={pendingImages.length >= 5 ? '#444' : '#3575f0'} />
+                <Pressable
+                  style={styles.imagePickerBtn}
+                  onPress={pickFromCamera}
+                  disabled={pendingImages.length >= 5}
+                >
+                  <Ionicons
+                    name="camera-outline"
+                    size={18}
+                    color={pendingImages.length >= 5 ? '#444' : '#3575f0'}
+                  />
                 </Pressable>
-                <Pressable style={styles.imagePickerBtn} onPress={pickFromLibrary} disabled={pendingImages.length >= 5}>
-                  <Ionicons name="images-outline" size={18} color={pendingImages.length >= 5 ? '#444' : '#3575f0'} />
+                <Pressable
+                  style={styles.imagePickerBtn}
+                  onPress={pickFromLibrary}
+                  disabled={pendingImages.length >= 5}
+                >
+                  <Ionicons
+                    name="images-outline"
+                    size={18}
+                    color={pendingImages.length >= 5 ? '#444' : '#3575f0'}
+                  />
                 </Pressable>
                 {pendingImages.length > 0 && (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pendingImagesScroll} contentContainerStyle={styles.pendingImagesContent}>
-                    {pendingImages.map(img => (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.pendingImagesScroll}
+                    contentContainerStyle={styles.pendingImagesContent}
+                  >
+                    {pendingImages.map((img) => (
                       <View key={img.id} style={styles.pendingThumb}>
-                        <Image source={{ uri: img.uri }} style={styles.pendingThumbImage} contentFit="cover" />
-                        <Pressable style={styles.removeImageBtn} onPress={() => handleRemoveImage(img.id)} hitSlop={6}>
+                        <Image
+                          source={{ uri: resolveNoteImageUri(img, noteImageUris) }}
+                          style={styles.pendingThumbImage}
+                          contentFit="cover"
+                        />
+                        <Pressable
+                          style={styles.removeImageBtn}
+                          onPress={() => handleRemoveImage(img.id)}
+                          hitSlop={6}
+                        >
                           <Text style={styles.removeImageText}>✕</Text>
                         </Pressable>
                       </View>
@@ -471,7 +594,9 @@ export default function CellNoteForm({ cropId, weekDate, initialMode = 'view' }:
                 ) : (
                   <Pressable
                     style={styles.secondaryBtn}
-                    onPress={entries.length > 0 ? () => setComposerOpen(false) : handleSecondaryAction}
+                    onPress={
+                      entries.length > 0 ? () => setComposerOpen(false) : handleSecondaryAction
+                    }
                     disabled={saving}
                   >
                     <Text style={styles.secondaryBtnText}>
@@ -481,9 +606,7 @@ export default function CellNoteForm({ cropId, weekDate, initialMode = 'view' }:
                 )}
 
                 <Pressable style={styles.primaryBtn} onPress={handleSaveEntry} disabled={saving}>
-                  <Text style={styles.primaryBtnText}>
-                    {editingEntry ? 'Save Note' : 'Add Note'}
-                  </Text>
+                  <Text style={styles.primaryBtnText}>Save Note</Text>
                 </Pressable>
               </View>
             </View>

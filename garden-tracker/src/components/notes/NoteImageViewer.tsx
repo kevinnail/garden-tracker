@@ -1,15 +1,10 @@
-import React, { useState } from 'react';
-import {
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
-} from 'react-native';
+import React, { useRef, useState } from 'react';
+import { Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
+import Toast from 'react-native-toast-message';
 
 import { NoteImage } from '@/src/types';
+import { PHOTO_UNAVAILABLE_TOAST } from './photoUnavailableToast';
 
 interface Props {
   images: NoteImage[];
@@ -19,19 +14,37 @@ interface Props {
 
 export default function NoteImageViewer({ images, initialIndex, onClose }: Props) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const [failedIds, setFailedIds] = useState<Set<string>>(new Set());
+  // Report each failed image once (onError can re-fire across renders/nav).
+  const reportedIds = useRef<Set<string>>(new Set());
   const { width, height } = useWindowDimensions();
 
   const current = images[currentIndex];
   if (!current) return null;
 
+  const handleImageError = (imageId: string) => {
+    setFailedIds((prev) => (prev.has(imageId) ? prev : new Set(prev).add(imageId)));
+    if (reportedIds.current.has(imageId)) return;
+    reportedIds.current.add(imageId);
+    Toast.show(PHOTO_UNAVAILABLE_TOAST);
+  };
+
   return (
     <Modal visible animationType="fade" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <Image
-          source={{ uri: current.uri }}
-          style={{ width, height }}
-          contentFit="contain"
-        />
+        {failedIds.has(current.id) ? (
+          <View style={[{ width, height }, styles.brokenView]}>
+            <Text style={styles.brokenIcon}>⚠</Text>
+            <Text style={styles.brokenText}>Photo unavailable</Text>
+          </View>
+        ) : (
+          <Image
+            source={{ uri: current.uri }}
+            style={{ width, height }}
+            contentFit="contain"
+            onError={() => handleImageError(current.id)}
+          />
+        )}
 
         <Pressable style={styles.closeBtn} onPress={onClose} hitSlop={16}>
           <Text style={styles.closeBtnText}>✕</Text>
@@ -41,17 +54,19 @@ export default function NoteImageViewer({ images, initialIndex, onClose }: Props
           <View style={styles.navRow}>
             <Pressable
               style={[styles.navBtn, currentIndex === 0 && styles.navBtnDisabled]}
-              onPress={() => currentIndex > 0 && setCurrentIndex(i => i - 1)}
+              onPress={() => currentIndex > 0 && setCurrentIndex((i) => i - 1)}
               hitSlop={16}
             >
               <Text style={styles.navBtnText}>‹</Text>
             </Pressable>
 
-            <Text style={styles.pageIndicator}>{currentIndex + 1} / {images.length}</Text>
+            <Text style={styles.pageIndicator}>
+              {currentIndex + 1} / {images.length}
+            </Text>
 
             <Pressable
               style={[styles.navBtn, currentIndex === images.length - 1 && styles.navBtnDisabled]}
-              onPress={() => currentIndex < images.length - 1 && setCurrentIndex(i => i + 1)}
+              onPress={() => currentIndex < images.length - 1 && setCurrentIndex((i) => i + 1)}
               hitSlop={16}
             >
               <Text style={styles.navBtnText}>›</Text>
@@ -69,6 +84,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  brokenView: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  brokenIcon: {
+    color: '#d8b45c',
+    fontSize: 40,
+    marginBottom: 8,
+  },
+  brokenText: {
+    color: '#8a929b',
+    fontSize: 15,
   },
   closeBtn: {
     position: 'absolute',

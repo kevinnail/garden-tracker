@@ -1,4 +1,5 @@
 import { getDb } from '@/src/db/database';
+import { TS_NOW, UUID4_SQL } from '@/src/db/schema';
 import { Task, TaskCompletion, TaskType, TodayTaskItem } from '@/src/types';
 import { formatDateKey, parseDateKey, toSunday } from '@/src/utils/dateUtils';
 
@@ -21,6 +22,15 @@ interface DashboardTaskRow {
 }
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+// Sync uses a pure per-row last-write-wins store keyed on uuid, with no cascade:
+// a crop only survives a remote tombstone if the client re-pushes the
+// crop_instances row itself with a newer updated_at. So when a task-level child
+// changes, bump the parent crop's updated_at too (unless it's locally
+// tombstoned) so it rides the next push batch and resurrects the crop under LWW.
+// This mirrors what editCrop does for stage edits via updateCropInstance.
+const TOUCH_CROP_SQL = `UPDATE crop_instances SET updated_at = ${TS_NOW} WHERE id = ? AND deleted_at IS NULL`;
+const TOUCH_CROP_BY_TASK_SQL = `UPDATE crop_instances SET updated_at = ${TS_NOW} WHERE id = (SELECT crop_instance_id FROM tasks WHERE id = ?) AND deleted_at IS NULL`;
 
 function utcMidnightMs(date: Date): number {
   return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
@@ -70,7 +80,7 @@ function isTaskScheduledOnDate(task: DashboardTaskRow, dueDate: Date): boolean {
 function countMissedOccurrences(
   task: DashboardTaskRow,
   mostRecentDueDate: Date,
-  completions: Set<string>
+  completions: Set<string>,
 ): number {
   const stepDays = task.frequency_weeks * 7;
   let count = 0;
@@ -86,7 +96,11 @@ function countMissedOccurrences(
   return count;
 }
 
-function buildDashboardItem(task: DashboardTaskRow, dueDate: Date, missed_count = 1): TodayTaskItem {
+function buildDashboardItem(
+  task: DashboardTaskRow,
+  dueDate: Date,
+  missed_count = 1,
+): TodayTaskItem {
   return {
     task_id: task.task_id,
     crop_instance_id: task.crop_instance_id,
@@ -152,7 +166,7 @@ async function getDashboardTasks(): Promise<DashboardTaskRow[]> {
       COALESCE((
         SELECT SUM(cs.duration_weeks)
         FROM crop_stages cs
-        WHERE cs.crop_instance_id = ci.id
+        WHERE cs.crop_instance_id = ci.id AND cs.deleted_at IS NULL
       ), 0) AS total_duration_weeks
     FROM tasks t
     JOIN task_types tt ON tt.id = t.task_type_id
@@ -161,7 +175,12 @@ async function getDashboardTasks(): Promise<DashboardTaskRow[]> {
     JOIN gardens g ON g.id = s.garden_id
     JOIN locations l ON l.id = g.location_id
     WHERE ci.archived = 0
-    ORDER BY l.order_index, g.order_index, s.order_index, ci.start_date, ci.id, t.id
+      AND t.deleted_at IS NULL
+      AND ci.deleted_at IS NULL
+      AND s.deleted_at IS NULL
+      AND g.deleted_at IS NULL
+      AND l.deleted_at IS NULL
+    ORDER BY l.order_index, g.order_index, s.order_index, ci.start_date, ci.uuid, t.uuid
   `);
 }
 
@@ -173,14 +192,18 @@ async function getCompletionSet(): Promise<Set<string>> {
     JOIN tasks t ON t.id = tc.task_id
     JOIN crop_instances ci ON ci.id = t.crop_instance_id
     WHERE ci.archived = 0
+      AND tc.deleted_at IS NULL
+      AND t.deleted_at IS NULL
+      AND ci.deleted_at IS NULL
   `);
 
-  return new Set((rows ?? []).map(row => `${row.task_id}:${row.completed_date}`));
+  return new Set((rows ?? []).map((row) => `${row.task_id}:${row.completed_date}`));
 }
 
 export async function getTasksForCrop(cropInstanceId: number): Promise<Task[]> {
   const db = await getDb();
-  return db.getAllAsync<Task>(`
+  return db.getAllAsync<Task>(
+    `
     SELECT
       t.id,
       t.crop_instance_id,
@@ -192,25 +215,31 @@ export async function getTasksForCrop(cropInstanceId: number): Promise<Task[]> {
       tt.name AS task_type_name
     FROM tasks t
     JOIN task_types tt ON tt.id = t.task_type_id
-    WHERE t.crop_instance_id = ?
-  `, cropInstanceId);
+    WHERE t.crop_instance_id = ? AND t.deleted_at IS NULL
+  `,
+    cropInstanceId,
+  );
 }
 
 export async function getCompletionsForCrop(cropInstanceId: number): Promise<TaskCompletion[]> {
   const db = await getDb();
-  return db.getAllAsync<TaskCompletion>(`
+  return db.getAllAsync<TaskCompletion>(
+    `
     SELECT tc.id, tc.task_id, tc.completed_date
     FROM task_completions tc
     JOIN tasks t ON t.id = tc.task_id
-    WHERE t.crop_instance_id = ?
-  `, cropInstanceId);
+    WHERE t.crop_instance_id = ? AND tc.deleted_at IS NULL AND t.deleted_at IS NULL
+  `,
+    cropInstanceId,
+  );
 }
 
 export async function getTasksForCrops(cropInstanceIds: number[]): Promise<Task[]> {
   if (cropInstanceIds.length === 0) return [];
   const db = await getDb();
   const placeholders = cropInstanceIds.map(() => '?').join(',');
-  return db.getAllAsync<Task>(`
+  return db.getAllAsync<Task>(
+    `
     SELECT
       t.id,
       t.crop_instance_id,
@@ -222,22 +251,27 @@ export async function getTasksForCrops(cropInstanceIds: number[]): Promise<Task[
       tt.name AS task_type_name
     FROM tasks t
     JOIN task_types tt ON tt.id = t.task_type_id
-    WHERE t.crop_instance_id IN (${placeholders})
-  `, ...cropInstanceIds);
+    WHERE t.crop_instance_id IN (${placeholders}) AND t.deleted_at IS NULL
+  `,
+    ...cropInstanceIds,
+  );
 }
 
 export async function getCompletionsForCrops(
-  cropInstanceIds: number[]
+  cropInstanceIds: number[],
 ): Promise<(TaskCompletion & { crop_instance_id: number })[]> {
   if (cropInstanceIds.length === 0) return [];
   const db = await getDb();
   const placeholders = cropInstanceIds.map(() => '?').join(',');
-  return db.getAllAsync<TaskCompletion & { crop_instance_id: number }>(`
+  return db.getAllAsync<TaskCompletion & { crop_instance_id: number }>(
+    `
     SELECT tc.id, tc.task_id, tc.completed_date, t.crop_instance_id
     FROM task_completions tc
     JOIN tasks t ON t.id = tc.task_id
-    WHERE t.crop_instance_id IN (${placeholders})
-  `, ...cropInstanceIds);
+    WHERE t.crop_instance_id IN (${placeholders}) AND tc.deleted_at IS NULL AND t.deleted_at IS NULL
+  `,
+    ...cropInstanceIds,
+  );
 }
 
 export async function getTaskTypes(): Promise<TaskType[]> {
@@ -250,43 +284,84 @@ export async function insertTask(
   taskTypeId: number,
   dayOfWeek: number,
   frequencyWeeks: number,
-  startOffsetWeeks: number
+  startOffsetWeeks: number,
 ): Promise<number> {
   const db = await getDb();
-  const result = await db.runAsync(
-    `INSERT INTO tasks (crop_instance_id, task_type_id, day_of_week, frequency_weeks, start_offset_weeks) VALUES (?, ?, ?, ?, ?)`,
-    cropInstanceId, taskTypeId, dayOfWeek, frequencyWeeks, startOffsetWeeks
-  );
-  return result.lastInsertRowId;
+  let insertedId = 0;
+  await db.withTransactionAsync(async () => {
+    const result = await db.runAsync(
+      `INSERT INTO tasks (uuid, crop_instance_id, task_type_id, day_of_week, frequency_weeks, start_offset_weeks, updated_at) VALUES ((${UUID4_SQL}), ?, ?, ?, ?, ?, ${TS_NOW})`,
+      cropInstanceId,
+      taskTypeId,
+      dayOfWeek,
+      frequencyWeeks,
+      startOffsetWeeks,
+    );
+    insertedId = result.lastInsertRowId;
+    await db.runAsync(TOUCH_CROP_SQL, cropInstanceId);
+  });
+  return insertedId;
 }
 
 export async function insertCompletion(taskId: number, weekDate: string): Promise<void> {
   const db = await getDb();
-  await db.runAsync(
-    `INSERT OR IGNORE INTO task_completions (task_id, completed_date) VALUES (?, ?)`,
-    taskId, weekDate
-  );
+  await db.withTransactionAsync(async () => {
+    // Revive on conflict: a prior uncomplete soft-deletes the row, which still
+    // occupies the UNIQUE(task_id, completed_date) slot, so INSERT OR IGNORE would
+    // silently no-op. Clearing deleted_at restores the completion.
+    await db.runAsync(
+      `INSERT INTO task_completions (uuid, task_id, completed_date, updated_at) VALUES ((${UUID4_SQL}), ?, ?, ${TS_NOW})
+       ON CONFLICT(task_id, completed_date) DO UPDATE SET deleted_at = NULL, updated_at = ${TS_NOW}`,
+      taskId,
+      weekDate,
+    );
+    await db.runAsync(TOUCH_CROP_BY_TASK_SQL, taskId);
+  });
 }
 
 export async function deleteCompletion(taskId: number, weekDate: string): Promise<void> {
   const db = await getDb();
-  await db.runAsync(
-    `DELETE FROM task_completions WHERE task_id = ? AND completed_date = ?`,
-    taskId, weekDate
-  );
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      `UPDATE task_completions SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW}
+       WHERE task_id = ? AND completed_date = ? AND deleted_at IS NULL`,
+      taskId,
+      weekDate,
+    );
+    await db.runAsync(TOUCH_CROP_BY_TASK_SQL, taskId);
+  });
 }
 
 export async function deleteTask(id: number): Promise<void> {
   const db = await getDb();
-  await db.runAsync(`DELETE FROM tasks WHERE id = ?`, id);
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      `UPDATE task_completions SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW} WHERE task_id = ? AND deleted_at IS NULL`,
+      id,
+    );
+    await db.runAsync(
+      `UPDATE tasks SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW} WHERE id = ?`,
+      id,
+    );
+    await db.runAsync(TOUCH_CROP_BY_TASK_SQL, id);
+  });
 }
 
 export async function updateTaskDay(id: number, dayOfWeek: number): Promise<void> {
   const db = await getDb();
-  await db.runAsync(`UPDATE tasks SET day_of_week = ? WHERE id = ?`, dayOfWeek, id);
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      `UPDATE tasks SET day_of_week = ?, updated_at = ${TS_NOW} WHERE id = ?`,
+      dayOfWeek,
+      id,
+    );
+    await db.runAsync(TOUCH_CROP_BY_TASK_SQL, id);
+  });
 }
 
-export async function getTodayAndOverdue(referenceDate: Date = new Date()): Promise<{ due: TodayTaskItem[]; overdue: TodayTaskItem[] }> {
+export async function getTodayAndOverdue(
+  referenceDate: Date = new Date(),
+): Promise<{ due: TodayTaskItem[]; overdue: TodayTaskItem[] }> {
   const today = new Date(referenceDate);
   today.setHours(0, 0, 0, 0);
 
@@ -294,16 +369,16 @@ export async function getTodayAndOverdue(referenceDate: Date = new Date()): Prom
 
   const todayWeekDate = formatDateKey(toSunday(today));
   const due = tasks
-    .filter(task => task.day_of_week === today.getDay())
-    .filter(task => isTaskScheduledOnDate(task, today))
-    .filter(task => !completions.has(`${task.task_id}:${todayWeekDate}`))
-    .map(task => buildDashboardItem(task, today))
+    .filter((task) => task.day_of_week === today.getDay())
+    .filter((task) => isTaskScheduledOnDate(task, today))
+    .filter((task) => !completions.has(`${task.task_id}:${todayWeekDate}`))
+    .map((task) => buildDashboardItem(task, today))
     .sort(compareDashboardItems);
 
   // For each task find the most recent *uncompleted* past occurrence, walking
   // backwards through the crop span until one is found or the span is exhausted.
   const overdue = tasks
-    .map(task => {
+    .map((task) => {
       const dayDelta = (7 + today.getDay() - task.day_of_week) % 7;
       const daysBack = dayDelta === 0 ? 7 : dayDelta;
       let dueDate = addDays(today, -daysBack);
@@ -319,7 +394,9 @@ export async function getTodayAndOverdue(referenceDate: Date = new Date()): Prom
       return null;
     })
     .filter((x): x is { task: DashboardTaskRow; dueDate: Date } => x !== null)
-    .map(({ task, dueDate }) => buildDashboardItem(task, dueDate, countMissedOccurrences(task, dueDate, completions)))
+    .map(({ task, dueDate }) =>
+      buildDashboardItem(task, dueDate, countMissedOccurrences(task, dueDate, completions)),
+    )
     .sort(compareDashboardItems);
 
   return { due, overdue };

@@ -1,5 +1,14 @@
-import React, { useMemo } from 'react';
-import { View, Pressable, Text, StyleSheet, useWindowDimensions, LayoutAnimation, UIManager, Platform } from 'react-native';
+import React from 'react';
+import {
+  View,
+  Pressable,
+  Text,
+  StyleSheet,
+  useWindowDimensions,
+  LayoutAnimation,
+  UIManager,
+  Platform,
+} from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -7,6 +16,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useShallow } from 'zustand/react/shallow';
 import { usePlannerStore } from '@/src/store/plannerStore';
 import { useTodayTick } from '@/src/hooks/useTodayTick';
+import { formatDateLabel } from '@/src/utils/dateUtils';
 import { useWeatherStore } from '@/src/store/weatherStore';
 import { wmoEmoji } from '@/src/hooks/useWeather';
 import Toast from 'react-native-toast-message';
@@ -40,14 +50,8 @@ function ViewToggle({
       accessibilityState={{ checked: active }}
       accessibilityLabel={label}
     >
-      <Ionicons
-        name={icon}
-        size={18}
-        color={active ? '#2ecc71' : '#666'}
-      />
-      <Text style={[styles.viewToggleLabel, active && styles.viewToggleLabelActive]}>
-        {label}
-      </Text>
+      <Ionicons name={icon} size={18} color={active ? '#2ecc71' : '#666'} />
+      <Text style={[styles.viewToggleLabel, active && styles.viewToggleLabelActive]}>{label}</Text>
     </Pressable>
   );
 }
@@ -56,46 +60,56 @@ function ViewToggle({
 // Main toolbar
 // ---------------------------------------------------------------------------
 export default function PlannerToolbar() {
-  // Re-render at midnight so `todayLabel` flips.
-  useTodayTick();
+  // Current local day (captured at rollover, not re-read each render).
+  const today = useTodayTick();
 
   const {
     hasSections,
-    showArchivedRows, toggleArchivedRows,
-    showTasks, toggleShowTasks,
-    showCursor, toggleShowCursor,
-    showNoteIndicators, toggleShowNoteIndicators,
-    cellZoomLevel, setCellZoomLevel,
-    showViewControls, toggleViewControls,
-    dueTodayCount, overdueCount,
-  } = usePlannerStore(useShallow(s => ({
-    hasSections: s.rows.some(r => r.type === 'section_header'),
-    showArchivedRows: s.showArchivedRows,
-    toggleArchivedRows: s.toggleArchivedRows,
-    showTasks: s.showTasks,
-    toggleShowTasks: s.toggleShowTasks,
-    showCursor: s.showCursor,
-    toggleShowCursor: s.toggleShowCursor,
-    showNoteIndicators: s.showNoteIndicators,
-    toggleShowNoteIndicators: s.toggleShowNoteIndicators,
-    cellZoomLevel: s.cellZoomLevel,
-    setCellZoomLevel: s.setCellZoomLevel,
-    showViewControls: s.showViewControls,
-    toggleViewControls: s.toggleViewControls,
-    dueTodayCount: s.todayDueTasks.length,
-    overdueCount: s.todayOverdueTasks.length,
-  })));
+    showArchivedRows,
+    toggleArchivedRows,
+    showTasks,
+    toggleShowTasks,
+    showCursor,
+    toggleShowCursor,
+    showNoteIndicators,
+    toggleShowNoteIndicators,
+    cellZoomLevel,
+    setCellZoomLevel,
+    showViewControls,
+    toggleViewControls,
+    dueTodayCount,
+    overdueCount,
+  } = usePlannerStore(
+    useShallow((s) => ({
+      hasSections: s.rows.some((r) => r.type === 'section_header'),
+      showArchivedRows: s.showArchivedRows,
+      toggleArchivedRows: s.toggleArchivedRows,
+      showTasks: s.showTasks,
+      toggleShowTasks: s.toggleShowTasks,
+      showCursor: s.showCursor,
+      toggleShowCursor: s.toggleShowCursor,
+      showNoteIndicators: s.showNoteIndicators,
+      toggleShowNoteIndicators: s.toggleShowNoteIndicators,
+      cellZoomLevel: s.cellZoomLevel,
+      setCellZoomLevel: s.setCellZoomLevel,
+      showViewControls: s.showViewControls,
+      toggleViewControls: s.toggleViewControls,
+      dueTodayCount: s.todayDueTasks.length,
+      overdueCount: s.todayOverdueTasks.length,
+    })),
+  );
 
-  const weather = useWeatherStore(s => s.weather);
+  const weather = useWeatherStore((s) => s.weather);
   const todayWeather = weather.status === 'ok' ? weather.days[0] : null;
-  const todayCount    = dueTodayCount + overdueCount;
+  const todayCount = dueTodayCount + overdueCount;
 
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
 
-  const todayLabel = useMemo(() => new Date().toLocaleDateString('en-US', {
-    weekday: 'long', month: 'long', day: 'numeric',
-  }), []);
+  // Format the day captured by useTodayTick (not a render-time `new Date()`) so
+  // it can't catch a value from Hermes' ~1hr timezone-offset-cache wobble near
+  // midnight and freeze there.
+  const todayLabel = formatDateLabel(today);
 
   const handleViewToggle = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -146,21 +160,25 @@ export default function PlannerToolbar() {
       ]}
       onPress={() => router.navigate('/(tabs)/today')}
       accessibilityRole="button"
-      accessibilityLabel={todayCount > 0 ? `Today: ${dueTodayCount} due, ${overdueCount} overdue` : 'Today: all clear'}
+      accessibilityLabel={
+        todayCount > 0 ? `Today: ${dueTodayCount} due, ${overdueCount} overdue` : 'Today: all clear'
+      }
       accessibilityHint="Opens the Today dashboard"
     >
       <View style={styles.todayBannerMain}>
-        <Text style={styles.todayBannerTitle}>Today</Text>
+        <Text style={[styles.todayBannerTitle, styles.todayBannerTitleLabel]} numberOfLines={1}>
+          {todayLabel}
+        </Text>
         {!isLandscape && (
           <Text style={styles.todayBannerText} numberOfLines={1}>
-            {todayCount > 0 ? (
+            {todayCount > 0 && (
               <>
                 <Text style={dueTodayCount > 0 ? styles.todayBannerDueToday : undefined}>
                   {`${dueTodayCount} due today`}
                 </Text>
                 {` · ${overdueCount} overdue`}
               </>
-            ) : todayLabel}
+            )}
           </Text>
         )}
         {isLandscape && todayCount > 0 && (
@@ -225,6 +243,15 @@ export default function PlannerToolbar() {
           View {showViewControls ? '▲' : '▾'}
         </Text>
       </Pressable>
+      <Pressable
+        style={styles.cloudBtn}
+        onPress={() => router.push('/(modals)/cloud-backup')}
+        accessibilityRole="button"
+        accessibilityLabel="Cloud backup"
+        accessibilityHint="Opens the cloud backup and account screen"
+      >
+        <Ionicons name="cloud-outline" size={15} color="#666" />
+      </Pressable>
       {__DEV__ && (
         <Pressable
           style={styles.debugBtn}
@@ -251,7 +278,7 @@ export default function PlannerToolbar() {
           label="Tasks"
           active={showTasks}
           onPress={toggleShowTasks}
-          />
+        />
         <ViewToggle
           icon="locate-outline"
           label="Today"
@@ -280,10 +307,12 @@ export default function PlannerToolbar() {
           disabled={cellZoomLevel <= 1}
           accessibilityLabel="Zoom out"
         >
-          <Text style={[styles.zoomBtnText, cellZoomLevel <= 1 && styles.zoomBtnTextDisabled]}>−</Text>
+          <Text style={[styles.zoomBtnText, cellZoomLevel <= 1 && styles.zoomBtnTextDisabled]}>
+            −
+          </Text>
         </Pressable>
         <View style={styles.zoomDots}>
-          {[1, 2, 3, 4, 5].map(l => (
+          {[1, 2, 3, 4, 5].map((l) => (
             <View key={l} style={[styles.dot, l <= cellZoomLevel && styles.dotActive]} />
           ))}
         </View>
@@ -293,7 +322,9 @@ export default function PlannerToolbar() {
           disabled={cellZoomLevel >= 5}
           accessibilityLabel="Zoom in"
         >
-          <Text style={[styles.zoomBtnText, cellZoomLevel >= 5 && styles.zoomBtnTextDisabled]}>+</Text>
+          <Text style={[styles.zoomBtnText, cellZoomLevel >= 5 && styles.zoomBtnTextDisabled]}>
+            +
+          </Text>
         </Pressable>
       </View>
     </View>
@@ -362,17 +393,19 @@ const styles = StyleSheet.create({
     minHeight: 0,
     paddingVertical: 5,
   },
-  todayBannerIdle:   { backgroundColor: '#14181d', borderColor: '#28313b' },
+  todayBannerIdle: { backgroundColor: '#14181d', borderColor: '#28313b' },
   todayBannerActive: { backgroundColor: '#18222e', borderColor: '#35506a' },
-  todayBannerOverdue:{ backgroundColor: '#2a1c1c', borderColor: '#6a3d3d' },
+  todayBannerOverdue: { backgroundColor: '#2a1c1c', borderColor: '#6a3d3d' },
   todayBannerMain: { flex: 1 },
-  todayBannerTitle: { color: '#edf4ff', fontSize: 14, fontWeight: '700' },
-  todayBannerText:      { color: '#a8b6c7', fontSize: 12 },
-  todayBannerDueToday:  { color: '#f5c842', fontWeight: '600' },
+  todayBannerTitle: { color: '#edf4ff', fontSize: 14, lineHeight: 18 },
+  todayBannerTitleLabel: { color: '#edf4ff', fontWeight: '700' },
+  todayBannerTitleDate: { color: '#a8b6c7', fontSize: 14, fontWeight: '500' },
+  todayBannerText: { color: '#a8b6c7', fontSize: 14 },
+  todayBannerDueToday: { color: '#f5c842', fontWeight: '600' },
   todayBannerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   weatherChip: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   weatherEmoji: { fontSize: 16 },
-  weatherTemp:  { color: '#f0c060', fontSize: 13, fontWeight: '700' },
+  weatherTemp: { color: '#f0c060', fontSize: 13, fontWeight: '700' },
   badge: {
     minWidth: 28,
     height: 28,
@@ -434,6 +467,16 @@ const styles = StyleSheet.create({
     borderColor: '#35506a',
   },
   debugBtnText: { color: '#9ec3ea', fontWeight: '700', fontSize: 13 },
+
+  cloudBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#242424',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#3a3a3a',
+    justifyContent: 'center',
+  },
 
   // ── View panel ─────────────────────────────────────────────────────────────
   viewPanel: {

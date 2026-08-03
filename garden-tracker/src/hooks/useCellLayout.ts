@@ -7,6 +7,6 @@ import { usePlannerStore } from '@/src/store/plannerStore';
  * so the grid re-renders correctly when the user changes zoom level.
  */
 export function useCellLayout() {
-  const level = usePlannerStore(s => s.cellZoomLevel);
+  const level = usePlannerStore((s) => s.cellZoomLevel);
   return ZOOM_LEVELS[level - 1];
 }

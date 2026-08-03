@@ -6,9 +6,18 @@ import ReanimatedSwipeable from 'react-native-gesture-handler/Swipeable';
 
 import { usePlannerData } from '@/src/hooks/usePlannerData';
 import { useTodayTick } from '@/src/hooks/useTodayTick';
+import { formatDateLabel } from '@/src/utils/dateUtils';
 import { TodayTaskItem } from '@/src/types';
 import { usePlannerStore } from '@/src/store/plannerStore';
-import { useWeather, wmoEmoji, wmoLabel, localDateStr, type DayForecast, type CurrentWeather, type HourForecast } from '@/src/hooks/useWeather';
+import {
+  useWeather,
+  wmoEmoji,
+  wmoLabel,
+  localDateStr,
+  type DayForecast,
+  type CurrentWeather,
+  type HourForecast,
+} from '@/src/hooks/useWeather';
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -60,8 +69,16 @@ function overdueBadgeLabel(missed_count: number): string {
   return `${missed_count} wks overdue`;
 }
 
-function TaskSwipeRow({ item, overdue, onPress }: { item: TodayTaskItem; overdue: boolean; onPress: () => void }) {
-  const completeTask = usePlannerStore(s => s.completeTask);
+function TaskSwipeRow({
+  item,
+  overdue,
+  onPress,
+}: {
+  item: TodayTaskItem;
+  overdue: boolean;
+  onPress: () => void;
+}) {
+  const completeTask = usePlannerStore((s) => s.completeTask);
   const taskBg = overdue ? '#180808' : '#121008';
   const taskBorderColor = overdue ? '#2e1010' : '#241e08';
 
@@ -70,7 +87,9 @@ function TaskSwipeRow({ item, overdue, onPress }: { item: TodayTaskItem; overdue
       friction={2}
       leftThreshold={60}
       renderLeftActions={() => <DoneAction />}
-      onSwipeableOpen={() => { completeTask(item.task_id, item.week_date).catch(() => {}); }}
+      onSwipeableOpen={() => {
+        completeTask(item.task_id, item.week_date).catch(() => {});
+      }}
     >
       <View style={[styles.taskRow, { backgroundColor: taskBg, borderTopColor: taskBorderColor }]}>
         <Pressable style={styles.taskBody} onPress={onPress}>
@@ -80,7 +99,9 @@ function TaskSwipeRow({ item, overdue, onPress }: { item: TodayTaskItem; overdue
               {overdue ? overdueBadgeLabel(item.missed_count) : 'Do today'}
             </Text>
           </View>
-          <Text style={styles.taskMeta}>{DAY_LABELS[item.day_of_week]} · {item.due_date}</Text>
+          <Text style={styles.taskMeta}>
+            {DAY_LABELS[item.day_of_week]} · {item.due_date}
+          </Text>
         </Pressable>
       </View>
     </ReanimatedSwipeable>
@@ -90,15 +111,15 @@ function TaskSwipeRow({ item, overdue, onPress }: { item: TodayTaskItem; overdue
 // ── Crop group card ───────────────────────────────────────────────────────────
 
 function CropGroup({ group, overdue }: { group: CropTaskGroup; overdue: boolean }) {
-  const focusPlannerCrop = usePlannerStore(s => s.focusPlannerCrop);
-  const setSelectedCrop = usePlannerStore(s => s.setSelectedCrop);
+  const focusPlannerCrop = usePlannerStore((s) => s.focusPlannerCrop);
+  const setSelectedCrop = usePlannerStore((s) => s.setSelectedCrop);
 
   const isMushroom = group.record_type === 'mushroom';
-  const headerBg    = isMushroom ? '#231008' : '#0a2010';
-  const cardBorder  = isMushroom ? '#4a2e14' : '#1e3d28';
-  const taskListBg  = overdue ? '#180808' : '#121008';
-  const cropNameColor  = isMushroom ? '#d8c0a0' : '#a8d8b0';
-  const cropMetaColor  = isMushroom ? '#6a4530' : '#3a6048';
+  const headerBg = isMushroom ? '#231008' : '#0a2010';
+  const cardBorder = isMushroom ? '#4a2e14' : '#1e3d28';
+  const taskListBg = overdue ? '#180808' : '#121008';
+  const cropNameColor = isMushroom ? '#d8c0a0' : '#a8d8b0';
+  const cropMetaColor = isMushroom ? '#6a4530' : '#3a6048';
   const cropArrowColor = isMushroom ? '#c07840' : '#48a860';
 
   const handleHeaderPress = () => {
@@ -126,7 +147,7 @@ function CropGroup({ group, overdue }: { group: CropTaskGroup; overdue: boolean 
         </Text>
       </Pressable>
       <View style={[styles.taskList, { backgroundColor: taskListBg }]}>
-        {group.tasks.map(task => (
+        {group.tasks.map((task) => (
           <TaskSwipeRow
             key={`${task.task_id}:${task.week_date}`}
             item={task}
@@ -166,9 +187,7 @@ function Section({
           <Text style={styles.emptyText}>{emptyText}</Text>
         </View>
       ) : (
-        groups.map(group => (
-          <CropGroup key={group.cropId} group={group} overdue={overdue} />
-        ))
+        groups.map((group) => <CropGroup key={group.cropId} group={group} overdue={overdue} />)
       )}
     </View>
   );
@@ -180,14 +199,22 @@ const DAY_ABBR = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 function formatHour(time: string): string {
   const h = parseInt(time.slice(11, 13), 10);
-  if (h === 0)  return '12 AM';
+  if (h === 0) return '12 AM';
   if (h === 12) return '12 PM';
   return h > 12 ? `${h - 12} PM` : `${h} AM`;
 }
 
 // ── Now panel ─────────────────────────────────────────────────────────────────
 
-function NowStat({ label, value, highlight = false }: { label: string; value: string; highlight?: boolean }) {
+function NowStat({
+  label,
+  value,
+  highlight = false,
+}: {
+  label: string;
+  value: string;
+  highlight?: boolean;
+}) {
   return (
     <View style={wxStyles.nowStatItem}>
       <Text style={[wxStyles.nowStatValue, highlight && wxStyles.nowStatHighlight]}>{value}</Text>
@@ -208,12 +235,17 @@ function NowPanel({ current }: { current: CurrentWeather }) {
         </View>
       </View>
       <View style={wxStyles.nowStats}>
-        <NowStat label="Humidity" value={`${current.humidity}%`} highlight={current.humidity >= 85} />
+        <NowStat
+          label="Humidity"
+          value={`${current.humidity}%`}
+          highlight={current.humidity >= 85}
+        />
         <NowStat label="Wind" value={`${current.windMph} mph`} />
-        {current.precipIn > 0
-          ? <NowStat label="Rain" value={`${current.precipIn.toFixed(2)}"`} />
-          : <NowStat label="Rain" value="None" />
-        }
+        {current.precipIn > 0 ? (
+          <NowStat label="Rain" value={`${current.precipIn.toFixed(2)}"`} />
+        ) : (
+          <NowStat label="Rain" value="None" />
+        )}
       </View>
     </View>
   );
@@ -262,7 +294,9 @@ function DayCard({ day, isToday }: { day: DayForecast; isToday: boolean }) {
       </View>
       <View style={wxStyles.cardConditionCol}>
         <Text style={wxStyles.cardEmoji}>{wmoEmoji(day.code)}</Text>
-        <Text style={wxStyles.cardCondition} numberOfLines={1}>{wmoLabel(day.code)}</Text>
+        <Text style={wxStyles.cardCondition} numberOfLines={1}>
+          {wmoLabel(day.code)}
+        </Text>
       </View>
       <View style={wxStyles.cardTemps}>
         <Text style={wxStyles.tempHigh}>{day.tempMax}°</Text>
@@ -289,15 +323,24 @@ function WeatherSection() {
   const today = localDateStr();
   const [tab, setTab] = useState<WeatherTab>('now');
 
-  const statusContent = wx.status === 'loading' ? (
-    <View style={wxStyles.statusCard}><Text style={wxStyles.statusText}>Loading weather…</Text></View>
-  ) : wx.status === 'no_network' ? (
-    <View style={wxStyles.statusCard}><Text style={wxStyles.statusText}>Weather unavailable — no network connection.</Text></View>
-  ) : wx.status === 'no_location' ? (
-    <View style={wxStyles.statusCard}><Text style={wxStyles.statusText}>Weather unavailable — location permission denied.</Text></View>
-  ) : wx.status === 'error' ? (
-    <View style={[wxStyles.statusCard, wxStyles.statusCardError]}><Text style={wxStyles.statusTextError}>Weather error: {wx.message}</Text></View>
-  ) : null;
+  const statusContent =
+    wx.status === 'loading' ? (
+      <View style={wxStyles.statusCard}>
+        <Text style={wxStyles.statusText}>Loading weather…</Text>
+      </View>
+    ) : wx.status === 'no_network' ? (
+      <View style={wxStyles.statusCard}>
+        <Text style={wxStyles.statusText}>Weather unavailable — no network connection.</Text>
+      </View>
+    ) : wx.status === 'no_location' ? (
+      <View style={wxStyles.statusCard}>
+        <Text style={wxStyles.statusText}>Weather unavailable — location permission denied.</Text>
+      </View>
+    ) : wx.status === 'error' ? (
+      <View style={[wxStyles.statusCard, wxStyles.statusCardError]}>
+        <Text style={wxStyles.statusTextError}>Weather error: {wx.message}</Text>
+      </View>
+    ) : null;
 
   if (statusContent) {
     return (
@@ -317,9 +360,15 @@ function WeatherSection() {
         <Text style={wxStyles.locationLabel}>{wx.locationLabel}</Text>
       </View>
       <View style={wxStyles.tabBar}>
-        {TAB_ORDER.map(t => (
-          <Pressable key={t} style={[wxStyles.tab, tab === t && wxStyles.tabActive]} onPress={() => setTab(t)}>
-            <Text style={[wxStyles.tabText, tab === t && wxStyles.tabTextActive]}>{TAB_LABELS[t]}</Text>
+        {TAB_ORDER.map((t) => (
+          <Pressable
+            key={t}
+            style={[wxStyles.tab, tab === t && wxStyles.tabActive]}
+            onPress={() => setTab(t)}
+          >
+            <Text style={[wxStyles.tabText, tab === t && wxStyles.tabTextActive]}>
+              {TAB_LABELS[t]}
+            </Text>
           </Pressable>
         ))}
       </View>
@@ -327,7 +376,7 @@ function WeatherSection() {
       {tab === 'hourly' && <HourlyScroll hourly={wx.hourly} />}
       {tab === '10day' && (
         <View style={wxStyles.verticalList}>
-          {wx.days.map(day => (
+          {wx.days.map((day) => (
             <DayCard key={day.date} day={day} isToday={day.date === today} />
           ))}
         </View>
@@ -340,18 +389,18 @@ function WeatherSection() {
 
 export default function TodayScreen() {
   usePlannerData();
-  // Re-render across local midnight so `todayLabel` advances.
-  useTodayTick();
+  // Current local day (captured at rollover, not re-read each render).
+  const today = useTodayTick();
 
-  const todayDueTasks    = usePlannerStore(s => s.todayDueTasks);
-  const todayOverdueTasks = usePlannerStore(s => s.todayOverdueTasks);
+  const todayDueTasks = usePlannerStore((s) => s.todayDueTasks);
+  const todayOverdueTasks = usePlannerStore((s) => s.todayOverdueTasks);
 
-  const dueGroups      = useMemo(() => groupByCrop(todayDueTasks),    [todayDueTasks]);
-  const overdueGroups  = useMemo(() => groupByCrop(todayOverdueTasks), [todayOverdueTasks]);
+  const dueGroups = useMemo(() => groupByCrop(todayDueTasks), [todayDueTasks]);
+  const overdueGroups = useMemo(() => groupByCrop(todayOverdueTasks), [todayOverdueTasks]);
 
-  const todayLabel = new Date().toLocaleDateString('en-US', {
-    weekday: 'long', month: 'long', day: 'numeric',
-  });
+  // Format the day from useTodayTick (captured at rollover), not a render-time
+  // `new Date()`; formatDateLabel uses raw getters (no toLocaleDateString).
+  const todayLabel = formatDateLabel(today);
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
@@ -366,11 +415,7 @@ export default function TodayScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Section
-          title="Up Today"
-          groups={dueGroups}
-          emptyText="Nothing is due today."
-        />
+        <Section title="Up Today" groups={dueGroups} emptyText="Nothing is due today." />
         <Section
           title="Overdue"
           groups={overdueGroups}

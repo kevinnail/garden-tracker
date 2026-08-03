@@ -5,6 +5,7 @@ import {
   upsertNote,
 } from '@/src/db/queries/noteQueries';
 import { getDb } from '@/src/db/database';
+import { TS_NOW } from '@/src/db/schema';
 
 jest.mock('@/src/db/database', () => ({
   getDb: jest.fn(),
@@ -14,6 +15,7 @@ const mockDb = {
   getAllAsync: jest.fn(),
   getFirstAsync: jest.fn(),
   runAsync: jest.fn(),
+  withTransactionAsync: jest.fn(async (fn: () => Promise<void>) => fn()),
 };
 
 beforeEach(() => {
@@ -31,7 +33,7 @@ describe('getNoteForCell', () => {
       expect.stringContaining('WHERE entity_type = ? AND crop_instance_id = ? AND week_date = ?'),
       'week_cell',
       1,
-      '2025-03-02'
+      '2025-03-02',
     );
   });
 
@@ -61,13 +63,15 @@ describe('upsertNote', () => {
       'week_cell',
       1,
       '2025-03-02',
-      'hello'
+      'hello',
     );
     expect(mockDb.getFirstAsync).toHaveBeenCalledWith(
-      expect.stringContaining('SELECT id FROM notes WHERE entity_type = ? AND crop_instance_id = ? AND week_date = ?'),
+      expect.stringContaining(
+        'SELECT id FROM notes WHERE entity_type = ? AND crop_instance_id = ? AND week_date = ?',
+      ),
       'week_cell',
       1,
-      '2025-03-02'
+      '2025-03-02',
     );
   });
 
@@ -83,7 +87,7 @@ describe('upsertNote', () => {
       'week_cell',
       1,
       '2025-03-02',
-      'updated'
+      'updated',
     );
   });
 
@@ -95,14 +99,14 @@ describe('upsertNote', () => {
 });
 
 describe('deleteNote', () => {
-  it('calls db with the note id', async () => {
+  it('soft-deletes the note by stamping deleted_at', async () => {
     mockDb.runAsync.mockResolvedValueOnce({});
 
     await deleteNote(4);
 
     expect(mockDb.runAsync).toHaveBeenCalledWith(
-      expect.stringContaining('DELETE FROM notes WHERE id = ?'),
-      4
+      expect.stringContaining(`UPDATE notes SET deleted_at = ${TS_NOW}, updated_at = ${TS_NOW}`),
+      4,
     );
   });
 
@@ -126,7 +130,7 @@ describe('getAllNotesForCrop', () => {
     expect(mockDb.getAllAsync).toHaveBeenCalledWith(
       expect.stringContaining('WHERE entity_type = ? AND crop_instance_id = ?'),
       'week_cell',
-      1
+      1,
     );
   });
 

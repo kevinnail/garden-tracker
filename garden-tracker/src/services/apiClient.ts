@@ -77,15 +77,30 @@ export async function requestJson<T>(path: string, init: RequestInit = {}): Prom
 
   if (!response.ok) {
     const kind = mapStatusToErrorKind(response.status);
-    throw new ApiClientError(extractErrorMessage(body, response.status), kind, response.status, body);
+    throw new ApiClientError(
+      extractErrorMessage(body, response.status),
+      kind,
+      response.status,
+      body,
+    );
   }
 
   if (body === null || body === '') {
-    throw new ApiClientError('Expected JSON response body', 'invalid-response', response.status, body);
+    throw new ApiClientError(
+      'Expected JSON response body',
+      'invalid-response',
+      response.status,
+      body,
+    );
   }
 
   if (typeof body !== 'object') {
-    throw new ApiClientError('Expected JSON object response body', 'invalid-response', response.status, body);
+    throw new ApiClientError(
+      'Expected JSON object response body',
+      'invalid-response',
+      response.status,
+      body,
+    );
   }
 
   return body as T;
@@ -97,6 +112,5 @@ export interface HealthResponse {
 }
 
 export function fetchBackendHealth(): Promise<HealthResponse> {
-  
   return requestJson<HealthResponse>('/health', { method: 'GET' });
 }

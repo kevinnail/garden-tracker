@@ -1,7 +1,23 @@
-import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import React, {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react';
 import {
-  View, Text, TextInput, StyleSheet, ScrollView,
-  Pressable, Alert, ActivityIndicator, Platform, KeyboardAvoidingView,
+  View,
+  Text,
+  TextInput,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  Alert,
+  ActivityIndicator,
+  Platform,
+  KeyboardAvoidingView,
+  InteractionManager,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useNavigation } from '@react-navigation/native';
@@ -28,53 +44,61 @@ export interface AddCropFormHandle {
   remove: () => void;
 }
 
-const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function AddCropForm({ cropId, embedded = false }: AddCropFormProps, ref) {
-  const stageDefs          = usePlannerStore(s => s.stageDefinitions);
-  const stageDefsAvailable = usePlannerStore(s => s.stageDefinitions.length > 0);
-  const addCrop            = usePlannerStore(s => s.addCrop);
-  const editCrop           = usePlannerStore(s => s.editCrop);
-  const archiveCrop        = usePlannerStore(s => s.archiveCrop);
-  const deleteCrop         = usePlannerStore(s => s.deleteCrop);
-  const cropRowAvailable   = usePlannerStore(s => (
-    cropId == null ? true : s.rows.some(row => row.type === 'crop_row' && row.crop.id === cropId)
-  ));
-  const sections  = usePlannerStore(s => s.sections);
-  const gardens   = usePlannerStore(s => s.gardens);
-  const locations = usePlannerStore(s => s.locations);
+const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function AddCropForm(
+  { cropId, embedded = false }: AddCropFormProps,
+  ref,
+) {
+  const stageDefs = usePlannerStore((s) => s.stageDefinitions);
+  const stageDefsAvailable = usePlannerStore((s) => s.stageDefinitions.length > 0);
+  const addCrop = usePlannerStore((s) => s.addCrop);
+  const editCrop = usePlannerStore((s) => s.editCrop);
+  const archiveCrop = usePlannerStore((s) => s.archiveCrop);
+  const deleteCrop = usePlannerStore((s) => s.deleteCrop);
+  const cropRowAvailable = usePlannerStore((s) =>
+    cropId == null ? true : s.rows.some((row) => row.type === 'crop_row' && row.crop.id === cropId),
+  );
+  const sections = usePlannerStore((s) => s.sections);
+  const gardens = usePlannerStore((s) => s.gardens);
+  const locations = usePlannerStore((s) => s.locations);
   const isEditMode = cropId != null;
 
   const navigation = useNavigation();
 
-  const [name, setName]             = useState('');
+  const [name, setName] = useState('');
   const [plantCount, setPlantCount] = useState('1');
-  const [startDate, setStartDate]   = useState<Date>(() => toSunday(new Date()));
+  const [startDate, setStartDate] = useState<Date>(() => toSunday(new Date()));
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [sectionId, setSectionId]   = useState<number | null>(null);
-  const [stages, setStages]         = useState<StageRow[]>([]);
+  const [sectionId, setSectionId] = useState<number | null>(null);
+  const [stages, setStages] = useState<StageRow[]>([]);
   const [recordType, setRecordType] = useState<'plant' | 'mushroom'>('plant');
   const [submitting, setSubmitting] = useState(false);
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [page, setPage] = useState<1 | 2>(1);
   const scrollRef = useRef<ScrollView>(null);
+  const nameInputRef = useRef<TextInput>(null);
 
-  // Tint the nav header when in mushroom mode
+  // Tint the nav header when in mushroom mode.
+  // Defer past the modal slide-in: calling setOptions on a header mid-transition
+  // crashes natively on Android (react-native-screens race).
   useEffect(() => {
-    if (!embedded) {
+    if (embedded) return;
+    const task = InteractionManager.runAfterInteractions(() => {
       navigation.setOptions({
         headerStyle: { backgroundColor: recordType === 'mushroom' ? '#3A2010' : '#003e14' },
       });
-    }
+    });
+    return () => task.cancel();
   }, [embedded, navigation, recordType]);
 
   const mushroomDefaultStages = useCallback((): StageRow[] => {
-    const inoculation  = stageDefs.find(d => d.name === 'Inoculation');
-    const colonization = stageDefs.find(d => d.name === 'Colonization');
-    const fruiting     = stageDefs.find(d => d.name === 'Fruiting' && d.order_index >= 7);
+    const inoculation = stageDefs.find((d) => d.name === 'Inoculation');
+    const colonization = stageDefs.find((d) => d.name === 'Colonization');
+    const fruiting = stageDefs.find((d) => d.name === 'Fruiting' && d.order_index >= 7);
     if (inoculation && colonization && fruiting) {
       return [
-        { stage_definition_id: inoculation.id,  duration_weeks: '4' },
+        { stage_definition_id: inoculation.id, duration_weeks: '4' },
         { stage_definition_id: colonization.id, duration_weeks: '4' },
-        { stage_definition_id: fruiting.id,     duration_weeks: '3' },
+        { stage_definition_id: fruiting.id, duration_weeks: '3' },
       ];
     }
     return stageDefs.slice(0, 3).map((def, i) => ({
@@ -83,19 +107,24 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
     }));
   }, [stageDefs]);
 
-  const plantDefaultStages = useCallback((): StageRow[] =>
-    stageDefs.slice(0, 3).map((def, i) => ({
-      stage_definition_id: def.id,
-      duration_weeks: ['2', '4', '8'][i] ?? '4',
-    }))
-  , [stageDefs]);
+  const plantDefaultStages = useCallback(
+    (): StageRow[] =>
+      stageDefs.slice(0, 3).map((def, i) => ({
+        stage_definition_id: def.id,
+        duration_weeks: ['2', '4', '8'][i] ?? '4',
+      })),
+    [stageDefs],
+  );
 
   // Toggle handler — also resets stages to matching defaults
-  const handleToggleRecordType = useCallback((next: 'plant' | 'mushroom') => {
-    setRecordType(next);
-    if (next === 'mushroom') setStages(mushroomDefaultStages());
-    else setStages(plantDefaultStages());
-  }, [mushroomDefaultStages, plantDefaultStages]);
+  const handleToggleRecordType = useCallback(
+    (next: 'plant' | 'mushroom') => {
+      setRecordType(next);
+      if (next === 'mushroom') setStages(mushroomDefaultStages());
+      else setStages(plantDefaultStages());
+    },
+    [mushroomDefaultStages, plantDefaultStages],
+  );
 
   useEffect(() => {
     let isCancelled = false;
@@ -107,11 +136,12 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
       }
       if (isCancelled) return;
 
-      const storeState       = usePlannerStore.getState();
+      const storeState = usePlannerStore.getState();
       const currentStageDefs = storeState.stageDefinitions;
-      const cropRow = isEditMode && cropId != null
-        ? storeState.rows.find(row => row.type === 'crop_row' && row.crop.id === cropId)
-        : null;
+      const cropRow =
+        isEditMode && cropId != null
+          ? storeState.rows.find((row) => row.type === 'crop_row' && row.crop.id === cropId)
+          : null;
 
       if (currentStageDefs.length === 0) {
         setLoadingInitial(false);
@@ -127,11 +157,11 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
         setSectionId(cropRow.crop.section_id);
         setStages(
           cropRow.stages.length > 0
-            ? cropRow.stages.map(stage => ({
+            ? cropRow.stages.map((stage) => ({
                 stage_definition_id: stage.stage_definition_id,
                 duration_weeks: String(stage.duration_weeks),
               }))
-            : [{ stage_definition_id: currentStageDefs[0]?.id ?? 1, duration_weeks: '1' }]
+            : [{ stage_definition_id: currentStageDefs[0]?.id ?? 1, duration_weeks: '1' }],
         );
         setLoadingInitial(false);
         return;
@@ -142,41 +172,48 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
       let initialRecordType: 'plant' | 'mushroom' = 'plant';
       if (firstSection) {
         setSectionId(firstSection.id);
-        const parentGarden = storeState.gardens.find(g => g.id === firstSection.garden_id);
+        const parentGarden = storeState.gardens.find((g) => g.id === firstSection.garden_id);
         initialRecordType = parentGarden?.record_type ?? 'plant';
         setRecordType(initialRecordType);
       }
 
       if (initialRecordType === 'mushroom') {
-        const inoculation  = currentStageDefs.find(d => d.name === 'Inoculation');
-        const colonization = currentStageDefs.find(d => d.name === 'Colonization');
-        const fruiting     = currentStageDefs.find(d => d.name === 'Fruiting' && d.order_index >= 7);
+        const inoculation = currentStageDefs.find((d) => d.name === 'Inoculation');
+        const colonization = currentStageDefs.find((d) => d.name === 'Colonization');
+        const fruiting = currentStageDefs.find((d) => d.name === 'Fruiting' && d.order_index >= 7);
         if (inoculation && colonization && fruiting) {
           setStages([
-            { stage_definition_id: inoculation.id,  duration_weeks: '4' },
+            { stage_definition_id: inoculation.id, duration_weeks: '4' },
             { stage_definition_id: colonization.id, duration_weeks: '4' },
-            { stage_definition_id: fruiting.id,     duration_weeks: '3' },
+            { stage_definition_id: fruiting.id, duration_weeks: '3' },
           ]);
         } else {
-          const mushroomDefs = currentStageDefs.filter(d => d.order_index >= 7);
-          setStages(mushroomDefs.slice(0, 3).map((def, i) => ({
-            stage_definition_id: def.id,
-            duration_weeks: ['4', '4', '3'][i] ?? '4',
-          })));
+          const mushroomDefs = currentStageDefs.filter((d) => d.order_index >= 7);
+          setStages(
+            mushroomDefs.slice(0, 3).map((def, i) => ({
+              stage_definition_id: def.id,
+              duration_weeks: ['4', '4', '3'][i] ?? '4',
+            })),
+          );
         }
       } else {
         setStages(
-          currentStageDefs.filter(d => d.order_index < 7).slice(0, 3).map((def, i) => ({
-            stage_definition_id: def.id,
-            duration_weeks: ['2', '4', '8'][i] ?? '4',
-          }))
+          currentStageDefs
+            .filter((d) => d.order_index < 7)
+            .slice(0, 3)
+            .map((def, i) => ({
+              stage_definition_id: def.id,
+              duration_weeks: ['2', '4', '8'][i] ?? '4',
+            })),
         );
       }
       setLoadingInitial(false);
     };
 
     loadFormData();
-    return () => { isCancelled = true; };
+    return () => {
+      isCancelled = true;
+    };
   }, [cropId, cropRowAvailable, isEditMode, sections.length, stageDefsAvailable]);
 
   const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
@@ -186,31 +223,37 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
   };
 
   const updateStageDefinition = (index: number, stageDefinitionId: number) => {
-    setStages(prev => prev.map((s, i) => (i === index ? { ...s, stage_definition_id: stageDefinitionId } : s)));
+    setStages((prev) =>
+      prev.map((s, i) => (i === index ? { ...s, stage_definition_id: stageDefinitionId } : s)),
+    );
   };
 
   const updateStageDuration = (index: number, value: string) => {
     const numeric = value.replace(/[^0-9]/g, '');
-    setStages(prev => prev.map((s, i) => (i === index ? { ...s, duration_weeks: numeric } : s)));
+    setStages((prev) => prev.map((s, i) => (i === index ? { ...s, duration_weeks: numeric } : s)));
   };
 
   const addStageRow = () => {
-    setStages(prev => [...prev, { stage_definition_id: stageDefs[0]?.id ?? 1, duration_weeks: '4' }]);
+    setStages((prev) => [
+      ...prev,
+      { stage_definition_id: stageDefs[0]?.id ?? 1, duration_weeks: '4' },
+    ]);
   };
 
   const removeStageRow = (index: number) => {
-    setStages(prev => prev.filter((_, i) => i !== index));
+    setStages((prev) => prev.filter((_, i) => i !== index));
   };
 
   const submitCrop = useCallback(async () => {
     if (!name.trim()) return Alert.alert('Validation', 'Crop name is required.');
     const count = parseInt(plantCount, 10);
-    if (isNaN(count) || count < 1) return Alert.alert('Validation', 'Plant count must be at least 1.');
+    if (isNaN(count) || count < 1)
+      return Alert.alert('Validation', 'Plant count must be at least 1.');
     if (stages.length === 0) return Alert.alert('Validation', 'Add at least one stage.');
     if (sectionId == null) return Alert.alert('Validation', 'Select a section.');
 
     const snappedDate = formatDateKey(toSunday(startDate));
-    const stageData = stages.map(s => {
+    const stageData = stages.map((s) => {
       const duration = parseInt(s.duration_weeks, 10);
       return {
         stage_definition_id: s.stage_definition_id,
@@ -245,9 +288,37 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
     } finally {
       setSubmitting(false);
     }
-  }, [addCrop, cropId, editCrop, isEditMode, name, plantCount, recordType, sectionId, stages, startDate]);
+  }, [
+    addCrop,
+    cropId,
+    editCrop,
+    isEditMode,
+    name,
+    plantCount,
+    recordType,
+    sectionId,
+    stages,
+    startDate,
+  ]);
 
-  const handleSubmit = async () => { await submitCrop(); };
+  const handleSubmit = async () => {
+    await submitCrop();
+  };
+
+  // Validate before advancing to page 2 so the user is corrected up front (and
+  // the name field re-focused) rather than trapped on page 2 with only Cancel.
+  const handleNext = () => {
+    if (!name.trim()) {
+      Alert.alert('Validation', 'Crop name is required.');
+      nameInputRef.current?.focus();
+      return;
+    }
+    if (sectionId == null) {
+      Alert.alert('Validation', 'Select a section for this crop.');
+      return;
+    }
+    setPage(2);
+  };
 
   const handleArchive = useCallback(() => {
     if (!isEditMode || cropId == null) return;
@@ -260,11 +331,15 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
           text: 'Archive',
           style: 'destructive',
           onPress: async () => {
-            try { await archiveCrop(cropId); router.back(); }
-            catch { /* toast shown by store */ }
+            try {
+              await archiveCrop(cropId);
+              router.back();
+            } catch {
+              /* toast shown by store */
+            }
           },
         },
-      ]
+      ],
     );
   }, [archiveCrop, cropId, isEditMode, name]);
 
@@ -279,19 +354,27 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            try { await deleteCrop(cropId); router.back(); }
-            catch { /* toast shown by store */ }
+            try {
+              await deleteCrop(cropId);
+              router.back();
+            } catch {
+              /* toast shown by store */
+            }
           },
         },
-      ]
+      ],
     );
   }, [cropId, deleteCrop, isEditMode, name]);
 
-  useImperativeHandle(ref, () => ({
-    submit: submitCrop,
-    archive: handleArchive,
-    remove: handleDelete,
-  }), [handleArchive, handleDelete, submitCrop]);
+  useImperativeHandle(
+    ref,
+    () => ({
+      submit: submitCrop,
+      archive: handleArchive,
+      remove: handleDelete,
+    }),
+    [handleArchive, handleDelete, submitCrop],
+  );
 
   if (loadingInitial) {
     const loadingContent = (
@@ -300,7 +383,9 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
         <Text style={styles.loadingText}>Loading crop details...</Text>
       </View>
     );
-    return embedded ? loadingContent : (
+    return embedded ? (
+      loadingContent
+    ) : (
       <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
         {loadingContent}
       </SafeAreaView>
@@ -331,43 +416,62 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
         </Pressable>
       </View>
 
-      <Text style={styles.label}>Choose garden / section for new crop</Text>
+      <Text style={styles.label}>
+        {isEditMode
+          ? 'Move crop to a different garden / section. Selected Garden/ Zone = ✓ '
+          : 'Choose garden / section for new crop'}
+      </Text>
       <View style={styles.sectionList}>
-        {locations.map(location => {
+        {locations.map((location) => {
           const locationGardens = gardens
-            .filter(g => g.location_id === location.id)
+            .filter((g) => g.location_id === location.id)
             .sort((a, b) => a.order_index - b.order_index);
-          const gardenRows = locationGardens.flatMap(garden => {
+          const gardenRows = locationGardens.flatMap((garden) => {
             const gardenSections = sections
-              .filter(s => s.garden_id === garden.id)
+              .filter((s) => s.garden_id === garden.id)
               .sort((a, b) => a.order_index - b.order_index);
             if (gardenSections.length === 0) return [];
             const isMshrm = garden.record_type === 'mushroom';
-            return [(
-              <View key={garden.id} style={[styles.gardenGroup, isMshrm && styles.gardenGroupMushroom]}>
+            return [
+              <View
+                key={garden.id}
+                style={[styles.gardenGroup, isMshrm && styles.gardenGroupMushroom]}
+              >
                 <View style={[styles.gardenHeader, isMshrm && styles.gardenHeaderMushroom]}>
-                  <Text style={[styles.gardenGroupLabel, isMshrm && styles.gardenGroupLabelMushroom]}>
+                  <Text
+                    style={[styles.gardenGroupLabel, isMshrm && styles.gardenGroupLabelMushroom]}
+                  >
                     {garden.name}
                   </Text>
                 </View>
                 <View style={styles.sectionItems}>
-                  {gardenSections.map(sec => (
+                  {gardenSections.map((sec) => (
                     <Pressable
                       key={sec.id}
-                      style={[styles.sectionOption, sectionId === sec.id && (isMshrm ? styles.sectionSelectedMushroom : styles.sectionSelected)]}
+                      style={[
+                        styles.sectionOption,
+                        sectionId === sec.id &&
+                          (isMshrm ? styles.sectionSelectedMushroom : styles.sectionSelected),
+                      ]}
                       onPress={() => {
                         setSectionId(sec.id);
                         handleToggleRecordType(garden.record_type ?? 'plant');
                       }}
                     >
-                      <Text style={[styles.sectionText, sectionId === sec.id && styles.sectionTextSelected]}>
+                      <Text
+                        style={[
+                          styles.sectionText,
+                          sectionId === sec.id && styles.sectionTextSelected,
+                        ]}
+                      >
                         {sec.name}
                       </Text>
+                      {sectionId === sec.id && <Text style={styles.sectionCheck}>✓</Text>}
                     </Pressable>
                   ))}
                 </View>
-              </View>
-            )];
+              </View>,
+            ];
           });
           if (gardenRows.length === 0) return null;
           return (
@@ -382,8 +486,13 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
         {sections.length === 0 && (
           <View style={styles.emptyStateBox}>
             <Text style={styles.emptyStateText}>No sections available yet.</Text>
-            <Text style={styles.emptyStateSubtext}>Create Location, then Garden, then Section first.</Text>
-            <Pressable style={styles.emptyStateBtn} onPress={() => router.push('/(modals)/add-location')}>
+            <Text style={styles.emptyStateSubtext}>
+              Create Location, then Garden, then Section first.
+            </Text>
+            <Pressable
+              style={styles.emptyStateBtn}
+              onPress={() => router.push('/(modals)/add-location')}
+            >
               <Text style={styles.emptyStateBtnText}>Set up hierarchy</Text>
             </Pressable>
           </View>
@@ -392,6 +501,7 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
 
       <Text style={styles.label}>Crop Name</Text>
       <TextInput
+        ref={nameInputRef}
         style={styles.input}
         value={name}
         onChangeText={setName}
@@ -418,7 +528,7 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
           <Pressable style={styles.cancelBtn} onPress={() => router.back()}>
             <Text style={styles.cancelBtnText}>Cancel</Text>
           </Pressable>
-          <Pressable style={styles.submitBtn} onPress={() => setPage(2)}>
+          <Pressable style={styles.submitBtn} onPress={handleNext}>
             <Text style={styles.submitBtnText}>Next</Text>
           </Pressable>
         </View>
@@ -432,7 +542,10 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
       <Pressable style={styles.dateButton} onPress={() => setShowDatePicker(true)}>
         <Text style={styles.dateButtonMain}>
           {startDate.toLocaleDateString('en-US', {
-            weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
           })}
         </Text>
         <Text style={styles.dateButtonSub}>Starts: {formatDateKey(toSunday(startDate))}</Text>
@@ -457,30 +570,34 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
       {stages.map((stage, i) => (
         <View key={i} style={styles.stageRow}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.stagePicker}>
-            {stageDefs.filter(def => isMushroom ? def.order_index >= 7 : def.order_index < 7).map(def => (
-              <Pressable
-                key={def.id}
-                style={[
-                  styles.stageChip,
-                  { borderColor: def.color },
-                  stage.stage_definition_id === def.id && { backgroundColor: def.color },
-                ]}
-                onPress={() => updateStageDefinition(i, def.id)}
-              >
-                <Text style={[
-                  styles.stageChipText,
-                  stage.stage_definition_id === def.id && styles.stageChipTextSelected,
-                ]}>
-                  {def.name}
-                </Text>
-              </Pressable>
-            ))}
+            {stageDefs
+              .filter((def) => (isMushroom ? def.order_index >= 7 : def.order_index < 7))
+              .map((def) => (
+                <Pressable
+                  key={def.id}
+                  style={[
+                    styles.stageChip,
+                    { borderColor: def.color },
+                    stage.stage_definition_id === def.id && { backgroundColor: def.color },
+                  ]}
+                  onPress={() => updateStageDefinition(i, def.id)}
+                >
+                  <Text
+                    style={[
+                      styles.stageChipText,
+                      stage.stage_definition_id === def.id && styles.stageChipTextSelected,
+                    ]}
+                  >
+                    {def.name}
+                  </Text>
+                </Pressable>
+              ))}
           </ScrollView>
           <View style={styles.stageRight}>
             <TextInput
               style={styles.weekInput}
               value={stage.duration_weeks}
-              onChangeText={v => updateStageDuration(i, v)}
+              onChangeText={(v) => updateStageDuration(i, v)}
               keyboardType="numeric"
               maxLength={3}
             />
@@ -500,14 +617,15 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
       {!embedded && (
         <>
           <View style={styles.actionRow}>
-            <Pressable style={styles.cancelBtn} onPress={() => router.back()} disabled={submitting}>
-              <Text style={styles.cancelBtnText}>Cancel</Text>
+            <Pressable style={styles.cancelBtn} onPress={() => setPage(1)} disabled={submitting}>
+              <Text style={styles.cancelBtnText}>Back</Text>
             </Pressable>
             <Pressable style={styles.submitBtn} onPress={handleSubmit} disabled={submitting}>
-              {submitting
-                ? <ActivityIndicator color="#fff" />
-                : <Text style={styles.submitBtnText}>{isEditMode ? 'Save Crop' : 'Add Crop'}</Text>
-              }
+              {submitting ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.submitBtnText}>{isEditMode ? 'Save Crop' : 'Add Crop'}</Text>
+              )}
             </Pressable>
           </View>
 
@@ -534,14 +652,21 @@ const AddCropForm = forwardRef<AddCropFormHandle, AddCropFormProps>(function Add
       keyboardShouldPersistTaps="handled"
     >
       {embedded ? (
-        <>{page1Content}{page2Content}</>
+        <>
+          {page1Content}
+          {page2Content}
+        </>
+      ) : page === 1 ? (
+        page1Content
       ) : (
-        page === 1 ? page1Content : page2Content
+        page2Content
       )}
     </ScrollView>
   );
 
-  return embedded ? scrollContent : (
+  return embedded ? (
+    scrollContent
+  ) : (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
       <KeyboardAvoidingView
         style={styles.keyboardAvoider}
@@ -575,19 +700,54 @@ const styles = StyleSheet.create({
     borderColor: '#3a3a3a',
     backgroundColor: '#262626',
   },
-  recordTypeBtnPlantActive:    { borderColor: '#2ecc71', backgroundColor: '#1a3a2a' },
+  recordTypeBtnPlantActive: { borderColor: '#2ecc71', backgroundColor: '#1a3a2a' },
   recordTypeBtnMushroomActive: { borderColor: '#8B4513', backgroundColor: '#2a1508' },
-  recordTypeBtnText:           { color: '#888', fontSize: 13, fontWeight: '600' },
-  recordTypeBtnTextActive:     { color: '#eee' },
+  recordTypeBtnText: { color: '#888', fontSize: 13, fontWeight: '600' },
+  recordTypeBtnTextActive: { color: '#eee' },
 
-  label: { color: '#888', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 16, marginBottom: 4 },
-  input: { backgroundColor: '#2a2a2a', color: '#eee', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14, borderWidth: 1, borderColor: '#3a3a3a' },
+  label: {
+    color: '#888',
+    fontSize: 11,
+    letterSpacing: 0.5,
+    marginTop: 16,
+    marginBottom: 4,
+  },
+  input: {
+    backgroundColor: '#2a2a2a',
+    color: '#eee',
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 14,
+    borderWidth: 1,
+    borderColor: '#3a3a3a',
+  },
   inputSmall: { width: 140 },
-  dateButton: { backgroundColor: '#2a2a2a', borderRadius: 6, borderWidth: 1, borderColor: '#3a3a3a', paddingHorizontal: 12, paddingVertical: 10 },
+  dateButton: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#3a3a3a',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
   dateButtonMain: { color: '#eee', fontSize: 14, fontWeight: '600' },
   dateButtonSub: { color: '#999', fontSize: 12, marginTop: 2 },
-  datePickerCard: { marginTop: 8, borderWidth: 1, borderColor: '#3a3a3a', borderRadius: 8, backgroundColor: '#202020', overflow: 'hidden' },
-  dateDoneBtn: { borderTopWidth: 1, borderTopColor: '#3a3a3a', alignItems: 'center', paddingVertical: 10, backgroundColor: '#272727' },
+  datePickerCard: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#3a3a3a',
+    borderRadius: 8,
+    backgroundColor: '#202020',
+    overflow: 'hidden',
+  },
+  dateDoneBtn: {
+    borderTopWidth: 1,
+    borderTopColor: '#3a3a3a',
+    alignItems: 'center',
+    paddingVertical: 10,
+    backgroundColor: '#272727',
+  },
   dateDoneText: { color: '#7dcea0', fontWeight: '600', fontSize: 14 },
 
   sectionList: { gap: 8 },
@@ -600,41 +760,123 @@ const styles = StyleSheet.create({
   gardenGroupMushroom: { backgroundColor: '#3A2010' },
   gardenHeader: { backgroundColor: '#003e14', paddingHorizontal: 10, paddingVertical: 6 },
   gardenHeaderMushroom: { backgroundColor: '#3A2010' },
-  gardenGroupLabel: { color: '#a8e6b8', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
+  gardenGroupLabel: {
+    color: '#a8e6b8',
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
   gardenGroupLabelMushroom: { color: '#d4a882' },
 
   sectionItems: { paddingHorizontal: 8, paddingBottom: 8, gap: 5 },
-  sectionOption: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 5, borderWidth: 2, borderColor: 'transparent', backgroundColor: '#cdcdcd' },
-  sectionSelected: { borderColor: 'transparent', backgroundColor: '#1a9148' },
-  sectionSelectedMushroom: { borderColor: 'transparent', backgroundColor: '#8B4513' },
-  sectionText: { color: '#1a1a1a', fontSize: 13, fontWeight: '600' },
+  // Unselected rows are deliberately dim/dark so the selected row is the only
+  // lit-up one — with a short list the old bright-grey unselected rows made it
+  // unclear that anything was selected at all.
+  sectionOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: '#3a3a3a',
+    backgroundColor: '#242424',
+  },
+  sectionSelected: { borderColor: '#7dffb0', backgroundColor: '#1a9148' },
+  sectionSelectedMushroom: { borderColor: '#e0a060', backgroundColor: '#8B4513' },
+  sectionText: { color: '#9a9a9a', fontSize: 13, fontWeight: '600' },
   sectionTextSelected: { color: '#fff', fontWeight: '700' },
+  sectionCheck: { color: '#fff', fontSize: 14, fontWeight: '800', marginLeft: 8 },
 
-  emptyStateBox: { borderWidth: 1, borderColor: '#3a3a3a', borderRadius: 8, backgroundColor: '#232323', padding: 10, gap: 8 },
+  emptyStateBox: {
+    borderWidth: 1,
+    borderColor: '#3a3a3a',
+    borderRadius: 8,
+    backgroundColor: '#232323',
+    padding: 10,
+    gap: 8,
+  },
   emptyStateText: { color: '#bbb', fontSize: 13, fontWeight: '600' },
   emptyStateSubtext: { color: '#8a8a8a', fontSize: 12 },
-  emptyStateBtn: { alignSelf: 'flex-start', borderWidth: 1, borderColor: '#4b6a55', borderRadius: 6, backgroundColor: '#1e3a2a', paddingHorizontal: 10, paddingVertical: 6 },
+  emptyStateBtn: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#4b6a55',
+    borderRadius: 6,
+    backgroundColor: '#1e3a2a',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
   emptyStateBtnText: { color: '#7dcea0', fontSize: 12, fontWeight: '700' },
 
   stageRow: { marginBottom: 8, gap: 6 },
   stagePicker: { flexGrow: 0 },
-  stageChip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1, marginRight: 6 },
+  stageChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginRight: 6,
+  },
   stageChipText: { color: '#aaa', fontSize: 11 },
   stageChipTextSelected: { color: '#111', fontWeight: 'bold' },
   stageRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  weekInput: { backgroundColor: '#2a2a2a', color: '#eee', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, fontSize: 14, borderWidth: 1, borderColor: '#3a3a3a', width: 48, textAlign: 'center' },
+  weekInput: {
+    backgroundColor: '#2a2a2a',
+    color: '#eee',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    fontSize: 14,
+    borderWidth: 1,
+    borderColor: '#3a3a3a',
+    width: 48,
+    textAlign: 'center',
+  },
   weekLabel: { color: '#666', fontSize: 12 },
   removeBtn: { padding: 4 },
   removeBtnText: { color: '#e74c3c', fontSize: 14 },
-  addStageBtn: { marginTop: 4, paddingVertical: 8, alignItems: 'center', borderWidth: 1, borderColor: '#3a3a3a', borderRadius: 6, borderStyle: 'dashed' },
+  addStageBtn: {
+    marginTop: 4,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#3a3a3a',
+    borderRadius: 6,
+    borderStyle: 'dashed',
+  },
   addStageBtnText: { color: '#7dcea0', fontSize: 13 },
 
   actionRow: { marginTop: 28, flexDirection: 'row', gap: 10 },
-  cancelBtn: { flex: 1, borderRadius: 8, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: '#4a4a4a', backgroundColor: '#262626' },
+  cancelBtn: {
+    flex: 1,
+    borderRadius: 8,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#4a4a4a',
+    backgroundColor: '#262626',
+  },
   cancelBtnText: { color: '#ddd', fontWeight: '600', fontSize: 15 },
-  submitBtn: { flex: 1, backgroundColor: '#2ecc71', borderRadius: 8, paddingVertical: 14, alignItems: 'center' },
+  submitBtn: {
+    flex: 1,
+    backgroundColor: '#2ecc71',
+    borderRadius: 8,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
   submitBtnText: { color: '#111', fontWeight: 'bold', fontSize: 15 },
-  archiveBtn: { marginTop: 12, borderRadius: 8, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: '#7b5b16', backgroundColor: '#2f2611' },
+  archiveBtn: {
+    marginTop: 12,
+    borderRadius: 8,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#7b5b16',
+    backgroundColor: '#2f2611',
+  },
   archiveBtnText: { color: '#e7c46a', fontWeight: '700', fontSize: 14 },
   deleteBtn: { marginTop: 8, paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
   deleteBtnText: { color: '#7a5454', fontSize: 13 },
