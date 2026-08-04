@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, Alert, Linking } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -24,6 +24,7 @@ export default function CloudBackupModal() {
   const email = useAuthStore((s) => s.email);
   const signOut = useAuthStore((s) => s.signOut);
 
+  const initSubscriptions = useSubscriptionStore((s) => s.init);
   const isPremium = useSubscriptionStore((s) => s.isPremium);
   const offering = useSubscriptionStore((s) => s.offering);
   const subError = useSubscriptionStore((s) => s.error);
@@ -39,6 +40,16 @@ export default function CloudBackupModal() {
   const syncNow = useSyncStore((s) => s.syncNow);
 
   const resetAllData = usePlannerStore((s) => s.resetAllData);
+
+  // The root layout seeds offerings once at app launch. If that fetch failed —
+  // a network blip, or a product App Store Connect wasn't serving yet — the
+  // Subscribe button would stay priceless and unbuyable until the app was
+  // force-quit, since nothing else re-fetches. Reloading here means anyone
+  // looking at the paywall gets a fresh attempt, and reopening the screen is
+  // enough to recover.
+  useEffect(() => {
+    initSubscriptions().catch(() => {});
+  }, [initSubscriptions]);
 
   const confirmResetLocalData = () => {
     Alert.alert(

@@ -106,6 +106,39 @@ describe('subscriptionStore.init', () => {
     expect(useSubscriptionStore.getState()).toMatchObject({ isPremium: false });
     expect(useSubscriptionStore.getState().error).toMatch(/not available/i);
   });
+
+  it('keeps a fetched offering when getCustomerInfo fails', async () => {
+    // The two fetches are unrelated; settling them together would throw away a
+    // usable offering and leave the paywall priceless over an entitlement read.
+    getCustomerInfoMock.mockRejectedValue({ message: 'Entitlement lookup failed' });
+    getOfferingsMock.mockResolvedValue({ current: offering });
+
+    await useSubscriptionStore.getState().init();
+
+    expect(useSubscriptionStore.getState().offering).toBe(offering);
+    expect(useSubscriptionStore.getState().error).toBe('Entitlement lookup failed');
+  });
+
+  it('recovers the offering on a later call after a failed fetch', async () => {
+    // This is what the paywall relies on: the launch-time fetch can fail, and
+    // reopening the screen must be able to fix it without a force-quit.
+    getCustomerInfoMock.mockRejectedValueOnce({ message: 'Offline' });
+    getOfferingsMock.mockRejectedValueOnce({ message: 'Offline' });
+
+    await useSubscriptionStore.getState().init();
+    expect(useSubscriptionStore.getState()).toMatchObject({ offering: null, error: 'Offline' });
+
+    getCustomerInfoMock.mockResolvedValue(premiumInfo);
+    getOfferingsMock.mockResolvedValue({ current: offering });
+
+    await useSubscriptionStore.getState().init();
+
+    expect(useSubscriptionStore.getState()).toMatchObject({
+      isPremium: true,
+      offering,
+      error: null,
+    });
+  });
 });
 
 describe('subscriptionStore.identify', () => {
