@@ -43,7 +43,11 @@ interface SubscriptionState {
    * through the multi-second Apple sheet + receipt validation, and a user whose
    * entitlement hasn't reflected yet taps it again (double-purchase attempt). */
   purchasePending: boolean;
-  /** Configure the SDK once and seed entitlement + offering. Called on app start. */
+  /**
+   * Configure the SDK once and (re)load entitlement + offering. Called on app
+   * start and again whenever the cloud-backup screen opens, so a failed fetch
+   * doesn't leave the paywall dead for the rest of the session.
+   */
   init: () => Promise<void>;
   /**
    * Associate purchases with the signed-in user, i.e. set RevenueCat's
@@ -100,15 +104,23 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
       configured = true;
     }
 
-    try {
-      const [info, offerings] = await Promise.all([
-        Purchases.getCustomerInfo(),
-        Purchases.getOfferings(),
-      ]);
-      set({ isPremium: hasPremium(info), offering: offerings.current ?? null, error: null });
-    } catch (error) {
-      set({ error: messageFromPurchaseError(error) });
-    }
+    // Settled independently rather than with Promise.all: these are two unrelated
+    // fetches, and Promise.all discards a successful getOfferings() whenever
+    // getCustomerInfo() rejects. That would waste the retry this function now
+    // gets on every paywall open.
+    const [infoResult, offeringsResult] = await Promise.allSettled([
+      Purchases.getCustomerInfo(),
+      Purchases.getOfferings(),
+    ]);
+
+    if (infoResult.status === 'fulfilled') set({ isPremium: hasPremium(infoResult.value) });
+    if (offeringsResult.status === 'fulfilled')
+      set({ offering: offeringsResult.value.current ?? null });
+
+    const rejected = [infoResult, offeringsResult].filter(
+      (result): result is PromiseRejectedResult => result.status === 'rejected',
+    );
+    set({ error: rejected.length > 0 ? messageFromPurchaseError(rejected[0].reason) : null });
   },
 
   identify: (userId) =>
